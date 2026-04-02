@@ -140,18 +140,23 @@ export default function ReportsPage() {
     };
   });
 
-  const farmerCycleBreakdown = farmers?.map(farmer => {
-    const fEntries = filteredCycleEntries?.filter(e => e.farmerId === farmer.id) || [];
-    return {
-      ...farmer,
-      totalQty: fEntries.reduce((acc, curr) => acc + (curr.quantity || 0), 0),
-      totalAmount: fEntries.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0)
-    };
-  }).filter(f => f.totalQty > 0).sort((a, b) => {
-    const aNum = parseInt(a.canNumber);
-    const bNum = parseInt(b.canNumber);
-    return (isNaN(aNum) || isNaN(bNum)) ? a.canNumber.localeCompare(b.canNumber) : aNum - bNum;
-  });
+  const farmerCycleMasterList = useMemo(() => {
+    if (!farmers) return [];
+    return farmers.map(farmer => {
+      const fEntries = filteredCycleEntries?.filter(e => e.farmerId === farmer.id) || [];
+      return {
+        ...farmer,
+        totalQty: fEntries.reduce((acc, curr) => acc + (curr.quantity || 0), 0),
+        totalAmount: fEntries.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0)
+      };
+    }).sort((a, b) => {
+      const aNum = parseInt(a.canNumber);
+      const bNum = parseInt(b.canNumber);
+      return (isNaN(aNum) || isNaN(bNum)) ? a.canNumber.localeCompare(b.canNumber) : aNum - bNum;
+    });
+  }, [farmers, filteredCycleEntries]);
+
+  const activeFarmerCycleBreakdown = farmerCycleMasterList.filter(f => f.totalQty > 0);
 
   const dailyEntries = allEntries?.filter(e => e.date === selectedDate).sort((a, b) => {
     const fA = farmers?.find(f => f.id === a.farmerId);
@@ -173,7 +178,7 @@ export default function ReportsPage() {
   const totalMonthlySalesRevenue = monthlySales.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0);
   const monthlyProfit = totalMonthlySalesRevenue - totalMonthlyProcurementCost;
 
-  const currentYear = selectedMonth.split('-')[0];
+  const currentYear = selectedMonth ? selectedMonth.split('-')[0] : format(new Date(), 'yyyy');
   const yearlyStats = useMemo(() => {
     if (!allEntries || !allSales || !currentYear) return [];
     
@@ -747,10 +752,10 @@ export default function ReportsPage() {
                     <TableBody>
                       {entriesLoading ? (
                         <TableRow><TableCell colSpan={5} className="text-center py-20"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>
-                      ) : farmerCycleBreakdown?.length === 0 ? (
-                        <TableRow><TableCell colSpan={5} className="text-center py-32 text-muted-foreground">No records for this cycle.</TableCell></TableRow>
+                      ) : activeFarmerCycleBreakdown?.length === 0 ? (
+                        <TableRow><TableCell colSpan={5} className="text-center py-32 text-muted-foreground">No active suppliers found for this cycle.</TableCell></TableRow>
                       ) : (
-                        farmerCycleBreakdown?.map((f) => (
+                        activeFarmerCycleBreakdown?.map((f) => (
                           <TableRow key={f.id} className="hover:bg-primary/5 transition-colors border-b last:border-0">
                             <TableCell className="font-black text-primary pl-8 text-xl tracking-tighter">{f.canNumber}</TableCell>
                             <TableCell className="font-bold">{f.name}</TableCell>
@@ -785,9 +790,9 @@ export default function ReportsPage() {
                         <TooltipContent className="max-w-[300px] p-4 rounded-xl shadow-xl border-primary/10">
                           <p className="font-bold mb-1">Summary Generation Logic:</p>
                           <p className="text-xs text-muted-foreground">
-                            Consolidates collection data and applies specific milk-type rates (Cow/Buffalo) from settings.
+                            Consolidates collection data for ALL registered farmers. 
                             <br/><br/>
-                            Generates the final <strong>Payable Amount</strong> for each CAN number to be used for bank processing.
+                            This view includes every farmer in your directory, even if they had no collection, to ensure a complete audit trail.
                           </p>
                         </TooltipContent>
                       </Tooltip>
@@ -830,7 +835,7 @@ export default function ReportsPage() {
                     <div className="flex flex-col sm:flex-row justify-between items-center gap-4 no-print">
                       <div>
                         <h3 className="text-2xl font-black text-primary uppercase tracking-tighter">Master Summary Sheet</h3>
-                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Payments for {currentCycle?.label} • {currentCycle?.range}</p>
+                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Complete Farmer Roster • {currentCycle?.label}</p>
                       </div>
                       <div className="bg-accent px-8 py-4 rounded-3xl text-accent-foreground shadow-lg flex items-center gap-4">
                         <IndianRupee className="w-6 h-6 opacity-50" />
@@ -853,21 +858,21 @@ export default function ReportsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {farmerCycleBreakdown?.length === 0 ? (
-                        <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground">No data for this cycle.</TableCell></TableRow>
+                      {farmerCycleMasterList?.length === 0 ? (
+                        <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground">No farmers registered in directory.</TableCell></TableRow>
                       ) : (
-                        farmerCycleBreakdown?.map((f) => (
-                          <TableRow key={f.id} className="hover:bg-primary/5 transition-colors border-b last:border-0">
+                        farmerCycleMasterList?.map((f) => (
+                          <TableRow key={f.id} className={cn("hover:bg-primary/5 transition-colors border-b last:border-0", f.totalQty === 0 && "opacity-60")}>
                             <TableCell className="font-black text-primary pl-8 text-lg">{f.canNumber}</TableCell>
                             <TableCell className="font-bold uppercase text-sm">{f.name}</TableCell>
                             <TableCell className="font-mono text-xs">{f.bankAccountNumber || "—"}</TableCell>
-                            <TableCell className="text-center font-bold">{f.totalQty.toFixed(2)}</TableCell>
+                            <TableCell className="text-center font-bold">{f.totalQty > 0 ? f.totalQty.toFixed(2) : "0.00"}</TableCell>
                             <TableCell className="text-right pr-8 font-black text-primary text-xl tracking-tighter">₹ {f.totalAmount.toLocaleString()}</TableCell>
                           </TableRow>
                         ))
                       )}
                     </TableBody>
-                    {farmerCycleBreakdown && farmerCycleBreakdown.length > 0 && (
+                    {farmerCycleMasterList && farmerCycleMasterList.length > 0 && (
                       <TableFooter className="bg-muted/50">
                         <TableRow className="hover:bg-transparent">
                           <TableCell colSpan={3} className="pl-8 font-black text-primary uppercase tracking-widest">Grand Total</TableCell>

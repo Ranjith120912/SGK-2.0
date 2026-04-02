@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { useDoc, useMemoFirebase, useFirestore } from "@/firebase";
@@ -12,15 +12,19 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Settings as SettingsIcon, Milk, Save, CheckCircle2, ShoppingBag, Building2 } from "lucide-react";
+import { Settings as SettingsIcon, Milk, Save, CheckCircle2, ShoppingBag, Building2, Upload, X, Image as ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import Image from "next/image";
 
 export default function SettingsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const [config, setConfig] = useState({ 
     companyName: "",
     address: "",
+    stampUrl: "",
     cowRate: "", 
     buffaloRate: "", 
     cowSellingRate: "",
@@ -40,6 +44,7 @@ export default function SettingsPage() {
       setConfig({
         companyName: currentSettings.companyName || "",
         address: currentSettings.address || "",
+        stampUrl: currentSettings.stampUrl || "",
         cowRate: currentSettings.cowRate?.toString() || "",
         buffaloRate: currentSettings.buffaloRate?.toString() || "",
         cowSellingRate: currentSettings.cowSellingRate?.toString() || "",
@@ -48,6 +53,22 @@ export default function SettingsPage() {
     }
   }, [currentSettings]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setConfig(prev => ({ ...prev, stampUrl: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeStamp = () => {
+    setConfig(prev => ({ ...prev, stampUrl: "" }));
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const handleSave = () => {
     if (!firestore) return;
     setIsSaving(true);
@@ -55,6 +76,7 @@ export default function SettingsPage() {
     const data = {
       companyName: config.companyName,
       address: config.address,
+      stampUrl: config.stampUrl,
       cowRate: parseFloat(config.cowRate) || 0,
       buffaloRate: parseFloat(config.buffaloRate) || 0,
       cowSellingRate: parseFloat(config.cowSellingRate) || 0,
@@ -76,103 +98,158 @@ export default function SettingsPage() {
       <main className="flex-grow pt-24 pb-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <header className="mb-10">
-            <h1 className="text-3xl font-black text-primary tracking-tight flex items-center gap-3">
+            <h1 className="text-3xl font-black text-primary tracking-tight flex items-center gap-3 uppercase">
               <SettingsIcon className="w-8 h-8" />
               Configuration
             </h1>
-            <p className="text-muted-foreground">Manage your company profile and pricing rates.</p>
+            <p className="text-muted-foreground font-medium">Manage your company profile, branding, and pricing rates.</p>
           </header>
 
-          <div className="space-y-6">
-            <Card className="rounded-3xl shadow-xl border-none bg-card/50 backdrop-blur-sm overflow-hidden">
-              <CardHeader className="bg-primary/5 border-b border-primary/10">
-                <CardTitle className="text-xl flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-primary" />
-                  Company Profile
+          <div className="space-y-8">
+            <Card className="rounded-[2.5rem] shadow-xl border-none bg-card/50 backdrop-blur-sm overflow-hidden">
+              <CardHeader className="bg-primary/5 border-b border-primary/10 p-8">
+                <CardTitle className="text-2xl font-black flex items-center gap-3 text-primary uppercase tracking-tighter">
+                  <Building2 className="w-6 h-6" />
+                  Company Profile & Branding
                 </CardTitle>
-                <CardDescription>Identity details reflected on invoices and reports.</CardDescription>
+                <CardDescription className="text-muted-foreground font-medium">Identity details reflected on invoices and reports.</CardDescription>
               </CardHeader>
-              <CardContent className="p-6 space-y-6">
-                <div className="space-y-3">
-                  <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Company Name</Label>
-                  <Input 
-                    placeholder="e.g. SRI GOPALA KRISHNA MILK DISTRIBUTIONS" 
-                    className="h-12 rounded-xl font-bold" 
-                    value={config.companyName} 
-                    onChange={(e) => setConfig({ ...config, companyName: e.target.value })} 
-                  />
-                </div>
-                <div className="space-y-3">
-                  <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Business Address (Optional)</Label>
-                  <Textarea 
-                    placeholder="e.g. 123 Dairy Lane, Milk City, State - 500001" 
-                    className="rounded-xl min-h-[80px]" 
-                    value={config.address} 
-                    onChange={(e) => setConfig({ ...config, address: e.target.value })} 
-                  />
-                  <p className="text-[10px] text-muted-foreground italic">Leave empty to hide from invoices.</p>
+              <CardContent className="p-8 space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-6">
+                    <div className="space-y-3">
+                      <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Company Name</Label>
+                      <Input 
+                        placeholder="e.g. SRI GOPALA KRISHNA MILK DISTRIBUTIONS" 
+                        className="h-14 rounded-2xl font-bold border-primary/10 focus:border-primary transition-all" 
+                        value={config.companyName} 
+                        onChange={(e) => setConfig({ ...config, companyName: e.target.value })} 
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Business Address</Label>
+                      <Textarea 
+                        placeholder="e.g. 123 Dairy Lane, Milk City, State - 500001" 
+                        className="rounded-2xl min-h-[120px] border-primary/10 focus:border-primary transition-all" 
+                        value={config.address} 
+                        onChange={(e) => setConfig({ ...config, address: e.target.value })} 
+                      />
+                      <p className="text-[10px] text-muted-foreground italic font-medium">Leave empty to hide from invoices.</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Official Business Stamp</Label>
+                    <div className="relative group">
+                      <div className={cn(
+                        "h-[220px] w-full rounded-[2rem] border-2 border-dashed transition-all flex flex-col items-center justify-center gap-4 bg-muted/20 overflow-hidden relative",
+                        config.stampUrl ? "border-primary/40 bg-white" : "border-primary/10 hover:border-primary/30"
+                      )}>
+                        {config.stampUrl ? (
+                          <>
+                            <div className="relative w-full h-full p-6">
+                              <img 
+                                src={config.stampUrl} 
+                                alt="Stamp Preview" 
+                                className="w-full h-full object-contain mix-blend-multiply opacity-80"
+                              />
+                            </div>
+                            <Button 
+                              variant="destructive" 
+                              size="icon" 
+                              className="absolute top-4 right-4 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={removeStamp}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <div className="p-4 bg-primary/10 rounded-full">
+                              <Upload className="w-8 h-8 text-primary/40" />
+                            </div>
+                            <div className="text-center">
+                              <p className="text-sm font-bold text-primary/60">Upload Stamp Photo</p>
+                              <p className="text-[10px] text-muted-foreground mt-1 px-8 uppercase tracking-widest leading-relaxed">Reflected in Authorized Signatory on Invoices</p>
+                            </div>
+                          </>
+                        )}
+                        <input 
+                          type="file" 
+                          ref={fileInputRef}
+                          onChange={handleFileChange}
+                          accept="image/*"
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <ImageIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                      <p className="text-[9px] text-muted-foreground uppercase font-black tracking-widest">Recommended: PNG with transparent background</p>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card className="rounded-3xl shadow-xl border-none bg-card/50 backdrop-blur-sm overflow-hidden h-full">
-                <CardHeader className="bg-primary/5 border-b border-primary/10">
-                  <CardTitle className="text-xl flex items-center gap-2">
-                    <Milk className="w-5 h-5 text-primary" />
-                    Purchase Rates
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <Card className="rounded-[2.5rem] shadow-xl border-none bg-card/50 backdrop-blur-sm overflow-hidden h-full">
+                <CardHeader className="bg-primary/5 border-b border-primary/10 p-8">
+                  <CardTitle className="text-xl font-black flex items-center gap-3 text-primary uppercase tracking-tighter">
+                    <Milk className="w-5 h-5" />
+                    Purchase Rates (Procurement)
                   </CardTitle>
-                  <CardDescription>Prices (₹/L) paid to suppliers.</CardDescription>
+                  <CardDescription className="text-muted-foreground font-medium">Prices (₹/L) paid to farmers.</CardDescription>
                 </CardHeader>
-                <CardContent className="p-6 space-y-6">
-                  <div className="space-y-3">
-                    <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Cow Milk Rate</Label>
+                <CardContent className="p-8 space-y-6">
+                  <div className="space-y-4">
+                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Cow Milk Rate</Label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">₹</span>
-                      <Input type="number" step="0.01" className="h-12 pl-8 rounded-xl font-bold" value={config.cowRate} onChange={(e) => setConfig({ ...config, cowRate: e.target.value })} />
+                      <span className="absolute left-5 top-1/2 -translate-y-1/2 text-primary/40 font-black">₹</span>
+                      <Input type="number" step="0.01" className="h-14 pl-10 rounded-2xl font-black text-lg border-primary/10 focus:border-primary" value={config.cowRate} onChange={(e) => setConfig({ ...config, cowRate: e.target.value })} />
                     </div>
                   </div>
-                  <div className="space-y-3">
-                    <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Buffalo Milk Rate</Label>
+                  <div className="space-y-4">
+                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Buffalo Milk Rate</Label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">₹</span>
-                      <Input type="number" step="0.01" className="h-12 pl-8 rounded-xl font-bold" value={config.buffaloRate} onChange={(e) => setConfig({ ...config, buffaloRate: e.target.value })} />
+                      <span className="absolute left-5 top-1/2 -translate-y-1/2 text-primary/40 font-black">₹</span>
+                      <Input type="number" step="0.01" className="h-14 pl-10 rounded-2xl font-black text-lg border-primary/10 focus:border-primary" value={config.buffaloRate} onChange={(e) => setConfig({ ...config, buffaloRate: e.target.value })} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="rounded-3xl shadow-xl border-none bg-accent/5 backdrop-blur-sm overflow-hidden h-full border-2 border-accent/10">
-                <CardHeader className="bg-accent/10 border-b border-accent/10">
-                  <CardTitle className="text-xl flex items-center gap-2">
-                    <ShoppingBag className="w-5 h-5 text-accent" />
-                    Sales Rates
+              <Card className="rounded-[2.5rem] shadow-xl border-2 border-accent/10 bg-accent/5 backdrop-blur-sm overflow-hidden h-full">
+                <CardHeader className="bg-accent/10 border-b border-accent/10 p-8">
+                  <CardTitle className="text-xl font-black flex items-center gap-3 text-accent uppercase tracking-tighter">
+                    <ShoppingBag className="w-5 h-5" />
+                    Sales Rates (Distribution)
                   </CardTitle>
-                  <CardDescription>Price (₹/L) charged to buyers.</CardDescription>
+                  <CardDescription className="text-muted-foreground font-medium">Prices (₹/L) charged to buyers.</CardDescription>
                 </CardHeader>
-                <CardContent className="p-6 space-y-6">
-                  <div className="space-y-3">
-                    <Label className="text-xs font-black uppercase tracking-widest text-accent/70">Cow Selling Price</Label>
+                <CardContent className="p-8 space-y-6">
+                  <div className="space-y-4">
+                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-accent/70">Cow Selling Price</Label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-accent/60 font-bold">₹</span>
-                      <Input type="number" step="0.01" className="h-12 pl-8 rounded-xl font-bold border-accent/20 focus:border-accent" value={config.cowSellingRate} onChange={(e) => setConfig({ ...config, cowSellingRate: e.target.value })} />
+                      <span className="absolute left-5 top-1/2 -translate-y-1/2 text-accent/40 font-black">₹</span>
+                      <Input type="number" step="0.01" className="h-14 pl-10 rounded-2xl font-black text-lg border-accent/20 focus:border-accent" value={config.cowSellingRate} onChange={(e) => setConfig({ ...config, cowSellingRate: e.target.value })} />
                     </div>
                   </div>
-                  <div className="space-y-3">
-                    <Label className="text-xs font-black uppercase tracking-widest text-accent/70">Buffalo Selling Price</Label>
+                  <div className="space-y-4">
+                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-accent/70">Buffalo Selling Price</Label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-accent/60 font-bold">₹</span>
-                      <Input type="number" step="0.01" className="h-12 pl-8 rounded-xl font-bold border-accent/20 focus:border-accent" value={config.buffaloSellingRate} onChange={(e) => setConfig({ ...config, buffaloSellingRate: e.target.value })} />
+                      <span className="absolute left-5 top-1/2 -translate-y-1/2 text-accent/40 font-black">₹</span>
+                      <Input type="number" step="0.01" className="h-14 pl-10 rounded-2xl font-black text-lg border-accent/20 focus:border-accent" value={config.buffaloSellingRate} onChange={(e) => setConfig({ ...config, buffaloSellingRate: e.target.value })} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            <div className="flex justify-end pt-4">
-              <Button onClick={handleSave} disabled={isSaving || isLoading} className="rounded-full px-10 h-12 shadow-lg">
-                {isSaving ? <CheckCircle2 className="w-5 h-5 animate-pulse" /> : <Save className="w-5 h-5 mr-2" />}
-                {isSaving ? "Updating..." : "Save Configuration"}
+            <div className="flex justify-end pt-6">
+              <Button onClick={handleSave} disabled={isSaving || isLoading} className="rounded-full px-12 h-16 shadow-2xl hover:scale-105 active:scale-95 transition-all font-black uppercase tracking-widest text-lg">
+                {isSaving ? <CheckCircle2 className="w-6 h-6 animate-pulse" /> : <Save className="w-6 h-6 mr-3" />}
+                {isSaving ? "Updating System..." : "Save Configuration"}
               </Button>
             </div>
           </div>

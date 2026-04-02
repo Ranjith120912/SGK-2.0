@@ -136,6 +136,10 @@
         "address": {
           "type": "string"
         },
+        "stampUrl": {
+          "type": "string",
+          "description": "Data URI or URL for the business stamp/signature"
+        },
         "cowRate": {
           "type": "number"
         },

@@ -93,18 +93,25 @@ export default function FarmersPage() {
         data = JSON.parse(trimmedData);
       } else {
         const lines = trimmedData.split('\n');
-        // Simple CSV parser
-        const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g, ''));
+        if (lines.length < 1) throw new Error("No data found.");
+
+        const firstLine = lines[0];
+        // Excel copy-paste from spreadsheet uses tabs (\t). CSV uses comma (,).
+        const delimiter = firstLine.includes('\t') ? '\t' : (firstLine.includes(',') ? ',' : null);
+        
+        if (!delimiter) {
+          throw new Error("Could not detect delimiter. Please use Comma (CSV) or paste directly from Excel (Tabs).");
+        }
+
+        const headers = lines[0].split(delimiter).map(h => h.trim().toLowerCase().replace(/\s+/g, ''));
         
         data = lines.slice(1).filter(line => line.trim()).map(line => {
-          const values = line.split(',').map(v => v.trim());
+          const values = line.split(delimiter);
           const obj: any = {};
           headers.forEach((header, i) => {
-            // Map specifically to our schema keys
-            if (header.includes('name')) obj.name = values[i];
-            else if (header.includes('can')) obj.canNumber = values[i];
-            else if (header.includes('account')) obj.accountNumber = values[i];
-            else obj[header] = values[i];
+            if (header.includes('name')) obj.name = values[i]?.trim();
+            else if (header.includes('can')) obj.canNumber = values[i]?.trim();
+            else if (header.includes('account')) obj.accountNumber = values[i]?.trim();
           });
           return obj;
         });
@@ -128,7 +135,7 @@ export default function FarmersPage() {
       setImportData("");
       setIsImporting(false);
     } catch (e: any) {
-      toast({ title: "Import Failed", description: e.message || "Invalid format. Ensure you have Name, Can Number, and Account Number headers.", variant: "destructive" });
+      toast({ title: "Import Failed", description: e.message || "Invalid format. Ensure you have Name, Can Number, and Account Number columns.", variant: "destructive" });
     }
   };
 
@@ -147,17 +154,7 @@ export default function FarmersPage() {
   };
 
   const downloadExcelTemplate = () => {
-    const headers = ["Name", "Can Number", "Account Number"];
-    const rows = [
-      ["Rajesh Kumar", "101", "9876543210"],
-      ["Suresh Singh", "102", "1234567890"]
-    ];
-    
-    const csvContent = [
-      headers.join(","),
-      ...rows.map(row => row.join(","))
-    ].join("\n");
-    
+    const csvContent = "Name,Can Number,Account Number\nRajesh Kumar,101,9876543210\nSuresh Singh,102,1234567890";
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -229,9 +226,9 @@ export default function FarmersPage() {
                           </TableHeader>
                           <TableBody>
                             <TableRow className="hover:bg-transparent border-b">
-                              <TableCell className="py-3 border-r">Rajesh Kumar</TableCell>
-                              <TableCell className="py-3 border-r">101</TableCell>
-                              <TableCell className="py-3">9876543210</TableCell>
+                              <TableCell className="py-3 border-r font-medium">Rajesh Kumar</TableCell>
+                              <TableCell className="py-3 border-r font-medium">101</TableCell>
+                              <TableCell className="py-3 font-medium">9876543210</TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-transparent">
                               <TableCell className="py-3 border-r text-muted-foreground/50 italic">...</TableCell>

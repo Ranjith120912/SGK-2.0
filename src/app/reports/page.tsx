@@ -9,13 +9,16 @@ import { collection } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, FileText, Droplets, ChevronRight, Loader2 } from "lucide-react";
-import { format, endOfMonth } from "date-fns";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar, FileText, Droplets, ChevronRight, Loader2, ClipboardList, ShoppingCart, User } from "lucide-react";
+import { format, endOfMonth, startOfMonth } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 
 export default function ReportsPage() {
   const firestore = useFirestore();
   const [selectedMonth, setSelectedMonth] = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState<string>("");
   const [activeCycle, setActiveCycle] = useState<number>(0);
   const [currentDate, setCurrentDate] = useState<Date | null>(null);
 
@@ -23,6 +26,7 @@ export default function ReportsPage() {
     const now = new Date();
     setCurrentDate(now);
     setSelectedMonth(format(now, 'yyyy-MM'));
+    setSelectedDate(format(now, 'yyyy-MM-dd'));
   }, []);
 
   // Generate Year-Month options for the last 12 months
@@ -48,7 +52,7 @@ export default function ReportsPage() {
     return [
       { id: 0, label: "Cycle 1", range: "1st - 10th", start: 1, end: 10 },
       { id: 1, label: "Cycle 2", range: "11th - 20th", start: 11, end: 20 },
-      { id: 2, label: "Cycle 3", range: `21st - ${lastDay}${lastDay === 31 ? ' (11 days)' : 'st'}`, start: 21, end: lastDay }
+      { id: 2, label: "Cycle 3", range: `21st - ${lastDay}`, start: 21, end: lastDay }
     ];
   }, [selectedMonth]);
 
@@ -62,34 +66,41 @@ export default function ReportsPage() {
     return collection(firestore, 'farmers');
   }, [firestore]);
 
+  const salesQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'sales');
+  }, [firestore]);
+
+  const buyersQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'buyers');
+  }, [firestore]);
+
   const { data: allEntries, isLoading: entriesLoading } = useCollection(entriesQuery);
   const { data: farmers } = useCollection(farmersQuery);
+  const { data: allSales } = useCollection(salesQuery);
+  const { data: buyers } = useCollection(buyersQuery);
 
-  // Filter entries based on selected month and cycle
+  // --- Cycle Bill Logic ---
   const currentCycle = cycles[activeCycle];
-  const filteredEntries = allEntries?.filter(entry => {
+  const filteredCycleEntries = allEntries?.filter(entry => {
     if (!selectedMonth || !entry.date.startsWith(selectedMonth)) return false;
     if (!currentCycle) return false;
     const day = parseInt(entry.date.split('-')[2]);
     return day >= currentCycle.start && day <= currentCycle.end;
   });
 
-  // Calculate stats for all cycles in the month
   const cycleStats = cycles.map(c => {
     const cEntries = allEntries?.filter(entry => {
       if (!selectedMonth || !entry.date.startsWith(selectedMonth)) return false;
       const day = parseInt(entry.date.split('-')[2]);
       return day >= c.start && day <= c.end;
     }) || [];
-    
-    return {
-      qty: cEntries.reduce((acc, curr) => acc + (curr.quantity || 0), 0)
-    };
+    return { qty: cEntries.reduce((acc, curr) => acc + (curr.quantity || 0), 0) };
   });
 
-  // Detailed farmer breakdown for the active cycle
-  const farmerBreakdown = farmers?.map(farmer => {
-    const fEntries = filteredEntries?.filter(e => e.farmerId === farmer.id) || [];
+  const farmerCycleBreakdown = farmers?.map(farmer => {
+    const fEntries = filteredCycleEntries?.filter(e => e.farmerId === farmer.id) || [];
     return {
       ...farmer,
       totalQty: fEntries.reduce((acc, curr) => acc + (curr.quantity || 0), 0)
@@ -98,6 +109,20 @@ export default function ReportsPage() {
     const aNum = parseInt(a.canNumber);
     const bNum = parseInt(b.canNumber);
     return (isNaN(aNum) || isNaN(bNum)) ? a.canNumber.localeCompare(b.canNumber) : aNum - bNum;
+  });
+
+  // --- Daily Summary Logic ---
+  const dailyEntries = allEntries?.filter(e => e.date === selectedDate).sort((a, b) => {
+    const fA = farmers?.find(f => f.id === a.farmerId);
+    const fB = farmers?.find(f => f.id === b.farmerId);
+    return (fA?.canNumber || "").localeCompare(fB?.canNumber || "");
+  });
+
+  // --- Sales Summary Logic ---
+  const dailySales = allSales?.filter(s => s.date === selectedDate).sort((a, b) => {
+    const bA = buyers?.find(buy => buy.id === a.buyerId);
+    const bB = buyers?.find(buy => buy.id === b.buyerId);
+    return (bA?.buyerCode || "").localeCompare(bB?.buyerCode || "");
   });
 
   if (!currentDate || !selectedMonth) {
@@ -119,121 +144,221 @@ export default function ReportsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
             <div>
-              <h1 className="text-3xl font-black text-primary tracking-tight">Payment Cycle Bill</h1>
-              <p className="text-muted-foreground">Quantity summary for 10-day cycles.</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Calendar className="w-5 h-5 text-primary" />
-              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger className="w-[200px] rounded-full font-bold">
-                  <SelectValue placeholder="Select Month" />
-                </SelectTrigger>
-                <SelectContent>
-                  {monthOptions.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <h1 className="text-3xl font-black text-primary tracking-tight">SGK MILK Reports</h1>
+              <p className="text-muted-foreground">Comprehensive analytics for collection and distribution.</p>
             </div>
           </header>
 
-          {/* Cycle Selection Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-            {cycles.map((cycle, idx) => (
-              <Card 
-                key={cycle.id}
-                onClick={() => setActiveCycle(idx)}
-                className={`relative overflow-hidden rounded-3xl cursor-pointer transition-all duration-300 border-2 ${
-                  activeCycle === idx 
-                  ? "border-primary bg-primary/5 shadow-xl scale-[1.02]" 
-                  : "border-transparent bg-card hover:bg-muted/50"
-                }`}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-center">
-                    <Badge variant={activeCycle === idx ? "default" : "outline"} className="rounded-full">
-                      {cycle.label}
-                    </Badge>
-                    {activeCycle === idx && <ChevronRight className="w-5 h-5 text-primary animate-pulse" />}
-                  </div>
-                  <CardTitle className="text-xl font-black mt-2">{cycle.range}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground font-medium">Total Litres:</span>
-                    <span className="font-bold text-primary text-lg">{cycleStats[idx]?.qty.toFixed(1) || "0.0"} L</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <Tabs defaultValue="cycle" className="space-y-8">
+            <TabsList className="grid grid-cols-3 w-full sm:w-[600px] rounded-full p-1 bg-muted">
+              <TabsTrigger value="cycle" className="rounded-full font-bold gap-2">
+                <FileText className="w-4 h-4" /> Cycle Bill
+              </TabsTrigger>
+              <TabsTrigger value="daily" className="rounded-full font-bold gap-2">
+                <ClipboardList className="w-4 h-4" /> Daily Summary
+              </TabsTrigger>
+              <TabsTrigger value="sales" className="rounded-full font-bold gap-2">
+                <ShoppingCart className="w-4 h-4" /> Sales Report
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Detailed Table */}
-          <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-2xl bg-card/50 backdrop-blur-sm">
-            <div className="p-8 border-b bg-muted/30 flex justify-between items-center">
-              <div>
-                <h3 className="text-xl font-black text-primary">Cycle Breakdown (Litres Only)</h3>
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">
-                  {currentCycle?.label}: {currentCycle?.range}
-                </p>
+            {/* PAYMENT CYCLE BILL */}
+            <TabsContent value="cycle" className="space-y-8 animate-in fade-in duration-500">
+              <div className="flex justify-end items-center gap-3">
+                <Calendar className="w-5 h-5 text-primary" />
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger className="w-[200px] rounded-full font-bold">
+                    <SelectValue placeholder="Select Month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {monthOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="text-right">
-                <p className="text-[10px] font-black text-muted-foreground uppercase">Grand Total Qty</p>
-                <p className="text-2xl font-black text-primary">{cycleStats[activeCycle]?.qty.toFixed(2) || "0.00"} L</p>
-              </div>
-            </div>
-            
-            <Table>
-              <TableHeader className="bg-muted/50">
-                <TableRow>
-                  <TableHead className="w-[120px] font-black text-primary pl-8 py-5">CAN</TableHead>
-                  <TableHead className="font-black text-primary">Farmer Name</TableHead>
-                  <TableHead className="font-black text-primary">Milk Type</TableHead>
-                  <TableHead className="text-right pr-8 font-black text-primary text-lg">Total Qty (Litre)</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {entriesLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center py-20">
-                      <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
-                      <p className="text-sm font-bold text-muted-foreground mt-4">Generating Bill...</p>
-                    </TableCell>
-                  </TableRow>
-                ) : farmerBreakdown?.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center py-24">
-                      <FileText className="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
-                      <p className="text-muted-foreground font-bold italic">No collection recorded for this cycle.</p>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  farmerBreakdown?.map((f) => (
-                    <TableRow key={f.id} className="hover:bg-primary/5 transition-colors border-b last:border-0 group">
-                      <TableCell className="font-black text-primary pl-8 text-xl">{f.canNumber}</TableCell>
-                      <TableCell>
-                        <span className="font-bold text-base">{f.name}</span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={f.milkType === 'BUFFALO' ? "secondary" : "outline"} className="rounded-full font-bold">
-                          {f.milkType || 'COW'}
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {cycles.map((cycle, idx) => (
+                  <Card 
+                    key={cycle.id}
+                    onClick={() => setActiveCycle(idx)}
+                    className={`relative overflow-hidden rounded-3xl cursor-pointer transition-all duration-300 border-2 ${
+                      activeCycle === idx 
+                      ? "border-primary bg-primary/5 shadow-xl scale-[1.02]" 
+                      : "border-transparent bg-card hover:bg-muted/50"
+                    }`}
+                  >
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-center">
+                        <Badge variant={activeCycle === idx ? "default" : "outline"} className="rounded-full">
+                          {cycle.label}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-right pr-8">
-                        <span className="font-black text-primary text-xl">{f.totalQty.toFixed(2)} L</span>
-                      </TableCell>
+                        {activeCycle === idx && <ChevronRight className="w-5 h-5 text-primary animate-pulse" />}
+                      </div>
+                      <CardTitle className="text-xl font-black mt-2">{cycle.range}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground font-medium">Total Litres:</span>
+                        <span className="font-bold text-primary text-lg">{cycleStats[idx]?.qty.toFixed(1) || "0.0"} L</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-2xl bg-card/50 backdrop-blur-sm">
+                <div className="p-8 border-b bg-muted/30 flex justify-between items-center">
+                  <div>
+                    <h3 className="text-xl font-black text-primary">Cycle Breakdown (Litres Only)</h3>
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">
+                      {currentCycle?.label}: {currentCycle?.range}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-muted-foreground uppercase">Grand Total Qty</p>
+                    <p className="text-2xl font-black text-primary">{cycleStats[activeCycle]?.qty.toFixed(2) || "0.00"} L</p>
+                  </div>
+                </div>
+                
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead className="w-[120px] font-black text-primary pl-8 py-5">CAN</TableHead>
+                      <TableHead className="font-black text-primary">Farmer Name</TableHead>
+                      <TableHead className="font-black text-primary">Milk Type</TableHead>
+                      <TableHead className="text-right pr-8 font-black text-primary text-lg">Total Qty (Litre)</TableHead>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-            
-            <div className="p-6 bg-muted/20 border-t text-center">
-              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">
-                Verified SGK MILK Quantity Report &bull; {currentDate ? format(currentDate, 'PPPP') : '...'}
-              </p>
-            </div>
-          </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {entriesLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-20">
+                          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
+                        </TableCell>
+                      </TableRow>
+                    ) : farmerCycleBreakdown?.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-24 text-muted-foreground font-bold italic">
+                          No collection recorded for this cycle.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      farmerCycleBreakdown?.map((f) => (
+                        <TableRow key={f.id} className="hover:bg-primary/5 transition-colors border-b last:border-0 group">
+                          <TableCell className="font-black text-primary pl-8 text-xl">{f.canNumber}</TableCell>
+                          <TableCell className="font-bold text-base">{f.name}</TableCell>
+                          <TableCell>
+                            <Badge variant={f.milkType === 'BUFFALO' ? "secondary" : "outline"} className="rounded-full font-bold">
+                              {f.milkType || 'COW'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right pr-8">
+                            <span className="font-black text-primary text-xl">{f.totalQty.toFixed(2)} L</span>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </Card>
+            </TabsContent>
+
+            {/* DAILY SUMMARY */}
+            <TabsContent value="daily" className="space-y-8 animate-in fade-in duration-500">
+              <div className="flex justify-end">
+                <Input 
+                  type="date" 
+                  value={selectedDate} 
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="w-[200px] rounded-full font-bold border-primary/20"
+                />
+              </div>
+
+              <Card className="rounded-3xl overflow-hidden border-none shadow-xl bg-card">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead className="w-[100px] font-bold pl-6">CAN</TableHead>
+                      <TableHead className="font-bold">Farmer Name</TableHead>
+                      <TableHead className="font-bold">Session</TableHead>
+                      <TableHead className="font-bold">Weight (Kg)</TableHead>
+                      <TableHead className="font-bold text-right pr-6">Qty (Litre)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {!dailyEntries || dailyEntries.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-20 text-muted-foreground">No records for this date.</TableCell>
+                      </TableRow>
+                    ) : (
+                      dailyEntries.map(entry => {
+                        const farmer = farmers?.find(f => f.id === entry.farmerId);
+                        return (
+                          <TableRow key={entry.id} className="hover:bg-primary/5">
+                            <TableCell className="font-black text-primary pl-6">{farmer?.canNumber || "—"}</TableCell>
+                            <TableCell className="font-medium">{farmer?.name || "Unknown"}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="rounded-full">{entry.session}</Badge>
+                            </TableCell>
+                            <TableCell className="font-mono">{entry.kgWeight?.toFixed(2)}</TableCell>
+                            <TableCell className="text-right pr-6 font-bold text-primary">{entry.quantity?.toFixed(2)} L</TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </Card>
+            </TabsContent>
+
+            {/* SALES REPORT */}
+            <TabsContent value="sales" className="space-y-8 animate-in fade-in duration-500">
+              <div className="flex justify-end">
+                <Input 
+                  type="date" 
+                  value={selectedDate} 
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="w-[200px] rounded-full font-bold border-primary/20"
+                />
+              </div>
+
+              <Card className="rounded-3xl overflow-hidden border-none shadow-xl bg-card">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead className="w-[100px] font-bold pl-6">Code</TableHead>
+                      <TableHead className="font-bold">Buyer Name</TableHead>
+                      <TableHead className="font-bold">Session</TableHead>
+                      <TableHead className="font-bold text-right pr-6">Qty (Litre)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {!dailySales || dailySales.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-20 text-muted-foreground">No sales recorded for this date.</TableCell>
+                      </TableRow>
+                    ) : (
+                      dailySales.map(sale => {
+                        const buyer = buyers?.find(b => b.id === sale.buyerId);
+                        return (
+                          <TableRow key={sale.id} className="hover:bg-accent/5">
+                            <TableCell className="font-black text-primary pl-6">{buyer?.buyerCode || "—"}</TableCell>
+                            <TableCell className="font-medium">{buyer?.name || "Unknown"}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="rounded-full">{sale.session}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right pr-6 font-bold text-primary">{sale.quantity?.toFixed(2)} L</TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
       <Footer />

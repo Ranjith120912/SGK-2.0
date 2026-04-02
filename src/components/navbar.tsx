@@ -1,4 +1,3 @@
-
 import Link from "next/link";
 import { Scale, Users, ClipboardList, BarChart3, Settings, ShoppingCart, UserCheck } from "lucide-react";
 
@@ -11,7 +10,7 @@ export function Navbar() {
             <div className="p-2 bg-primary rounded-lg group-hover:scale-105 transition-transform duration-200">
               <Scale className="w-5 h-5 text-white" />
             </div>
-            <span className="font-headline font-bold text-xl text-primary tracking-tight">LitreLink</span>
+            <span className="font-headline font-bold text-xl text-primary tracking-tight uppercase">SGK MILK</span>
           </Link>
           <div className="hidden lg:flex items-center gap-6">
             <Link href="/" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">

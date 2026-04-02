@@ -18,7 +18,7 @@ export function Footer() {
           <a href="#" className="hover:text-primary transition-colors">Support</a>
         </div>
         <div className="text-sm text-muted-foreground/60 font-body">
-          &copy; {year || '...'} LitreLink Conversion Engine. All rights reserved.
+          &copy; {year || '...'} SGK MILK Management System. All rights reserved.
         </div>
       </div>
     </footer>

@@ -5,7 +5,7 @@ import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { AuthInitializer } from '@/components/auth-initializer';
 
 export const metadata: Metadata = {
-  title: 'LitreLink - Milk Distribution Management',
+  title: 'SGK MILK - Milk Distribution Management',
   description: 'Professional milk collection and distribution software for dairy businesses.',
 };
 

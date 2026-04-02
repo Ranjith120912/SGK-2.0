@@ -4,8 +4,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import { useCollection, useMemoFirebase, useFirestore } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { useCollection, useDoc, useMemoFirebase, useFirestore } from "@/firebase";
+import { collection, doc } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,8 +21,6 @@ import {
   Printer, 
   ArrowLeft,
   Milk,
-  Download,
-  CheckCircle2,
   BarChart4,
   ArrowUpRight,
   ArrowDownRight,
@@ -96,10 +94,16 @@ export default function ReportsPage() {
     return collection(firestore, 'buyers');
   }, [firestore]);
 
+  const settingsRef = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return doc(firestore, 'settings', 'milk_rates');
+  }, [firestore]);
+
   const { data: allEntries, isLoading: entriesLoading } = useCollection(entriesQuery);
   const { data: farmers } = useCollection(farmersQuery);
   const { data: allSales } = useCollection(salesQuery);
   const { data: buyers } = useCollection(buyersQuery);
+  const { data: ratesConfig } = useDoc(settingsRef);
 
   const currentCycle = cycles[activeCycle];
   
@@ -165,6 +169,31 @@ export default function ReportsPage() {
   const invoiceFarmer = farmers?.find(f => f.id === viewingInvoiceFarmerId);
   const invoiceEntries = filteredCycleEntries?.filter(e => e.farmerId === viewingInvoiceFarmerId).sort((a, b) => a.date.localeCompare(b.date));
 
+  // Consolidate entries by date for the invoice table
+  const consolidatedInvoiceData = useMemo(() => {
+    if (!invoiceEntries) return [];
+    const grouped: Record<string, { date: string, morning: number, evening: number, total: number }> = {};
+    
+    invoiceEntries.forEach(entry => {
+      if (!grouped[entry.date]) {
+        grouped[entry.date] = { date: entry.date, morning: 0, evening: 0, total: 0 };
+      }
+      if (entry.session === 'Morning') grouped[entry.date].morning += entry.quantity || 0;
+      if (entry.session === 'Evening') grouped[entry.date].evening += entry.quantity || 0;
+      grouped[entry.date].total = grouped[entry.date].morning + grouped[entry.date].evening;
+    });
+
+    return Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date));
+  }, [invoiceEntries]);
+
+  const currentRate = useMemo(() => {
+    if (!invoiceFarmer || !ratesConfig) return 0;
+    return invoiceFarmer.milkType === 'BUFFALO' ? (ratesConfig.buffaloRate || 0) : (ratesConfig.cowRate || 0);
+  }, [invoiceFarmer, ratesConfig]);
+
+  const grandTotalLitres = consolidatedInvoiceData.reduce((acc, curr) => acc + curr.total, 0);
+  const grandTotalAmount = grandTotalLitres * currentRate;
+
   if (!isClient || !selectedMonth) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
@@ -192,99 +221,100 @@ export default function ReportsPage() {
               </Button>
             </div>
 
-            <Card className="rounded-[2.5rem] border-2 border-primary/10 shadow-none overflow-hidden invoice-content">
-              <div className="bg-primary p-10 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <Droplets className="w-8 h-8" />
-                    <h1 className="text-3xl font-black tracking-tighter uppercase leading-tight">SRI GOPALA KRISHNA MILK DISTRIBUTION</h1>
-                  </div>
-                  <p className="text-primary-foreground/80 font-bold uppercase tracking-[0.2em] text-xs">Payment Cycle Invoice</p>
+            <div className="invoice-content bg-white p-12 border shadow-sm">
+              <div className="text-center mb-10">
+                <h1 className="text-2xl font-bold tracking-tight mb-1">SRI GOPALA KRISHNA MILK DISTRIBUTIONS</h1>
+                <h2 className="text-xl font-semibold uppercase tracking-widest">MILK INVOICE</h2>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-12 gap-y-4 mb-8 text-sm font-medium">
+                <div className="flex gap-4">
+                  <span className="w-24 text-muted-foreground uppercase">Name:</span>
+                  <span className="font-bold border-b border-black flex-grow uppercase">{invoiceFarmer.name}</span>
                 </div>
-                <div className="text-right">
-                  <h2 className="text-2xl font-black uppercase tracking-tighter mb-1">Period</h2>
-                  <p className="text-lg font-bold">{currentCycle?.label} • {currentCycle?.range}</p>
-                  <p className="text-sm opacity-80">{format(new Date(selectedMonth + "-01"), "MMMM yyyy")}</p>
+                <div className="flex gap-4">
+                  <span className="w-24 text-muted-foreground uppercase">Date:</span>
+                  <span className="font-bold border-b border-black flex-grow">{format(new Date(), 'dd/MM/yyyy')}</span>
+                </div>
+                <div className="flex gap-4">
+                  <span className="w-24 text-muted-foreground uppercase">A/C No:</span>
+                  <span className="font-bold border-b border-black flex-grow font-mono">{invoiceFarmer.bankAccountNumber || "—"}</span>
+                </div>
+                <div className="flex gap-4">
+                  <span className="w-24 text-muted-foreground uppercase">Period:</span>
+                  <span className="font-bold border-b border-black flex-grow">
+                    {currentCycle ? `${currentCycle.start}/${selectedMonth.split('-')[1]}/${selectedMonth.split('-')[0].slice(2)} to ${currentCycle.end}/${selectedMonth.split('-')[1]}/${selectedMonth.split('-')[0].slice(2)}` : "—"}
+                  </span>
+                </div>
+                <div className="flex gap-4">
+                  <span className="w-24 text-muted-foreground uppercase">Can No:</span>
+                  <span className="font-bold border-b border-black flex-grow">{invoiceFarmer.canNumber}</span>
+                </div>
+                <div className="flex gap-4 invisible">
+                  <span className="w-24 text-muted-foreground uppercase">—</span>
+                  <span className="font-bold border-b border-black flex-grow">—</span>
+                </div>
+                <div className="flex gap-4">
+                  <span className="w-24 text-muted-foreground uppercase">Rate (₹):</span>
+                  <span className="font-bold border-b border-black flex-grow">{currentRate.toFixed(2)}</span>
                 </div>
               </div>
 
-              <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-10 border-b">
-                <div>
-                  <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4">Farmer Details</h3>
-                  <div className="space-y-1">
-                    <p className="text-2xl font-black text-primary">{invoiceFarmer.name}</p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <Badge variant="outline" className="rounded-full font-black border-primary/20">CAN: {invoiceFarmer.canNumber}</Badge>
-                      <Badge className="rounded-full font-black uppercase">{invoiceFarmer.milkType || 'COW'}</Badge>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-muted/30 p-6 rounded-3xl space-y-3">
-                  <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Bank Information</h3>
-                  <div>
-                    <p className="text-xs font-bold text-muted-foreground uppercase">Account Number</p>
-                    <p className="font-mono font-bold text-lg">{invoiceFarmer.bankAccountNumber || "Not Provided"}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-muted-foreground uppercase">IFSC Code</p>
-                    <p className="font-mono font-bold">{invoiceFarmer.ifscCode || "—"}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-0">
-                <Table>
-                  <TableHeader className="bg-muted/50">
-                    <TableRow>
-                      <TableHead className="pl-10 font-black text-primary">Date</TableHead>
-                      <TableHead className="font-black text-primary">Session</TableHead>
-                      <TableHead className="font-black text-primary text-center">Weight (Kg)</TableHead>
-                      <TableHead className="text-right pr-10 font-black text-primary">Quantity (Litre)</TableHead>
+              <div className="border border-black">
+                <Table className="border-collapse">
+                  <TableHeader className="bg-white">
+                    <TableRow className="hover:bg-transparent border-b border-black">
+                      <TableHead className="text-center border-r border-black font-bold text-black uppercase h-10 px-2">Date</TableHead>
+                      <TableHead className="text-center border-r border-black font-bold text-black uppercase h-10 px-2">Morning (L)</TableHead>
+                      <TableHead className="text-center border-r border-black font-bold text-black uppercase h-10 px-2">Evening (L)</TableHead>
+                      <TableHead className="text-center border-r border-black font-bold text-black uppercase h-10 px-2">Total Litres</TableHead>
+                      <TableHead className="text-center border-r border-black font-bold text-black uppercase h-10 px-2">Rate (₹)</TableHead>
+                      <TableHead className="text-right font-bold text-black uppercase h-10 px-4">Amount (₹)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {invoiceEntries?.map((entry) => (
-                      <TableRow key={entry.id} className="border-b">
-                        <TableCell className="pl-10 font-bold">{format(new Date(entry.date), 'dd MMM, yyyy')}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="rounded-full font-bold uppercase text-[10px] border-primary/10">
-                            {entry.session}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="font-mono text-center">{entry.kgWeight?.toFixed(2)}</TableCell>
-                        <TableCell className="text-right pr-10 font-black text-primary">
-                          {entry.quantity?.toFixed(2)} L
-                        </TableCell>
+                    {consolidatedInvoiceData.map((row) => (
+                      <TableRow key={row.date} className="hover:bg-transparent border-b border-black last:border-b-0">
+                        <TableCell className="text-center border-r border-black py-1.5 font-medium">{format(new Date(row.date), 'dd/MM/yy')}</TableCell>
+                        <TableCell className="text-center border-r border-black py-1.5">{row.morning.toFixed(2)}</TableCell>
+                        <TableCell className="text-center border-r border-black py-1.5">{row.evening.toFixed(2)}</TableCell>
+                        <TableCell className="text-center border-r border-black py-1.5 font-bold">{row.total.toFixed(2)}</TableCell>
+                        <TableCell className="text-center border-r border-black py-1.5">{currentRate.toFixed(2)}</TableCell>
+                        <TableCell className="text-right py-1.5 pr-4 font-mono">{ (row.total * currentRate).toFixed(2) }</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </div>
 
-              <div className="p-10 bg-primary/5 flex flex-col sm:flex-row justify-between items-center gap-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-4 bg-white rounded-3xl shadow-sm">
-                    <Milk className="w-10 h-10 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-black text-muted-foreground uppercase tracking-widest">Total Cycle Volume</p>
-                    <p className="text-5xl font-black text-primary tracking-tighter">
-                      {invoiceEntries?.reduce((acc, curr) => acc + (curr.quantity || 0), 0).toFixed(2)} <small className="text-2xl">L</small>
-                    </p>
+              <div className="mt-8 space-y-4">
+                <div className="flex justify-between items-center text-lg font-bold border-t border-black pt-4">
+                  <span className="uppercase">Total</span>
+                  <div className="flex gap-20">
+                    <span className="w-32 text-center">{grandTotalLitres.toFixed(2)}</span>
+                    <span className="w-40 text-right font-mono">{grandTotalAmount.toFixed(2)}</span>
                   </div>
                 </div>
-                <div className="text-right flex flex-col items-end">
-                   <div className="flex items-center gap-2 mb-2">
-                     <CheckCircle2 className="w-5 h-5 text-primary" />
-                     <span className="text-sm font-black text-primary uppercase tracking-widest">Verified Report</span>
-                   </div>
-                   <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-relaxed">
-                     Generated on {format(new Date(), 'PPPP')}<br />
-                     SRI GOPALA KRISHNA MILK DISTRIBUTION
-                   </p>
+
+                <div className="flex flex-col items-end gap-2 pt-8">
+                  <div className="flex gap-4 text-base">
+                    <span className="font-medium">Total Litres:</span>
+                    <span className="font-bold w-24 text-right">{grandTotalLitres.toFixed(2)}</span>
+                  </div>
+                  <div className="flex gap-4 text-base">
+                    <span className="font-medium">Total Amount (₹):</span>
+                    <span className="font-bold w-24 text-right font-mono">{grandTotalAmount.toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
-            </Card>
+
+              <div className="mt-20 flex justify-between items-end italic text-xs text-muted-foreground">
+                <p>Generated by SGK MILK Management System</p>
+                <div className="text-right">
+                  <p className="border-t border-black w-48 text-center pt-2 font-bold text-black uppercase">Authorized Signature</p>
+                </div>
+              </div>
+            </div>
           </div>
         </main>
         <Footer />

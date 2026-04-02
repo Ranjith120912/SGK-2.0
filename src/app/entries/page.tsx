@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -30,9 +31,9 @@ export default function EntriesPage() {
     setDate(format(new Date(), 'yyyy-MM-dd'));
   }, []);
 
-  const customersQuery = useMemoFirebase(() => {
+  const farmersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return collection(firestore, 'customers');
+    return collection(firestore, 'farmers');
   }, [firestore]);
 
   const entriesQuery = useMemoFirebase(() => {
@@ -44,20 +45,20 @@ export default function EntriesPage() {
     );
   }, [firestore, date, session]);
 
-  const { data: customers } = useCollection(customersQuery);
+  const { data: farmers } = useCollection(farmersQuery);
   const { data: entries } = useCollection(entriesQuery);
 
-  const filteredCustomers = customers?.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.canNumber.includes(searchTerm)
+  const filteredFarmers = farmers?.filter(f => 
+    f.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    f.canNumber.includes(searchTerm)
   ).sort((a, b) => parseInt(a.canNumber) - parseInt(b.canNumber));
 
-  const handleKgChange = (customerId: string, value: string) => {
-    setKgValues(prev => ({ ...prev, [customerId]: value }));
+  const handleKgChange = (farmerId: string, value: string) => {
+    setKgValues(prev => ({ ...prev, [farmerId]: value }));
   };
 
-  const handleSave = (customerId: string) => {
-    const kgValue = parseFloat(kgValues[customerId]);
+  const handleSave = (farmerId: string) => {
+    const kgValue = parseFloat(kgValues[farmerId]);
     if (isNaN(kgValue) || kgValue <= 0) {
       toast({ title: "Error", description: "Please enter a valid weight in Kg.", variant: "destructive" });
       return;
@@ -69,7 +70,7 @@ export default function EntriesPage() {
     const quantityLitre = kgValue * CONVERSION_RATE;
 
     addDocumentNonBlocking(collection(firestore, 'entries'), {
-      customerId,
+      farmerId,
       date,
       session,
       kgWeight: kgValue,
@@ -84,7 +85,7 @@ export default function EntriesPage() {
 
     toast({ 
       title: "Saved", 
-      description: `${kgValue} Kg converted to ${quantityLitre.toFixed(2)} L saved.` 
+      description: `${kgValue} Kg converted to ${quantityLitre.toFixed(2)} L saved for CAN ${farmers?.find(f => f.id === farmerId)?.canNumber}.` 
     });
   };
 
@@ -107,7 +108,7 @@ export default function EntriesPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
             <div>
-              <h1 className="text-3xl font-black text-primary tracking-tight">Daily Entry (Kg → L)</h1>
+              <h1 className="text-3xl font-black text-primary tracking-tight">Daily Collection (Kg → L)</h1>
               <p className="text-muted-foreground">Recording weight for {format(new Date(date), 'MMMM dd, yyyy')}</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
@@ -137,7 +138,7 @@ export default function EntriesPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input 
                 className="pl-10 h-12 bg-card rounded-2xl border-primary/10 shadow-sm" 
-                placeholder="Quick search CAN or Name..." 
+                placeholder="Quick search CAN or Farmer Name..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -156,22 +157,22 @@ export default function EntriesPage() {
               <TableHeader className="bg-muted/50">
                 <TableRow>
                   <TableHead className="w-[80px]">CAN</TableHead>
-                  <TableHead>Customer</TableHead>
+                  <TableHead>Farmer</TableHead>
                   <TableHead className="w-[180px]">Status (Litre Result)</TableHead>
                   <TableHead className="w-[200px]">Weight (Kg)</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCustomers?.map((customer) => {
-                  const existingEntry = entries?.find(e => e.customerId === customer.id);
-                  const currentKg = kgValues[customer.id] || "";
+                {filteredFarmers?.map((farmer) => {
+                  const existingEntry = entries?.find(e => e.farmerId === farmer.id);
+                  const currentKg = kgValues[farmer.id] || "";
                   const previewLitre = currentKg ? (parseFloat(currentKg) * CONVERSION_RATE).toFixed(2) : "0.00";
 
                   return (
-                    <TableRow key={customer.id} className={cn(existingEntry && "bg-green-50/30")}>
-                      <TableCell className="font-black text-primary">{customer.canNumber}</TableCell>
-                      <TableCell className="font-semibold">{customer.name}</TableCell>
+                    <TableRow key={farmer.id} className={cn(existingEntry && "bg-green-50/30")}>
+                      <TableCell className="font-black text-primary">{farmer.canNumber}</TableCell>
+                      <TableCell className="font-semibold">{farmer.name}</TableCell>
                       <TableCell>
                         {existingEntry ? (
                           <div className="flex flex-col gap-1">
@@ -196,8 +197,8 @@ export default function EntriesPage() {
                             placeholder="0.0"
                             step="0.01"
                             className="h-10 rounded-lg pr-10 font-medium"
-                            value={kgValues[customer.id] || (existingEntry ? (existingEntry.kgWeight || (existingEntry.quantity / CONVERSION_RATE)).toFixed(2) : "")}
-                            onChange={(e) => handleKgChange(customer.id, e.target.value)}
+                            value={kgValues[farmer.id] || (existingEntry ? (existingEntry.kgWeight || (existingEntry.quantity / CONVERSION_RATE)).toFixed(2) : "")}
+                            onChange={(e) => handleKgChange(farmer.id, e.target.value)}
                             disabled={!!existingEntry}
                           />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground">KG</span>
@@ -208,7 +209,7 @@ export default function EntriesPage() {
                           <Button 
                             size="sm" 
                             className="rounded-full px-6 shadow-sm"
-                            onClick={() => handleSave(customer.id)}
+                            onClick={() => handleSave(farmer.id)}
                           >
                             <Save className="w-3 h-3 mr-2" /> Save
                           </Button>

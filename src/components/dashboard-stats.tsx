@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -17,9 +18,9 @@ export function DashboardStats() {
 
   const today = currentDate ? format(currentDate, 'yyyy-MM-dd') : null;
 
-  const customersQuery = useMemoFirebase(() => {
+  const farmersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return collection(firestore, 'customers');
+    return collection(firestore, 'farmers');
   }, [firestore]);
 
   const entriesQuery = useMemoFirebase(() => {
@@ -27,7 +28,7 @@ export function DashboardStats() {
     return query(collection(firestore, 'entries'), where('date', '==', today));
   }, [firestore, today]);
 
-  const { data: customers } = useCollection(customersQuery);
+  const { data: farmers } = useCollection(farmersQuery);
   const { data: todayEntries } = useCollection(entriesQuery);
 
   const totalLitres = todayEntries?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
@@ -58,8 +59,8 @@ export function DashboardStats() {
         <CardContent className="p-6">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs font-bold text-accent/60 uppercase tracking-widest mb-1">Total Customers</p>
-              <h3 className="text-3xl font-black text-primary">{customers?.length || 0}</h3>
+              <p className="text-xs font-bold text-accent/60 uppercase tracking-widest mb-1">Total Farmers</p>
+              <h3 className="text-3xl font-black text-primary">{farmers?.length || 0}</h3>
             </div>
             <div className="p-2 bg-accent/10 rounded-xl">
               <Users className="w-5 h-5 text-accent" />
@@ -84,7 +85,7 @@ export function DashboardStats() {
             </div>
           </div>
           <p className="mt-4 text-xs font-medium text-muted-foreground">
-            {((todayEntries?.length || 0) / (customers?.length || 1) * 100).toFixed(0)}% completion rate
+            {((todayEntries?.length || 0) / (farmers?.length || 1) * 100).toFixed(0)}% completion rate
           </p>
         </CardContent>
       </Card>

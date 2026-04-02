@@ -1,18 +1,18 @@
 
 {
   "entities": {
-    "Customer": {
-      "title": "Customer",
-      "description": "A milk distribution customer",
+    "Farmer": {
+      "title": "Farmer",
+      "description": "A milk distribution supplier/farmer",
       "type": "object",
       "properties": {
         "name": {
           "type": "string",
-          "description": "Full name of the customer"
+          "description": "Full name of the farmer"
         },
         "canNumber": {
           "type": "string",
-          "description": "Unique CAN number assigned to the customer"
+          "description": "Unique CAN number assigned to the farmer"
         },
         "accountNumber": {
           "type": "string",
@@ -20,7 +20,7 @@
         },
         "active": {
           "type": "boolean",
-          "description": "Whether the customer is currently active"
+          "description": "Whether the farmer is currently active"
         },
         "createdAt": {
           "type": "string",
@@ -34,9 +34,9 @@
       "description": "A daily milk collection or distribution record",
       "type": "object",
       "properties": {
-        "customerId": {
+        "farmerId": {
           "type": "string",
-          "description": "Reference to the customer ID"
+          "description": "Reference to the farmer ID"
         },
         "date": {
           "type": "string",
@@ -51,6 +51,10 @@
         "quantity": {
           "type": "number",
           "description": "Quantity of milk in Litres"
+        },
+        "kgWeight": {
+          "type": "number",
+          "description": "Original weight in Kilograms"
         },
         "fat": {
           "type": "number",
@@ -69,16 +73,16 @@
           "description": "Total amount for this entry"
         }
       },
-      "required": ["customerId", "date", "session", "quantity"]
+      "required": ["farmerId", "date", "session", "quantity"]
     }
   },
   "auth": {
     "providers": ["password"]
   },
   "firestore": {
-    "/customers/{customerId}": {
-      "schema": "Customer",
-      "description": "Collection of milk customers"
+    "/farmers/{farmerId}": {
+      "schema": "Farmer",
+      "description": "Collection of milk farmers"
     },
     "/entries/{entryId}": {
       "schema": "MilkEntry",

@@ -1,47 +1,34 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
      * FIRESTORE SECURITY RULES
-     * 
-     * Updated to include the 'entries' collection and allow access for 
-     * authenticated users to facilitate rapid prototyping.
+     * Updated to support 'farmers' and 'entries' for dairy business management.
      */
-
-    // --- HELPER FUNCTIONS ---
 
     function isSignedIn() {
       return request.auth != null;
     }
 
     function isAdmin() {
-      // In production, you would check a roles collection.
-      // For this prototype, we treat any authenticated user as an admin.
+      // For the prototype, any signed-in user is treated as admin
       return isSignedIn();
     }
 
-    // --- COLLECTION RULES ---
-
-    match /roles_admin/{adminUid} {
-      allow get: if isSignedIn() && (request.auth.uid == adminUid || isAdmin());
-      allow list, write: if isAdmin();
-    }
-
-    match /customers/{customerId} {
+    match /farmers/{farmerId} {
       allow read, write: if isAdmin();
-
-      match /subscriptions/{subscriptionId} {
-        allow read, write: if isAdmin();
-      }
     }
 
     match /entries/{entryId} {
       allow read, write: if isAdmin();
     }
 
-    match /canTypes/{canTypeId} {
-      allow read, write: if isAdmin();
+    // Role-based access placeholder
+    match /roles_admin/{adminUid} {
+      allow get: if isSignedIn() && (request.auth.uid == adminUid || isAdmin());
+      allow list, write: if isAdmin();
     }
   }
 }

@@ -1,3 +1,4 @@
+
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { DashboardStats } from "@/components/dashboard-stats";
@@ -14,10 +15,10 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <header className="mb-10">
             <h1 className="text-4xl font-black text-primary tracking-tight mb-2">
-              Business Dashboard
+              Farmer Dashboard
             </h1>
             <p className="text-muted-foreground">
-              Monitor your daily milk collection and manage your customer base.
+              Monitor daily collection and manage your milk suppliers.
             </p>
           </header>
 
@@ -30,7 +31,7 @@ export default function Home() {
                   <PlusCircle className="w-8 h-8 text-primary" />
                 </div>
                 <h3 className="text-xl font-bold text-primary">Daily Entry</h3>
-                <p className="text-sm text-muted-foreground">Record morning and evening milk collection from customers.</p>
+                <p className="text-sm text-muted-foreground">Record morning and evening milk collection from farmers.</p>
               </div>
             </Link>
 
@@ -39,8 +40,8 @@ export default function Home() {
                 <div className="p-4 bg-accent/10 rounded-2xl group-hover:scale-110 transition-transform">
                   <Users className="w-8 h-8 text-accent" />
                 </div>
-                <h3 className="text-xl font-bold text-primary">Manage Customers</h3>
-                <p className="text-sm text-muted-foreground">Add, edit, or view your 50+ registered milk suppliers.</p>
+                <h3 className="text-xl font-bold text-primary">Manage Farmers</h3>
+                <p className="text-sm text-muted-foreground">Directory of your registered milk suppliers.</p>
               </div>
             </Link>
 
@@ -50,7 +51,7 @@ export default function Home() {
                   <ListChecks className="w-8 h-8 text-secondary" />
                 </div>
                 <h3 className="text-xl font-bold text-primary">Reports</h3>
-                <p className="text-sm text-muted-foreground">Generate payment summaries and historical distribution logs.</p>
+                <p className="text-sm text-muted-foreground">Generate payment summaries and collection logs.</p>
               </div>
             </Link>
           </div>

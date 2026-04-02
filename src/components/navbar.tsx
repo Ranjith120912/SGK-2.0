@@ -1,3 +1,4 @@
+
 import Link from "next/link";
 import { Scale, Users, ClipboardList, BarChart3 } from "lucide-react";
 
@@ -22,7 +23,7 @@ export function Navbar() {
             </Link>
             <Link href="/customers" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
               <Users className="w-4 h-4" />
-              Customers
+              Farmers
             </Link>
             <Link href="/reports" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />

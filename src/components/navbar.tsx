@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Scale, Users, ClipboardList, BarChart3, Settings, ShoppingCart, UserCheck } from "lucide-react";
+import { Droplets, Users, ClipboardList, BarChart3, Settings, ShoppingCart, UserCheck } from "lucide-react";
 
 export function Navbar() {
   return (
@@ -8,7 +8,7 @@ export function Navbar() {
         <div className="flex justify-between items-center h-16">
           <Link href="/" className="flex items-center gap-2 group">
             <div className="p-2 bg-primary rounded-lg group-hover:scale-105 transition-transform duration-200">
-              <Scale className="w-5 h-5 text-white" />
+              <Droplets className="w-5 h-5 text-white" />
             </div>
             <span className="font-headline font-bold text-xl text-primary tracking-tight uppercase">SGK MILK</span>
           </Link>

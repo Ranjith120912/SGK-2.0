@@ -1,4 +1,3 @@
-
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { DashboardStats } from "@/components/dashboard-stats";
@@ -23,10 +22,10 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <header className="mb-8">
             <h1 className="text-4xl font-black text-primary tracking-tight mb-2">
-              Dairy Dashboard
+              SGK MILK Dashboard
             </h1>
             <p className="text-muted-foreground">
-              Real-time monitoring and management.
+              Real-time monitoring and dairy distribution management.
             </p>
           </header>
 

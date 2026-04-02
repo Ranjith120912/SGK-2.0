@@ -33,13 +33,20 @@ import {
   Wallet,
   Activity,
   History,
-  TrendingDown
+  TrendingDown,
+  Info
 } from "lucide-react";
 import { format, endOfMonth, startOfMonth, startOfYear, endOfYear, eachMonthOfInterval } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export default function ReportsPage() {
   const firestore = useFirestore();
@@ -158,7 +165,6 @@ export default function ReportsPage() {
     return (bA?.buyerCode || "").localeCompare(bB?.buyerCode || "");
   });
 
-  // Monthly Analytics
   const monthlyEntries = allEntries?.filter(e => e.date.startsWith(selectedMonth)) || [];
   const monthlySales = allSales?.filter(s => s.date.startsWith(selectedMonth)) || [];
   
@@ -167,7 +173,6 @@ export default function ReportsPage() {
   const totalMonthlySalesRevenue = monthlySales.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0);
   const monthlyProfit = totalMonthlySalesRevenue - totalMonthlyProcurementCost;
 
-  // Yearly Analytics
   const currentYear = selectedMonth.split('-')[0];
   const yearlyStats = useMemo(() => {
     if (!allEntries || !allSales || !currentYear) return [];
@@ -196,7 +201,6 @@ export default function ReportsPage() {
     });
   }, [allEntries, allSales, currentYear]);
 
-  // Analytics Calculations (Daily)
   const totalCollectionDailyVolume = dailyEntries?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
   const totalSalesDailyVolume = dailySales?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
   const totalFarmerCostDaily = dailyEntries?.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0) || 0;
@@ -372,540 +376,635 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <Navbar />
-      <main className="flex-grow pt-24 pb-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-            <div>
-              <h1 className="text-3xl font-black text-primary tracking-tight uppercase">SGK MILK Intelligence</h1>
-              <p className="text-muted-foreground font-medium">Enterprise collection logs, sales analytics and billing.</p>
-            </div>
-          </header>
-
-          <Tabs defaultValue="overview" className="space-y-8">
-            <TabsList className="flex flex-wrap h-auto gap-2 p-1.5 bg-muted rounded-2xl md:rounded-full border border-primary/5 w-full">
-              <TabsTrigger value="overview" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
-                <BarChart4 className="w-3.5 h-3.5" /> Overview
-              </TabsTrigger>
-              <TabsTrigger value="cycle" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
-                <FileText className="w-3.5 h-3.5" /> Cycle Bill
-              </TabsTrigger>
-              <TabsTrigger value="master" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
-                <ListChecks className="w-3.5 h-3.5" /> Master Summary
-              </TabsTrigger>
-              <TabsTrigger value="management" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
-                <Activity className="w-3.5 h-3.5" /> Internal logs
-              </TabsTrigger>
-              <TabsTrigger value="daily" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
-                <ClipboardList className="w-3.5 h-3.5" /> Collection
-              </TabsTrigger>
-              <TabsTrigger value="sales" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
-                <ShoppingCart className="w-3.5 h-3.5" /> Sales
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="overview" className="space-y-8 animate-in fade-in duration-500">
-              <div className="flex justify-end mb-4">
-                <Input 
-                  type="date" 
-                  value={selectedDate} 
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-[200px] rounded-full font-bold border-primary/20 shadow-sm bg-card"
-                />
+    <TooltipProvider>
+      <div className="min-h-screen flex flex-col bg-background">
+        <Navbar />
+        <main className="flex-grow pt-24 pb-20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+              <div>
+                <h1 className="text-3xl font-black text-primary tracking-tight uppercase">SGK MILK Intelligence</h1>
+                <p className="text-muted-foreground font-medium">Enterprise collection logs, sales analytics and billing.</p>
               </div>
+            </header>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card className="rounded-3xl border-none shadow-xl bg-primary text-primary-foreground overflow-hidden">
-                  <CardHeader className="pb-2">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Collection Volume</p>
-                    <CardTitle className="text-4xl font-black">{totalCollectionDailyVolume.toFixed(1)} L</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-1 text-xs font-bold opacity-90">
-                      <ArrowUpRight className="w-4 h-4" />
-                      Incoming from farmers
-                    </div>
-                  </CardContent>
-                </Card>
+            <Tabs defaultValue="overview" className="space-y-8">
+              <TabsList className="flex flex-wrap h-auto gap-2 p-1.5 bg-muted rounded-2xl md:rounded-full border border-primary/5 w-full">
+                <TabsTrigger value="overview" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
+                  <BarChart4 className="w-3.5 h-3.5" /> Overview
+                </TabsTrigger>
+                <TabsTrigger value="cycle" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
+                  <FileText className="w-3.5 h-3.5" /> Cycle Bill
+                </TabsTrigger>
+                <TabsTrigger value="master" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
+                  <ListChecks className="w-3.5 h-3.5" /> Master Summary
+                </TabsTrigger>
+                <TabsTrigger value="management" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
+                  <Activity className="w-3.5 h-3.5" /> Internal logs
+                </TabsTrigger>
+                <TabsTrigger value="daily" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
+                  <ClipboardList className="w-3.5 h-3.5" /> Collection
+                </TabsTrigger>
+                <TabsTrigger value="sales" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
+                  <ShoppingCart className="w-3.5 h-3.5" /> Sales
+                </TabsTrigger>
+              </TabsList>
 
-                <Card className="rounded-3xl border-none shadow-xl bg-accent text-accent-foreground overflow-hidden">
-                  <CardHeader className="pb-2">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Distribution Volume</p>
-                    <CardTitle className="text-4xl font-black">{totalSalesDailyVolume.toFixed(1)} L</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-1 text-xs font-bold opacity-90">
-                      <ArrowDownRight className="w-4 h-4" />
-                      Outgoing to buyers
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded-3xl border-none shadow-xl bg-card overflow-hidden">
-                  <CardHeader className="pb-2">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Daily Net Profit</p>
-                    <CardTitle className={cn("text-4xl font-black", profitDaily >= 0 ? "text-green-600" : "text-destructive")}>
-                      ₹ {profitDaily.toLocaleString()}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
-                      <TrendingUp className={cn("w-4 h-4", profitDaily >= 0 ? "text-green-600" : "text-destructive")} />
-                      Sales - Farmer Costs
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded-3xl border-none shadow-xl bg-card overflow-hidden">
-                  <CardHeader className="pb-2">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Farmer Payables</p>
-                    <CardTitle className="text-3xl font-black text-primary">₹ {totalFarmerCostDaily.toLocaleString()}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
-                      <Wallet className="w-4 h-4" />
-                      Total daily payouts
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <Card className="rounded-[2.5rem] border-none shadow-xl bg-card p-8">
-                  <h3 className="text-xl font-black text-primary mb-6 flex items-center gap-2 uppercase tracking-tighter">
-                    <PieChart className="w-5 h-5" /> Milk Composition
-                  </h3>
-                  <div className="space-y-6">
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm font-black uppercase tracking-widest text-muted-foreground">
-                        <span>Cow Milk</span>
-                        <span className="text-primary">{cowVolume.toFixed(1)} L</span>
-                      </div>
-                      <div className="h-4 bg-muted rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-primary transition-all duration-1000" 
-                          style={{ width: `${totalCollectionDailyVolume > 0 ? (cowVolume/totalCollectionDailyVolume)*100 : 0}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm font-black uppercase tracking-widest text-muted-foreground">
-                        <span>Buffalo Milk</span>
-                        <span className="text-accent">{buffaloVolume.toFixed(1)} L</span>
-                      </div>
-                      <div className="h-4 bg-muted rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-accent transition-all duration-1000" 
-                          style={{ width: `${totalCollectionDailyVolume > 0 ? (buffaloVolume/totalCollectionDailyVolume)*100 : 0}%` }}
-                        />
-                      </div>
-                    </div>
+              <TabsContent value="overview" className="space-y-8 animate-in fade-in duration-500">
+                <div className="flex justify-between items-center mb-4">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xl font-black text-primary uppercase tracking-tighter">Daily Intelligence</h3>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[300px] p-4 rounded-xl shadow-xl border-primary/10">
+                        <p className="font-bold mb-1">Overview Generation Logic:</p>
+                        <p className="text-xs text-muted-foreground">
+                          Provides a real-time snapshot of daily operations. 
+                          <br/><br/>
+                          <strong>Profit</strong> = (Total Distribution Revenue) - (Total Farmer Procurement Costs).
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
-                </Card>
-
-                <Card className="rounded-[2.5rem] border-none shadow-xl bg-card p-8">
-                  <h3 className="text-xl font-black text-primary mb-6 flex items-center gap-2 uppercase tracking-tighter">
-                    <BarChart4 className="w-5 h-5" /> Efficiency Summary
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-6 bg-muted/30 rounded-3xl text-center">
-                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Morning Yield</p>
-                      <p className="text-2xl font-black text-primary">
-                        {dailyEntries?.filter(e => e.session === 'Morning').reduce((acc, curr) => acc + (curr.quantity || 0), 0).toFixed(1)} L
-                      </p>
-                    </div>
-                    <div className="p-6 bg-muted/30 rounded-3xl text-center">
-                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Evening Yield</p>
-                      <p className="text-2xl font-black text-primary">
-                        {dailyEntries?.filter(e => e.session === 'Evening').reduce((acc, curr) => acc + (curr.quantity || 0), 0).toFixed(1)} L
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-6 p-4 border border-dashed border-primary/20 rounded-2xl text-[11px] text-muted-foreground font-medium text-center">
-                    Data for {format(new Date(selectedDate), 'PPPP')}
-                  </div>
-                </Card>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="management" className="space-y-12 animate-in fade-in duration-500">
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                <div className="flex items-center gap-3">
-                  <Calendar className="w-5 h-5 text-primary" />
-                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                    <SelectTrigger className="w-[200px] rounded-full font-bold border-primary/20 bg-card">
-                      <SelectValue placeholder="Select Month" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {monthOptions.map(opt => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Input 
+                    type="date" 
+                    value={selectedDate} 
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="w-[200px] rounded-full font-bold border-primary/20 shadow-sm bg-card"
+                  />
                 </div>
-                <div className="flex items-center gap-2 bg-primary/10 px-4 py-2 rounded-full border border-primary/20">
-                  <History className="w-4 h-4 text-primary" />
-                  <span className="text-xs font-black uppercase tracking-widest text-primary">Internal Audit Mode</span>
-                </div>
-              </div>
 
-              {/* Monthly Stats Section */}
-              <div className="space-y-6">
-                <h3 className="text-2xl font-black text-primary uppercase tracking-tighter flex items-center gap-2">
-                  <Calendar className="w-6 h-6" /> Monthly Management Summary
-                </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <Card className="rounded-3xl border-none shadow-xl bg-card p-6">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Monthly Procurement</p>
-                    <p className="text-2xl font-black text-primary">{totalMonthlyCollection.toFixed(1)} Litres</p>
-                    <p className="text-[10px] font-bold text-muted-foreground mt-2 italic">Total milk collected this month</p>
+                  <Card className="rounded-3xl border-none shadow-xl bg-primary text-primary-foreground overflow-hidden">
+                    <CardHeader className="pb-2">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Collection Volume</p>
+                      <CardTitle className="text-4xl font-black">{totalCollectionDailyVolume.toFixed(1)} L</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-1 text-xs font-bold opacity-90">
+                        <ArrowUpRight className="w-4 h-4" />
+                        Incoming from farmers
+                      </div>
+                    </CardContent>
                   </Card>
-                  <Card className="rounded-3xl border-none shadow-xl bg-card p-6">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Procurement Cost</p>
-                    <p className="text-2xl font-black text-destructive">₹ {totalMonthlyProcurementCost.toLocaleString()}</p>
-                    <p className="text-[10px] font-bold text-muted-foreground mt-2 italic">Total paid to farmers</p>
-                  </Card>
-                  <Card className="rounded-3xl border-none shadow-xl bg-card p-6">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Sales Revenue</p>
-                    <p className="text-2xl font-black text-green-600">₹ {totalMonthlySalesRevenue.toLocaleString()}</p>
-                    <p className="text-[10px] font-bold text-muted-foreground mt-2 italic">Total distribution income</p>
-                  </Card>
-                  <Card className="rounded-3xl border-none shadow-xl bg-primary text-primary-foreground p-6">
-                    <p className="text-[10px] font-black uppercase tracking-widest mb-1 opacity-80">Net Monthly Profit</p>
-                    <p className="text-2xl font-black">₹ {monthlyProfit.toLocaleString()}</p>
-                    <p className="text-[10px] font-bold mt-2 italic opacity-80">Operating surplus for {format(new Date(selectedMonth + "-01"), 'MMM')}</p>
-                  </Card>
-                </div>
-              </div>
 
-              {/* Yearly Stats Table */}
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-2xl font-black text-primary uppercase tracking-tighter flex items-center gap-2">
-                    <BarChart4 className="w-6 h-6" /> Yearly Growth & Performance ({currentYear})
-                  </h3>
-                  <Button variant="outline" size="sm" className="rounded-full h-8" onClick={() => window.print()}>
-                    <Printer className="w-4 h-4 mr-2" /> Export Annual
-                  </Button>
+                  <Card className="rounded-3xl border-none shadow-xl bg-accent text-accent-foreground overflow-hidden">
+                    <CardHeader className="pb-2">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Distribution Volume</p>
+                      <CardTitle className="text-4xl font-black">{totalSalesDailyVolume.toFixed(1)} L</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-1 text-xs font-bold opacity-90">
+                        <ArrowDownRight className="w-4 h-4" />
+                        Outgoing to buyers
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="rounded-3xl border-none shadow-xl bg-card overflow-hidden">
+                    <CardHeader className="pb-2">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Daily Net Profit</p>
+                      <CardTitle className={cn("text-4xl font-black", profitDaily >= 0 ? "text-green-600" : "text-destructive")}>
+                        ₹ {profitDaily.toLocaleString()}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
+                        <TrendingUp className={cn("w-4 h-4", profitDaily >= 0 ? "text-green-600" : "text-destructive")} />
+                        Sales - Farmer Costs
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="rounded-3xl border-none shadow-xl bg-card overflow-hidden">
+                    <CardHeader className="pb-2">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Farmer Payables</p>
+                      <CardTitle className="text-3xl font-black text-primary">₹ {totalFarmerCostDaily.toLocaleString()}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
+                        <Wallet className="w-4 h-4" />
+                        Total daily payouts
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <Card className="rounded-[2.5rem] border-none shadow-xl bg-card p-8">
+                    <h3 className="text-xl font-black text-primary mb-6 flex items-center gap-2 uppercase tracking-tighter">
+                      <PieChart className="w-5 h-5" /> Milk Composition
+                    </h3>
+                    <div className="space-y-6">
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm font-black uppercase tracking-widest text-muted-foreground">
+                          <span>Cow Milk</span>
+                          <span className="text-primary">{cowVolume.toFixed(1)} L</span>
+                        </div>
+                        <div className="h-4 bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-primary transition-all duration-1000" 
+                            style={{ width: `${totalCollectionDailyVolume > 0 ? (cowVolume/totalCollectionDailyVolume)*100 : 0}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm font-black uppercase tracking-widest text-muted-foreground">
+                          <span>Buffalo Milk</span>
+                          <span className="text-accent">{buffaloVolume.toFixed(1)} L</span>
+                        </div>
+                        <div className="h-4 bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-accent transition-all duration-1000" 
+                            style={{ width: `${totalCollectionDailyVolume > 0 ? (buffaloVolume/totalCollectionDailyVolume)*100 : 0}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  <Card className="rounded-[2.5rem] border-none shadow-xl bg-card p-8">
+                    <h3 className="text-xl font-black text-primary mb-6 flex items-center gap-2 uppercase tracking-tighter">
+                      <BarChart4 className="w-5 h-5" /> Efficiency Summary
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-6 bg-muted/30 rounded-3xl text-center">
+                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Morning Yield</p>
+                        <p className="text-2xl font-black text-primary">
+                          {dailyEntries?.filter(e => e.session === 'Morning').reduce((acc, curr) => acc + (curr.quantity || 0), 0).toFixed(1)} L
+                        </p>
+                      </div>
+                      <div className="p-6 bg-muted/30 rounded-3xl text-center">
+                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Evening Yield</p>
+                        <p className="text-2xl font-black text-primary">
+                          {dailyEntries?.filter(e => e.session === 'Evening').reduce((acc, curr) => acc + (curr.quantity || 0), 0).toFixed(1)} L
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-6 p-4 border border-dashed border-primary/20 rounded-2xl text-[11px] text-muted-foreground font-medium text-center">
+                      Data for {format(new Date(selectedDate), 'PPPP')}
+                    </div>
+                  </Card>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="management" className="space-y-12 animate-in fade-in duration-500">
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xl font-black text-primary uppercase tracking-tighter">Internal Audit</h3>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[300px] p-4 rounded-xl shadow-xl border-primary/10">
+                          <p className="font-bold mb-1">Internal Audit Generation:</p>
+                          <p className="text-xs text-muted-foreground">
+                            Aggregates all daily transactions into Monthly and Yearly summaries. 
+                            <br/><br/>
+                            Used for high-level management review and identifying seasonal production trends.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                      <SelectTrigger className="w-[200px] rounded-full font-bold border-primary/20 bg-card">
+                        <SelectValue placeholder="Select Month" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {monthOptions.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2 bg-primary/10 px-4 py-2 rounded-full border border-primary/20">
+                    <History className="w-4 h-4 text-primary" />
+                    <span className="text-xs font-black uppercase tracking-widest text-primary">Internal Audit Mode</span>
+                  </div>
+                </div>
+
+                {/* Monthly Stats Section */}
+                <div className="space-y-6">
+                  <h3 className="text-2xl font-black text-primary uppercase tracking-tighter flex items-center gap-2">
+                    <Calendar className="w-6 h-6" /> Monthly Management Summary
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <Card className="rounded-3xl border-none shadow-xl bg-card p-6">
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Monthly Procurement</p>
+                      <p className="text-2xl font-black text-primary">{totalMonthlyCollection.toFixed(1)} Litres</p>
+                      <p className="text-[10px] font-bold text-muted-foreground mt-2 italic">Total milk collected this month</p>
+                    </Card>
+                    <Card className="rounded-3xl border-none shadow-xl bg-card p-6">
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Procurement Cost</p>
+                      <p className="text-2xl font-black text-destructive">₹ {totalMonthlyProcurementCost.toLocaleString()}</p>
+                      <p className="text-[10px] font-bold text-muted-foreground mt-2 italic">Total paid to farmers</p>
+                    </Card>
+                    <Card className="rounded-3xl border-none shadow-xl bg-card p-6">
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Sales Revenue</p>
+                      <p className="text-2xl font-black text-green-600">₹ {totalMonthlySalesRevenue.toLocaleString()}</p>
+                      <p className="text-[10px] font-bold text-muted-foreground mt-2 italic">Total distribution income</p>
+                    </Card>
+                    <Card className="rounded-3xl border-none shadow-xl bg-primary text-primary-foreground p-6">
+                      <p className="text-[10px] font-black uppercase tracking-widest mb-1 opacity-80">Net Monthly Profit</p>
+                      <p className="text-2xl font-black">₹ {monthlyProfit.toLocaleString()}</p>
+                      <p className="text-[10px] font-bold mt-2 italic opacity-80">Operating surplus for {format(new Date(selectedMonth + "-01"), 'MMM')}</p>
+                    </Card>
+                  </div>
+                </div>
+
+                {/* Yearly Stats Table */}
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-2xl font-black text-primary uppercase tracking-tighter flex items-center gap-2">
+                      <BarChart4 className="w-6 h-6" /> Yearly Growth & Performance ({currentYear})
+                    </h3>
+                    <Button variant="outline" size="sm" className="rounded-full h-8" onClick={() => window.print()}>
+                      <Printer className="w-4 h-4 mr-2" /> Export Annual
+                    </Button>
+                  </div>
+                  <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-2xl bg-card">
+                    <Table>
+                      <TableHeader className="bg-muted/50">
+                        <TableRow>
+                          <TableHead className="pl-8 py-5 font-black text-primary uppercase text-[10px] tracking-widest">Month</TableHead>
+                          <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Collection (L)</TableHead>
+                          <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest text-right">Farmer Cost (₹)</TableHead>
+                          <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest text-right">Sales Revenue (₹)</TableHead>
+                          <TableHead className="pr-8 font-black text-primary uppercase text-[10px] tracking-widest text-right">Net Profit (₹)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {yearlyStats.map((item) => (
+                          <TableRow key={item.month} className={cn("hover:bg-primary/5 transition-colors", item.profit < 0 && "bg-destructive/5")}>
+                            <TableCell className="pl-8 font-black text-lg text-primary">{item.fullName}</TableCell>
+                            <TableCell className="font-bold">{item.collection.toFixed(1)} L</TableCell>
+                            <TableCell className="text-right font-mono text-destructive">₹ {item.cost.toLocaleString()}</TableCell>
+                            <TableCell className="text-right font-mono text-green-600">₹ {item.revenue.toLocaleString()}</TableCell>
+                            <TableCell className="pr-8 text-right font-black text-xl tracking-tighter">
+                              <span className={item.profit >= 0 ? "text-primary" : "text-destructive"}>
+                                {item.profit >= 0 ? "+" : ""} ₹ {item.profit.toLocaleString()}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                      <TableFooter className="bg-primary/10">
+                        <TableRow>
+                          <TableCell className="pl-8 font-black uppercase text-xs">Annual Total</TableCell>
+                          <TableCell className="font-black text-primary">
+                            {yearlyStats.reduce((acc, curr) => acc + curr.collection, 0).toFixed(1)} L
+                          </TableCell>
+                          <TableCell className="text-right font-black text-destructive">
+                            ₹ {yearlyStats.reduce((acc, curr) => acc + curr.cost, 0).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right font-black text-green-600">
+                            ₹ {yearlyStats.reduce((acc, curr) => acc + curr.revenue, 0).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="pr-8 text-right font-black text-2xl tracking-tighter text-primary">
+                            ₹ {yearlyStats.reduce((acc, curr) => acc + curr.profit, 0).toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      </TableFooter>
+                    </Table>
+                  </Card>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="cycle" className="space-y-8 animate-in fade-in duration-500">
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xl font-black text-primary uppercase tracking-tighter">Payment Cycle</h3>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[300px] p-4 rounded-xl shadow-xl border-primary/10">
+                          <p className="font-bold mb-1">Cycle Generation Logic:</p>
+                          <p className="text-xs text-muted-foreground">
+                            Reports are grouped into 10-day intervals (1-10, 11-20, 21-End). 
+                            <br/><br/>
+                            Displays <strong>Litres Only</strong> to allow farmers to verify quantities before payouts are calculated.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                      <SelectTrigger className="w-[200px] rounded-full font-bold border-primary/20 bg-card">
+                        <SelectValue placeholder="Select Month" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {monthOptions.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex gap-2">
+                    {cycles.map((cycle, idx) => (
+                      <Button 
+                        key={cycle.id}
+                        variant={activeCycle === idx ? "default" : "outline"}
+                        onClick={() => setActiveCycle(idx)}
+                        className="rounded-full text-[10px] font-black uppercase tracking-widest h-8"
+                      >
+                        {cycle.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
                 <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-2xl bg-card">
+                  <div className="p-8 border-b bg-primary/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                      <h3 className="text-2xl font-black text-primary uppercase tracking-tighter">Cycle Quantity Bill</h3>
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">
+                        {currentCycle?.label} • {currentCycle?.range} • {format(new Date(selectedMonth + "-01"), "MMMM yyyy")}
+                      </p>
+                    </div>
+                    <div className="bg-primary px-8 py-4 rounded-3xl text-primary-foreground shadow-lg flex items-center gap-4">
+                      <Milk className="w-6 h-6 opacity-50" />
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Cycle Litres Total</p>
+                        <p className="text-3xl font-black tracking-tighter">{cycleStats[activeCycle]?.qty.toFixed(2)} L</p>
+                      </div>
+                    </div>
+                  </div>
+                  
                   <Table>
-                    <TableHeader className="bg-muted/50">
-                      <TableRow>
-                        <TableHead className="pl-8 py-5 font-black text-primary uppercase text-[10px] tracking-widest">Month</TableHead>
-                        <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Collection (L)</TableHead>
-                        <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest text-right">Farmer Cost (₹)</TableHead>
-                        <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest text-right">Sales Revenue (₹)</TableHead>
-                        <TableHead className="pr-8 font-black text-primary uppercase text-[10px] tracking-widest text-right">Net Profit (₹)</TableHead>
+                    <TableHeader className="bg-muted/50 border-b">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="w-[120px] font-black text-primary pl-8 py-6 uppercase text-[10px] tracking-widest">CAN</TableHead>
+                        <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Farmer Name</TableHead>
+                        <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Milk Type</TableHead>
+                        <TableHead className="text-right font-black text-primary uppercase text-[10px] tracking-widest">Total Litres</TableHead>
+                        <TableHead className="text-right pr-8 font-black text-primary uppercase text-[10px] tracking-widest">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {yearlyStats.map((item) => (
-                        <TableRow key={item.month} className={cn("hover:bg-primary/5 transition-colors", item.profit < 0 && "bg-destructive/5")}>
-                          <TableCell className="pl-8 font-black text-lg text-primary">{item.fullName}</TableCell>
-                          <TableCell className="font-bold">{item.collection.toFixed(1)} L</TableCell>
-                          <TableCell className="text-right font-mono text-destructive">₹ {item.cost.toLocaleString()}</TableCell>
-                          <TableCell className="text-right font-mono text-green-600">₹ {item.revenue.toLocaleString()}</TableCell>
-                          <TableCell className="pr-8 text-right font-black text-xl tracking-tighter">
-                            <span className={item.profit >= 0 ? "text-primary" : "text-destructive"}>
-                              {item.profit >= 0 ? "+" : ""} ₹ {item.profit.toLocaleString()}
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {entriesLoading ? (
+                        <TableRow><TableCell colSpan={5} className="text-center py-20"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>
+                      ) : farmerCycleBreakdown?.length === 0 ? (
+                        <TableRow><TableCell colSpan={5} className="text-center py-32 text-muted-foreground">No records for this cycle.</TableCell></TableRow>
+                      ) : (
+                        farmerCycleBreakdown?.map((f) => (
+                          <TableRow key={f.id} className="hover:bg-primary/5 transition-colors border-b last:border-0">
+                            <TableCell className="font-black text-primary pl-8 text-xl tracking-tighter">{f.canNumber}</TableCell>
+                            <TableCell className="font-bold">{f.name}</TableCell>
+                            <TableCell>
+                              <Badge variant={f.milkType === 'BUFFALO' ? "secondary" : "outline"} className="rounded-full font-black text-[10px] uppercase">
+                                {f.milkType || 'COW'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="font-black text-primary text-2xl tracking-tighter">{f.totalQty.toFixed(2)} L</span>
+                            </TableCell>
+                            <TableCell className="text-right pr-8">
+                              <Button size="sm" onClick={() => setViewingInvoiceFarmerId(f.id)} className="rounded-full font-black text-[10px] uppercase tracking-widest">View Invoice</Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
                     </TableBody>
-                    <TableFooter className="bg-primary/10">
-                      <TableRow>
-                        <TableCell className="pl-8 font-black uppercase text-xs">Annual Total</TableCell>
-                        <TableCell className="font-black text-primary">
-                          {yearlyStats.reduce((acc, curr) => acc + curr.collection, 0).toFixed(1)} L
-                        </TableCell>
-                        <TableCell className="text-right font-black text-destructive">
-                          ₹ {yearlyStats.reduce((acc, curr) => acc + curr.cost, 0).toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right font-black text-green-600">
-                          ₹ {yearlyStats.reduce((acc, curr) => acc + curr.revenue, 0).toLocaleString()}
-                        </TableCell>
-                        <TableCell className="pr-8 text-right font-black text-2xl tracking-tighter text-primary">
-                          ₹ {yearlyStats.reduce((acc, curr) => acc + curr.profit, 0).toLocaleString()}
-                        </TableCell>
-                      </TableRow>
-                    </TableFooter>
                   </Table>
                 </Card>
-              </div>
-            </TabsContent>
+              </TabsContent>
 
-            <TabsContent value="cycle" className="space-y-8 animate-in fade-in duration-500">
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                <div className="flex items-center gap-3">
-                  <Calendar className="w-5 h-5 text-primary" />
-                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                    <SelectTrigger className="w-[200px] rounded-full font-bold border-primary/20 bg-card">
-                      <SelectValue placeholder="Select Month" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {monthOptions.map(opt => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex gap-2">
-                  {cycles.map((cycle, idx) => (
-                    <Button 
-                      key={cycle.id}
-                      variant={activeCycle === idx ? "default" : "outline"}
-                      onClick={() => setActiveCycle(idx)}
-                      className="rounded-full text-[10px] font-black uppercase tracking-widest h-8"
-                    >
-                      {cycle.label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-2xl bg-card">
-                <div className="p-8 border-b bg-primary/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <h3 className="text-2xl font-black text-primary uppercase tracking-tighter">Cycle Quantity Bill</h3>
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">
-                      {currentCycle?.label} • {currentCycle?.range} • {format(new Date(selectedMonth + "-01"), "MMMM yyyy")}
-                    </p>
-                  </div>
-                  <div className="bg-primary px-8 py-4 rounded-3xl text-primary-foreground shadow-lg flex items-center gap-4">
-                    <Milk className="w-6 h-6 opacity-50" />
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Cycle Litres Total</p>
-                      <p className="text-3xl font-black tracking-tighter">{cycleStats[activeCycle]?.qty.toFixed(2)} L</p>
+              <TabsContent value="master" className="space-y-8 animate-in fade-in duration-500">
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xl font-black text-primary uppercase tracking-tighter">Master Summary</h3>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[300px] p-4 rounded-xl shadow-xl border-primary/10">
+                          <p className="font-bold mb-1">Summary Generation Logic:</p>
+                          <p className="text-xs text-muted-foreground">
+                            Consolidates collection data and applies specific milk-type rates (Cow/Buffalo) from settings.
+                            <br/><br/>
+                            Generates the final <strong>Payable Amount</strong> for each CAN number to be used for bank processing.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
+                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                      <SelectTrigger className="w-[200px] rounded-full font-bold border-primary/20 bg-card">
+                        <SelectValue placeholder="Select Month" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {monthOptions.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </div>
-                
-                <Table>
-                  <TableHeader className="bg-muted/50 border-b">
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-[120px] font-black text-primary pl-8 py-6 uppercase text-[10px] tracking-widest">CAN</TableHead>
-                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Farmer Name</TableHead>
-                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Milk Type</TableHead>
-                      <TableHead className="text-right font-black text-primary uppercase text-[10px] tracking-widest">Total Litres</TableHead>
-                      <TableHead className="text-right pr-8 font-black text-primary uppercase text-[10px] tracking-widest">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {entriesLoading ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-20"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>
-                    ) : farmerCycleBreakdown?.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-32 text-muted-foreground">No records for this cycle.</TableCell></TableRow>
-                    ) : (
-                      farmerCycleBreakdown?.map((f) => (
-                        <TableRow key={f.id} className="hover:bg-primary/5 transition-colors border-b last:border-0">
-                          <TableCell className="font-black text-primary pl-8 text-xl tracking-tighter">{f.canNumber}</TableCell>
-                          <TableCell className="font-bold">{f.name}</TableCell>
-                          <TableCell>
-                            <Badge variant={f.milkType === 'BUFFALO' ? "secondary" : "outline"} className="rounded-full font-black text-[10px] uppercase">
-                              {f.milkType || 'COW'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <span className="font-black text-primary text-2xl tracking-tighter">{f.totalQty.toFixed(2)} L</span>
-                          </TableCell>
-                          <TableCell className="text-right pr-8">
-                            <Button size="sm" onClick={() => setViewingInvoiceFarmerId(f.id)} className="rounded-full font-black text-[10px] uppercase tracking-widest">View Invoice</Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="master" className="space-y-8 animate-in fade-in duration-500">
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                <div className="flex items-center gap-3">
-                  <Calendar className="w-5 h-5 text-primary" />
-                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                    <SelectTrigger className="w-[200px] rounded-full font-bold border-primary/20 bg-card">
-                      <SelectValue placeholder="Select Month" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {monthOptions.map(opt => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex gap-2">
-                  {cycles.map((cycle, idx) => (
-                    <Button 
-                      key={cycle.id}
-                      variant={activeCycle === idx ? "default" : "outline"}
-                      onClick={() => setActiveCycle(idx)}
-                      className="rounded-full text-[10px] font-black uppercase tracking-widest h-8"
-                    >
-                      {cycle.label}
+                  <div className="flex gap-2">
+                    {cycles.map((cycle, idx) => (
+                      <Button 
+                        key={cycle.id}
+                        variant={activeCycle === idx ? "default" : "outline"}
+                        onClick={() => setActiveCycle(idx)}
+                        className="rounded-full text-[10px] font-black uppercase tracking-widest h-8"
+                      >
+                        {cycle.label}
+                      </Button>
+                    ))}
+                    <Button onClick={() => window.print()} className="rounded-full h-8 px-4 font-black text-[10px] uppercase tracking-widest shadow-lg">
+                      <Printer className="w-3 h-3 mr-2" /> Print Summary Sheet
                     </Button>
-                  ))}
-                  <Button onClick={() => window.print()} className="rounded-full h-8 px-4 font-black text-[10px] uppercase tracking-widest shadow-lg">
-                    <Printer className="w-3 h-3 mr-2" /> Print Summary Sheet
-                  </Button>
-                </div>
-              </div>
-
-              <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-2xl bg-card master-summary-print">
-                <div className="p-8 border-b bg-muted/30">
-                  <div className="text-center mb-6 print-only hidden">
-                    <h1 className="text-2xl font-bold">SRI GOPALA KRISHNA MILK DISTRIBUTIONS</h1>
-                    <h2 className="text-lg font-semibold uppercase tracking-widest">MASTER SUMMARY SHEET</h2>
-                    <p className="text-sm font-medium">Cycle: {currentCycle?.label} ({currentCycle?.range}) • {format(new Date(selectedMonth + "-01"), "MMMM yyyy")}</p>
                   </div>
-                  <div className="flex flex-col sm:flex-row justify-between items-center gap-4 no-print">
-                    <div>
-                      <h3 className="text-2xl font-black text-primary uppercase tracking-tighter">Master Summary Sheet</h3>
-                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Payments for {currentCycle?.label} • {currentCycle?.range}</p>
+                </div>
+
+                <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-2xl bg-card master-summary-print">
+                  <div className="p-8 border-b bg-muted/30">
+                    <div className="text-center mb-6 print-only hidden">
+                      <h1 className="text-2xl font-bold">SRI GOPALA KRISHNA MILK DISTRIBUTIONS</h1>
+                      <h2 className="text-lg font-semibold uppercase tracking-widest">MASTER SUMMARY SHEET</h2>
+                      <p className="text-sm font-medium">Cycle: {currentCycle?.label} ({currentCycle?.range}) • {format(new Date(selectedMonth + "-01"), "MMMM yyyy")}</p>
                     </div>
-                    <div className="bg-accent px-8 py-4 rounded-3xl text-accent-foreground shadow-lg flex items-center gap-4">
-                      <IndianRupee className="w-6 h-6 opacity-50" />
+                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4 no-print">
                       <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Total Cycle Amount</p>
-                        <p className="text-3xl font-black tracking-tighter">₹ {cycleStats[activeCycle]?.amount.toLocaleString()}</p>
+                        <h3 className="text-2xl font-black text-primary uppercase tracking-tighter">Master Summary Sheet</h3>
+                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Payments for {currentCycle?.label} • {currentCycle?.range}</p>
+                      </div>
+                      <div className="bg-accent px-8 py-4 rounded-3xl text-accent-foreground shadow-lg flex items-center gap-4">
+                        <IndianRupee className="w-6 h-6 opacity-50" />
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Total Cycle Amount</p>
+                          <p className="text-3xl font-black tracking-tighter">₹ {cycleStats[activeCycle]?.amount.toLocaleString()}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
+
+                  <Table>
+                    <TableHeader className="bg-muted/50 border-b">
+                      <TableRow>
+                        <TableHead className="w-[100px] font-black text-primary pl-8 py-5 uppercase text-[10px] tracking-widest">CAN No</TableHead>
+                        <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Farmer Name</TableHead>
+                        <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">A/C Number</TableHead>
+                        <TableHead className="text-center font-black text-primary uppercase text-[10px] tracking-widest">Total Litres</TableHead>
+                        <TableHead className="text-right pr-8 font-black text-primary uppercase text-[10px] tracking-widest">Amount (₹)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {farmerCycleBreakdown?.length === 0 ? (
+                        <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground">No data for this cycle.</TableCell></TableRow>
+                      ) : (
+                        farmerCycleBreakdown?.map((f) => (
+                          <TableRow key={f.id} className="hover:bg-primary/5 transition-colors border-b last:border-0">
+                            <TableCell className="font-black text-primary pl-8 text-lg">{f.canNumber}</TableCell>
+                            <TableCell className="font-bold uppercase text-sm">{f.name}</TableCell>
+                            <TableCell className="font-mono text-xs">{f.bankAccountNumber || "—"}</TableCell>
+                            <TableCell className="text-center font-bold">{f.totalQty.toFixed(2)}</TableCell>
+                            <TableCell className="text-right pr-8 font-black text-primary text-xl tracking-tighter">₹ {f.totalAmount.toLocaleString()}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                    {farmerCycleBreakdown && farmerCycleBreakdown.length > 0 && (
+                      <TableFooter className="bg-muted/50">
+                        <TableRow className="hover:bg-transparent">
+                          <TableCell colSpan={3} className="pl-8 font-black text-primary uppercase tracking-widest">Grand Total</TableCell>
+                          <TableCell className="text-center font-black text-lg">{cycleStats[activeCycle]?.qty.toFixed(2)} L</TableCell>
+                          <TableCell className="text-right pr-8 font-black text-2xl tracking-tighter text-primary">₹ {cycleStats[activeCycle]?.amount.toLocaleString()}</TableCell>
+                        </TableRow>
+                      </TableFooter>
+                    )}
+                  </Table>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="daily" className="space-y-8 animate-in fade-in duration-500">
+                <div className="flex justify-end items-center gap-3">
+                  <div className="flex items-center gap-2 mr-auto">
+                    <h3 className="text-xl font-black text-primary uppercase tracking-tighter">Collection Logs</h3>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[300px] p-4 rounded-xl shadow-xl border-primary/10">
+                        <p className="font-bold mb-1">Collection Report Logic:</p>
+                        <p className="text-xs text-muted-foreground">
+                          Itemized daily log of all milk received from farmers. 
+                          <br/><br/>
+                          Shows specific morning/evening sessions and raw weight recorded on the scale.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">Select Date:</span>
+                  <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-[200px] rounded-full font-bold border-primary/20 bg-card" />
                 </div>
 
-                <Table>
-                  <TableHeader className="bg-muted/50 border-b">
-                    <TableRow>
-                      <TableHead className="w-[100px] font-black text-primary pl-8 py-5 uppercase text-[10px] tracking-widest">CAN No</TableHead>
-                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Farmer Name</TableHead>
-                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">A/C Number</TableHead>
-                      <TableHead className="text-center font-black text-primary uppercase text-[10px] tracking-widest">Total Litres</TableHead>
-                      <TableHead className="text-right pr-8 font-black text-primary uppercase text-[10px] tracking-widest">Amount (₹)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {farmerCycleBreakdown?.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground">No data for this cycle.</TableCell></TableRow>
-                    ) : (
-                      farmerCycleBreakdown?.map((f) => (
-                        <TableRow key={f.id} className="hover:bg-primary/5 transition-colors border-b last:border-0">
-                          <TableCell className="font-black text-primary pl-8 text-lg">{f.canNumber}</TableCell>
-                          <TableCell className="font-bold uppercase text-sm">{f.name}</TableCell>
-                          <TableCell className="font-mono text-xs">{f.bankAccountNumber || "—"}</TableCell>
-                          <TableCell className="text-center font-bold">{f.totalQty.toFixed(2)}</TableCell>
-                          <TableCell className="text-right pr-8 font-black text-primary text-xl tracking-tighter">₹ {f.totalAmount.toLocaleString()}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                  {farmerCycleBreakdown && farmerCycleBreakdown.length > 0 && (
-                    <TableFooter className="bg-muted/50">
-                      <TableRow className="hover:bg-transparent">
-                        <TableCell colSpan={3} className="pl-8 font-black text-primary uppercase tracking-widest">Grand Total</TableCell>
-                        <TableCell className="text-center font-black text-lg">{cycleStats[activeCycle]?.qty.toFixed(2)} L</TableCell>
-                        <TableCell className="text-right pr-8 font-black text-2xl tracking-tighter text-primary">₹ {cycleStats[activeCycle]?.amount.toLocaleString()}</TableCell>
+                <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-xl bg-card">
+                  <Table>
+                    <TableHeader className="bg-muted/50 border-b">
+                      <TableRow>
+                        <TableHead className="w-[100px] font-black text-primary pl-8 py-5 uppercase text-[10px] tracking-widest">CAN</TableHead>
+                        <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Farmer Name</TableHead>
+                        <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Session</TableHead>
+                        <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Weight (Kg)</TableHead>
+                        <TableHead className="font-black text-primary text-right pr-8 uppercase text-[10px] tracking-widest">Qty (Litre)</TableHead>
                       </TableRow>
-                    </TableFooter>
-                  )}
-                </Table>
-              </Card>
-            </TabsContent>
+                    </TableHeader>
+                    <TableBody>
+                      {!dailyEntries || dailyEntries.length === 0 ? (
+                        <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground">No records found for {selectedDate}.</TableCell></TableRow>
+                      ) : (
+                        dailyEntries.map(entry => {
+                          const farmer = farmers?.find(f => f.id === entry.farmerId);
+                          return (
+                            <TableRow key={entry.id} className="hover:bg-primary/5 transition-colors">
+                              <TableCell className="font-black text-primary pl-8 text-lg">{farmer?.canNumber || "—"}</TableCell>
+                              <TableCell className="font-bold">{farmer?.name || "Unknown"}</TableCell>
+                              <TableCell><Badge variant="outline">{entry.session}</Badge></TableCell>
+                              <TableCell>{entry.kgWeight?.toFixed(2)}</TableCell>
+                              <TableCell className="text-right pr-8 font-black text-primary">{entry.quantity?.toFixed(2)} L</TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </Card>
+              </TabsContent>
 
-            <TabsContent value="daily" className="space-y-8 animate-in fade-in duration-500">
-              <div className="flex justify-end items-center gap-3">
-                <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">Select Date:</span>
-                <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-[200px] rounded-full font-bold border-primary/20 bg-card" />
-              </div>
+              <TabsContent value="sales" className="space-y-8 animate-in fade-in duration-500">
+                <div className="flex justify-end items-center gap-3">
+                  <div className="flex items-center gap-2 mr-auto">
+                    <h3 className="text-xl font-black text-primary uppercase tracking-tighter">Distribution Logs</h3>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[300px] p-4 rounded-xl shadow-xl border-primary/10">
+                        <p className="font-bold mb-1">Sales Report Logic:</p>
+                        <p className="text-xs text-muted-foreground">
+                          Detailed log of all milk sold to buyers. 
+                          <br/><br/>
+                          Uses the **Selling Rate** defined in global configuration to generate revenue reports.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">Select Date:</span>
+                  <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-[200px] rounded-full font-bold border-primary/20 bg-card" />
+                </div>
 
-              <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-xl bg-card">
-                <Table>
-                  <TableHeader className="bg-muted/50 border-b">
-                    <TableRow>
-                      <TableHead className="w-[100px] font-black text-primary pl-8 py-5 uppercase text-[10px] tracking-widest">CAN</TableHead>
-                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Farmer Name</TableHead>
-                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Session</TableHead>
-                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Weight (Kg)</TableHead>
-                      <TableHead className="font-black text-primary text-right pr-8 uppercase text-[10px] tracking-widest">Qty (Litre)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {!dailyEntries || dailyEntries.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground">No records found for {selectedDate}.</TableCell></TableRow>
-                    ) : (
-                      dailyEntries.map(entry => {
-                        const farmer = farmers?.find(f => f.id === entry.farmerId);
-                        return (
-                          <TableRow key={entry.id} className="hover:bg-primary/5 transition-colors">
-                            <TableCell className="font-black text-primary pl-8 text-lg">{farmer?.canNumber || "—"}</TableCell>
-                            <TableCell className="font-bold">{farmer?.name || "Unknown"}</TableCell>
-                            <TableCell><Badge variant="outline">{entry.session}</Badge></TableCell>
-                            <TableCell>{entry.kgWeight?.toFixed(2)}</TableCell>
-                            <TableCell className="text-right pr-8 font-black text-primary">{entry.quantity?.toFixed(2)} L</TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </Card>
-            </TabsContent>
+                <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-xl bg-card">
+                  <Table>
+                    <TableHeader className="bg-muted/50 border-b">
+                      <TableRow>
+                        <TableHead className="w-[100px] font-black text-primary pl-8 py-5 uppercase text-[10px] tracking-widest">Code</TableHead>
+                        <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Buyer Name</TableHead>
+                        <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Session</TableHead>
+                        <TableHead className="font-black text-primary text-right pr-8 uppercase text-[10px] tracking-widest">Qty Sold (Litre)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {!dailySales || dailySales.length === 0 ? (
+                        <TableRow><TableCell colSpan={4} className="text-center py-20 text-muted-foreground">No distribution records found.</TableCell></TableRow>
+                      ) : (
+                        dailySales.map(sale => {
+                          const buyer = buyers?.find(b => b.id === sale.buyerId);
+                          return (
+                            <TableRow key={sale.id} className="hover:bg-accent/5 transition-colors">
+                              <TableCell className="font-black text-primary pl-8 text-lg">{buyer?.buyerCode || "—"}</TableCell>
+                              <TableCell className="font-bold">{buyer?.name || "Unknown"}</TableCell>
+                              <TableCell><Badge variant="outline">{sale.session}</Badge></TableCell>
+                              <TableCell className="text-right pr-8 font-black text-primary">{sale.quantity?.toFixed(2)} L</TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
+        </main>
+        <Footer />
 
-            <TabsContent value="sales" className="space-y-8 animate-in fade-in duration-500">
-              <div className="flex justify-end items-center gap-3">
-                <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">Select Date:</span>
-                <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-[200px] rounded-full font-bold border-primary/20 bg-card" />
-              </div>
-
-              <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-xl bg-card">
-                <Table>
-                  <TableHeader className="bg-muted/50 border-b">
-                    <TableRow>
-                      <TableHead className="w-[100px] font-black text-primary pl-8 py-5 uppercase text-[10px] tracking-widest">Code</TableHead>
-                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Buyer Name</TableHead>
-                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Session</TableHead>
-                      <TableHead className="font-black text-primary text-right pr-8 uppercase text-[10px] tracking-widest">Qty Sold (Litre)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {!dailySales || dailySales.length === 0 ? (
-                      <TableRow><TableCell colSpan={4} className="text-center py-20 text-muted-foreground">No distribution records found.</TableCell></TableRow>
-                    ) : (
-                      dailySales.map(sale => {
-                        const buyer = buyers?.find(b => b.id === sale.buyerId);
-                        return (
-                          <TableRow key={sale.id} className="hover:bg-accent/5 transition-colors">
-                            <TableCell className="font-black text-primary pl-8 text-lg">{buyer?.buyerCode || "—"}</TableCell>
-                            <TableCell className="font-bold">{buyer?.name || "Unknown"}</TableCell>
-                            <TableCell><Badge variant="outline">{sale.session}</Badge></TableCell>
-                            <TableCell className="text-right pr-8 font-black text-primary">{sale.quantity?.toFixed(2)} L</TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
-      </main>
-      <Footer />
-
-      <style jsx global>{`
-        @media print {
-          .no-print { display: none !important; }
-          .print-only { display: block !important; }
-          .master-summary-print { border: none !important; box-shadow: none !important; }
-          .master-summary-print table { border-collapse: collapse !important; width: 100% !important; }
-          .master-summary-print th, .master-summary-print td { border: 1px solid black !important; padding: 8px !important; }
-          body * { visibility: hidden; }
-          .master-summary-print, .master-summary-print * { visibility: visible; }
-          .master-summary-print { position: absolute; left: 0; top: 0; }
-        }
-      `}</style>
-    </div>
+        <style jsx global>{`
+          @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            .master-summary-print { border: none !important; box-shadow: none !important; }
+            .master-summary-print table { border-collapse: collapse !important; width: 100% !important; }
+            .master-summary-print th, .master-summary-print td { border: 1px solid black !important; padding: 8px !important; }
+            body * { visibility: hidden; }
+            .master-summary-print, .master-summary-print * { visibility: visible; }
+            .master-summary-print { position: absolute; left: 0; top: 0; }
+          }
+        `}</style>
+      </div>
+    </TooltipProvider>
   );
 }

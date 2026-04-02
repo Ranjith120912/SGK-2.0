@@ -27,7 +27,8 @@ import {
   Scale,
   IndianRupee,
   PieChart,
-  CheckCircle2
+  CheckCircle2,
+  ListChecks
 } from "lucide-react";
 import { format, endOfMonth, startOfMonth } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -170,7 +171,6 @@ export default function ReportsPage() {
   const invoiceFarmer = farmers?.find(f => f.id === viewingInvoiceFarmerId);
   const invoiceEntries = filteredCycleEntries?.filter(e => e.farmerId === viewingInvoiceFarmerId).sort((a, b) => a.date.localeCompare(b.date));
 
-  // Consolidate entries by date for the invoice table
   const consolidatedInvoiceData = useMemo(() => {
     if (!invoiceEntries) return [];
     const grouped: Record<string, { date: string, morning: number, evening: number, total: number }> = {};
@@ -339,12 +339,15 @@ export default function ReportsPage() {
           </header>
 
           <Tabs defaultValue="overview" className="space-y-8">
-            <TabsList className="grid grid-cols-4 w-full sm:w-[800px] rounded-full p-1 bg-muted border border-primary/5">
+            <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 w-full rounded-full p-1 bg-muted border border-primary/5">
               <TabsTrigger value="overview" className="rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest">
                 <BarChart4 className="w-4 h-4" /> Overview
               </TabsTrigger>
               <TabsTrigger value="cycle" className="rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest">
                 <FileText className="w-4 h-4" /> Cycle Bill
+              </TabsTrigger>
+              <TabsTrigger value="master" className="rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest">
+                <ListChecks className="w-4 h-4" /> Master Summary
               </TabsTrigger>
               <TabsTrigger value="daily" className="rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest">
                 <ClipboardList className="w-4 h-4" /> Collection
@@ -493,39 +496,18 @@ export default function ReportsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="text-xs font-black text-muted-foreground uppercase tracking-widest">
-                  10-Day Cycle Billing: Strictly showing collection Litres
+                <div className="flex gap-2">
+                  {cycles.map((cycle, idx) => (
+                    <Button 
+                      key={cycle.id}
+                      variant={activeCycle === idx ? "default" : "outline"}
+                      onClick={() => setActiveCycle(idx)}
+                      className="rounded-full text-[10px] font-black uppercase tracking-widest h-8"
+                    >
+                      {cycle.label}
+                    </Button>
+                  ))}
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {cycles.map((cycle, idx) => (
-                  <Card 
-                    key={cycle.id}
-                    onClick={() => setActiveCycle(idx)}
-                    className={`relative overflow-hidden rounded-[2rem] cursor-pointer transition-all duration-300 border-2 ${
-                      activeCycle === idx 
-                      ? "border-primary bg-primary/5 shadow-xl scale-[1.02]" 
-                      : "border-transparent bg-card hover:border-primary/20"
-                    }`}
-                  >
-                    <CardHeader className="pb-2">
-                      <div className="flex justify-between items-center">
-                        <Badge variant={activeCycle === idx ? "default" : "outline"} className="rounded-full font-black text-[10px] uppercase">
-                          {cycle.label}
-                        </Badge>
-                        {activeCycle === idx && <ChevronRight className="w-5 h-5 text-primary animate-pulse" />}
-                      </div>
-                      <CardTitle className="text-xl font-black mt-2 tracking-tighter">{cycle.range}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground font-bold text-xs uppercase tracking-tighter">Volume:</span>
-                        <span className="font-black text-primary text-2xl tracking-tighter">{cycleStats[idx]?.qty.toFixed(1) || "0.0"} <small className="text-xs">L</small></span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
               </div>
 
               <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-2xl bg-card">
@@ -557,65 +539,129 @@ export default function ReportsPage() {
                   </TableHeader>
                   <TableBody>
                     {entriesLoading ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center py-20">
-                          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
-                        </TableCell>
-                      </TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center py-20"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>
                     ) : farmerCycleBreakdown?.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center py-32 text-muted-foreground">
-                          <Droplets className="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
-                          <p className="font-bold text-lg">No collection recorded for this cycle.</p>
-                        </TableCell>
-                      </TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center py-32 text-muted-foreground">No records for this cycle.</TableCell></TableRow>
                     ) : (
                       farmerCycleBreakdown?.map((f) => (
-                        <TableRow key={f.id} className="hover:bg-primary/5 transition-colors border-b last:border-0 group">
+                        <TableRow key={f.id} className="hover:bg-primary/5 transition-colors border-b last:border-0">
                           <TableCell className="font-black text-primary pl-8 text-xl tracking-tighter">{f.canNumber}</TableCell>
-                          <TableCell className="font-bold text-base">{f.name}</TableCell>
+                          <TableCell className="font-bold">{f.name}</TableCell>
                           <TableCell>
                             <Badge variant={f.milkType === 'BUFFALO' ? "secondary" : "outline"} className="rounded-full font-black text-[10px] uppercase">
                               {f.milkType || 'COW'}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className="font-black text-primary text-2xl tracking-tighter">{f.totalQty.toFixed(2)} <small className="text-xs opacity-60">L</small></span>
+                            <span className="font-black text-primary text-2xl tracking-tighter">{f.totalQty.toFixed(2)} L</span>
                           </TableCell>
                           <TableCell className="text-right pr-8">
-                            <Button 
-                              variant="default" 
-                              size="sm" 
-                              className="rounded-full font-black text-[10px] uppercase tracking-widest shadow-sm"
-                              onClick={() => setViewingInvoiceFarmerId(f.id)}
-                            >
-                              <FileText className="w-3 h-3 mr-2" />
-                              View Invoice
-                            </Button>
+                            <Button size="sm" onClick={() => setViewingInvoiceFarmerId(f.id)} className="rounded-full font-black text-[10px] uppercase tracking-widest">View Invoice</Button>
                           </TableCell>
                         </TableRow>
                       ))
                     )}
                   </TableBody>
                 </Table>
-                
-                <div className="p-6 bg-muted/20 border-t text-center">
-                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">
-                    Verified SGK MILK Report &bull; {format(new Date(), 'PPPP')}
-                  </p>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="master" className="space-y-8 animate-in fade-in duration-500">
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <Calendar className="w-5 h-5 text-primary" />
+                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                    <SelectTrigger className="w-[200px] rounded-full font-bold border-primary/20 bg-card">
+                      <SelectValue placeholder="Select Month" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {monthOptions.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
+                <div className="flex gap-2">
+                  {cycles.map((cycle, idx) => (
+                    <Button 
+                      key={cycle.id}
+                      variant={activeCycle === idx ? "default" : "outline"}
+                      onClick={() => setActiveCycle(idx)}
+                      className="rounded-full text-[10px] font-black uppercase tracking-widest h-8"
+                    >
+                      {cycle.label}
+                    </Button>
+                  ))}
+                  <Button onClick={() => window.print()} className="rounded-full h-8 px-4 font-black text-[10px] uppercase tracking-widest shadow-lg">
+                    <Printer className="w-3 h-3 mr-2" /> Print Summary Sheet
+                  </Button>
+                </div>
+              </div>
+
+              <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-2xl bg-card master-summary-print">
+                <div className="p-8 border-b bg-muted/30">
+                  <div className="text-center mb-6 print-only hidden">
+                    <h1 className="text-2xl font-bold">SRI GOPALA KRISHNA MILK DISTRIBUTIONS</h1>
+                    <h2 className="text-lg font-semibold uppercase tracking-widest">MASTER SUMMARY SHEET</h2>
+                    <p className="text-sm font-medium">Cycle: {currentCycle?.label} ({currentCycle?.range}) • {format(new Date(selectedMonth + "-01"), "MMMM yyyy")}</p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row justify-between items-center gap-4 no-print">
+                    <div>
+                      <h3 className="text-2xl font-black text-primary uppercase tracking-tighter">Master Summary Sheet</h3>
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Payments for {currentCycle?.label} • {currentCycle?.range}</p>
+                    </div>
+                    <div className="bg-accent px-8 py-4 rounded-3xl text-accent-foreground shadow-lg flex items-center gap-4">
+                      <IndianRupee className="w-6 h-6 opacity-50" />
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Total Cycle Amount</p>
+                        <p className="text-3xl font-black tracking-tighter">₹ {cycleStats[activeCycle]?.amount.toLocaleString()}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <Table>
+                  <TableHeader className="bg-muted/50 border-b">
+                    <TableRow>
+                      <TableHead className="w-[100px] font-black text-primary pl-8 py-5 uppercase text-[10px] tracking-widest">CAN No</TableHead>
+                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Farmer Name</TableHead>
+                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">A/C Number</TableHead>
+                      <TableHead className="text-center font-black text-primary uppercase text-[10px] tracking-widest">Total Litres</TableHead>
+                      <TableHead className="text-right pr-8 font-black text-primary uppercase text-[10px] tracking-widest">Amount (₹)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {farmerCycleBreakdown?.length === 0 ? (
+                      <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground">No data for this cycle.</TableCell></TableRow>
+                    ) : (
+                      farmerCycleBreakdown?.map((f) => (
+                        <TableRow key={f.id} className="hover:bg-primary/5 transition-colors border-b last:border-0">
+                          <TableCell className="font-black text-primary pl-8 text-lg">{f.canNumber}</TableCell>
+                          <TableCell className="font-bold uppercase text-sm">{f.name}</TableCell>
+                          <TableCell className="font-mono text-xs">{f.bankAccountNumber || "—"}</TableCell>
+                          <TableCell className="text-center font-bold">{f.totalQty.toFixed(2)}</TableCell>
+                          <TableCell className="text-right pr-8 font-black text-primary text-xl tracking-tighter">₹ {f.totalAmount.toLocaleString()}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                  {farmerCycleBreakdown && farmerCycleBreakdown.length > 0 && (
+                    <TableFooter className="bg-muted/50">
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell colSpan={3} className="pl-8 font-black text-primary uppercase tracking-widest">Grand Total</TableCell>
+                        <TableCell className="text-center font-black text-lg">{cycleStats[activeCycle]?.qty.toFixed(2)} L</TableCell>
+                        <TableCell className="text-right pr-8 font-black text-2xl tracking-tighter text-primary">₹ {cycleStats[activeCycle]?.amount.toLocaleString()}</TableCell>
+                      </TableRow>
+                    </TableFooter>
+                  )}
+                </Table>
               </Card>
             </TabsContent>
 
             <TabsContent value="daily" className="space-y-8 animate-in fade-in duration-500">
               <div className="flex justify-end items-center gap-3">
                 <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">Select Date:</span>
-                <Input 
-                  type="date" 
-                  value={selectedDate} 
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-[200px] rounded-full font-bold border-primary/20 shadow-sm bg-card"
-                />
+                <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-[200px] rounded-full font-bold border-primary/20 bg-card" />
               </div>
 
               <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-xl bg-card">
@@ -631,30 +677,17 @@ export default function ReportsPage() {
                   </TableHeader>
                   <TableBody>
                     {!dailyEntries || dailyEntries.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center py-20 text-muted-foreground">No records found for {selectedDate}.</TableCell>
-                      </TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground">No records found for {selectedDate}.</TableCell></TableRow>
                     ) : (
                       dailyEntries.map(entry => {
                         const farmer = farmers?.find(f => f.id === entry.farmerId);
                         return (
-                          <TableRow key={entry.id} className="hover:bg-primary/5 transition-colors border-b last:border-0">
-                            <TableCell className="font-black text-primary pl-8 text-lg tracking-tighter">{farmer?.canNumber || "—"}</TableCell>
-                            <TableCell>
-                              <div className="flex flex-col">
-                                <span className="font-bold text-base">{farmer?.name || "Unknown"}</span>
-                                <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">{farmer?.milkType}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="rounded-full font-bold text-[10px] uppercase border-primary/10">
-                                {entry.session}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="font-mono text-base">{entry.kgWeight?.toFixed(2)}</TableCell>
-                            <TableCell className="text-right pr-8 font-black text-primary text-xl tracking-tighter">
-                              {entry.quantity?.toFixed(2)} <small className="text-xs opacity-60">L</small>
-                            </TableCell>
+                          <TableRow key={entry.id} className="hover:bg-primary/5 transition-colors">
+                            <TableCell className="font-black text-primary pl-8 text-lg">{farmer?.canNumber || "—"}</TableCell>
+                            <TableCell className="font-bold">{farmer?.name || "Unknown"}</TableCell>
+                            <TableCell><Badge variant="outline">{entry.session}</Badge></TableCell>
+                            <TableCell>{entry.kgWeight?.toFixed(2)}</TableCell>
+                            <TableCell className="text-right pr-8 font-black text-primary">{entry.quantity?.toFixed(2)} L</TableCell>
                           </TableRow>
                         );
                       })
@@ -667,12 +700,7 @@ export default function ReportsPage() {
             <TabsContent value="sales" className="space-y-8 animate-in fade-in duration-500">
               <div className="flex justify-end items-center gap-3">
                 <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">Select Date:</span>
-                <Input 
-                  type="date" 
-                  value={selectedDate} 
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-[200px] rounded-full font-bold border-primary/20 shadow-sm bg-card"
-                />
+                <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-[200px] rounded-full font-bold border-primary/20 bg-card" />
               </div>
 
               <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-xl bg-card">
@@ -687,24 +715,16 @@ export default function ReportsPage() {
                   </TableHeader>
                   <TableBody>
                     {!dailySales || dailySales.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center py-20 text-muted-foreground">No distribution records found for {selectedDate}.</TableCell>
-                      </TableRow>
+                      <TableRow><TableCell colSpan={4} className="text-center py-20 text-muted-foreground">No distribution records found.</TableCell></TableRow>
                     ) : (
                       dailySales.map(sale => {
                         const buyer = buyers?.find(b => b.id === sale.buyerId);
                         return (
-                          <TableRow key={sale.id} className="hover:bg-accent/5 transition-colors border-b last:border-0">
-                            <TableCell className="font-black text-primary pl-8 text-lg tracking-tighter">{buyer?.buyerCode || "—"}</TableCell>
-                            <TableCell className="font-bold text-base">{buyer?.name || "Unknown"}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="rounded-full font-bold text-[10px] uppercase border-accent/20">
-                                {sale.session}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right pr-8 font-black text-primary text-xl tracking-tighter">
-                              {sale.quantity?.toFixed(2)} <small className="text-xs opacity-60">L</small>
-                            </TableCell>
+                          <TableRow key={sale.id} className="hover:bg-accent/5 transition-colors">
+                            <TableCell className="font-black text-primary pl-8 text-lg">{buyer?.buyerCode || "—"}</TableCell>
+                            <TableCell className="font-bold">{buyer?.name || "Unknown"}</TableCell>
+                            <TableCell><Badge variant="outline">{sale.session}</Badge></TableCell>
+                            <TableCell className="text-right pr-8 font-black text-primary">{sale.quantity?.toFixed(2)} L</TableCell>
                           </TableRow>
                         );
                       })
@@ -717,6 +737,20 @@ export default function ReportsPage() {
         </div>
       </main>
       <Footer />
+
+      <style jsx global>{`
+        @media print {
+          .no-print { display: none !important; }
+          .print-only { display: block !important; }
+          .master-summary-print { border: none !important; box-shadow: none !important; }
+          .master-summary-print table { border-collapse: collapse !important; width: 100% !important; }
+          .master-summary-print th, .master-summary-print td { border: 1px solid black !important; padding: 8px !important; }
+          body * { visibility: hidden; }
+          .master-summary-print, .master-summary-print * { visibility: visible; }
+          .master-summary-print { position: absolute; left: 0; top: 0; }
+        }
+      `}</style>
     </div>
   );
 }
+

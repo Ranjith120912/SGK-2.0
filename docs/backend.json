@@ -14,9 +14,9 @@
           "type": "string",
           "description": "Unique CAN number assigned to the customer"
         },
-        "phoneNumber": {
+        "accountNumber": {
           "type": "string",
-          "description": "Contact phone number"
+          "description": "Bank account number for payments"
         },
         "active": {
           "type": "boolean",

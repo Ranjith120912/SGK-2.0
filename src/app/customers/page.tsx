@@ -1,16 +1,17 @@
+
 "use client";
 
 import { useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { useCollection, useMemoFirebase, useFirestore } from "@/firebase";
-import { collection, doc, serverTimestamp } from "firebase/firestore";
+import { collection, serverTimestamp } from "firebase/firestore";
 import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Search, UserPlus, Database } from "lucide-react";
+import { UserPlus, Database, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function CustomersPage() {
@@ -18,7 +19,7 @@ export default function CustomersPage() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [isAdding, setIsAdding] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({ name: "", canNumber: "", phoneNumber: "" });
+  const [newCustomer, setNewCustomer] = useState({ name: "", canNumber: "", accountNumber: "" });
 
   const customersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -46,7 +47,7 @@ export default function CustomersPage() {
       createdAt: serverTimestamp(),
     });
 
-    setNewCustomer({ name: "", canNumber: "", phoneNumber: "" });
+    setNewCustomer({ name: "", canNumber: "", accountNumber: "" });
     setIsAdding(false);
     toast({ title: "Success", description: "Customer added successfully." });
   };
@@ -58,7 +59,7 @@ export default function CustomersPage() {
       addDocumentNonBlocking(collection(firestore, 'customers'), {
         name: `Supplier ${i}`,
         canNumber: i.toString().padStart(3, '0'),
-        phoneNumber: `9876543${i.toString().padStart(3, '0')}`,
+        accountNumber: `ACC-${i.toString().padStart(6, '0')}`,
         active: true,
         createdAt: serverTimestamp(),
       });
@@ -109,9 +110,9 @@ export default function CustomersPage() {
                 </div>
                 <div className="space-y-2">
                   <Input 
-                    placeholder="Phone Number" 
-                    value={newCustomer.phoneNumber}
-                    onChange={(e) => setNewCustomer({...newCustomer, phoneNumber: e.target.value})}
+                    placeholder="Account Number" 
+                    value={newCustomer.accountNumber}
+                    onChange={(e) => setNewCustomer({...newCustomer, accountNumber: e.target.value})}
                   />
                 </div>
                 <div className="sm:col-span-3 flex justify-end">
@@ -137,7 +138,7 @@ export default function CustomersPage() {
                 <TableRow>
                   <TableHead className="w-[100px]">CAN</TableHead>
                   <TableHead>Customer Name</TableHead>
-                  <TableHead>Phone Number</TableHead>
+                  <TableHead>Account Number</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -151,7 +152,7 @@ export default function CustomersPage() {
                     <TableRow key={customer.id}>
                       <TableCell className="font-bold text-primary">{customer.canNumber}</TableCell>
                       <TableCell className="font-medium">{customer.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{customer.phoneNumber || "N/A"}</TableCell>
+                      <TableCell className="text-muted-foreground">{customer.accountNumber || "N/A"}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm">Edit</Button>
                       </TableCell>

@@ -14,9 +14,13 @@
           "type": "string",
           "description": "Unique CAN number assigned to the farmer"
         },
-        "accountNumber": {
+        "bankAccountNumber": {
           "type": "string",
           "description": "Bank account number for payments"
+        },
+        "ifscCode": {
+          "type": "string",
+          "description": "Bank IFSC code"
         },
         "milkType": {
           "type": "string",

@@ -50,7 +50,7 @@ export default function FarmersPage() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [isAdding, setIsAdding] = useState(false);
-  const [newFarmer, setNewFarmer] = useState({ name: "", canNumber: "", accountNumber: "", milkType: "COW" });
+  const [newFarmer, setNewFarmer] = useState({ name: "", canNumber: "", bankAccountNumber: "", ifscCode: "", milkType: "COW" });
   const [importData, setImportData] = useState("");
   const [isImporting, setIsImporting] = useState(false);
 
@@ -86,7 +86,7 @@ export default function FarmersPage() {
       createdAt: serverTimestamp(),
     });
 
-    setNewFarmer({ name: "", canNumber: "", accountNumber: "", milkType: "COW" });
+    setNewFarmer({ name: "", canNumber: "", bankAccountNumber: "", ifscCode: "", milkType: "COW" });
     setIsAdding(false);
     toast({ title: "Success", description: "Farmer added successfully." });
   };
@@ -103,7 +103,8 @@ export default function FarmersPage() {
 
       const name = item.Name || item.name || normalizedItem.name || normalizedItem.farmername;
       const canNumber = item['Can Number'] || item.canNumber || normalizedItem.cannumber || normalizedItem.can;
-      const accountNumber = item['Bank Account Number'] || item['Account Number'] || item.accountNumber || normalizedItem.bankaccountnumber || normalizedItem.accountnumber || normalizedItem.account;
+      const bankAccountNumber = item['Bank Account Number'] || item['Account Number'] || item.bankAccountNumber || normalizedItem.bankaccountnumber || normalizedItem.accountnumber || normalizedItem.account;
+      const ifscCode = item['IFSC Code'] || item.ifscCode || normalizedItem.ifsccode || normalizedItem.ifsc;
       const milkTypeRaw = item['Milk Type'] || item.milkType || normalizedItem.milktype || normalizedItem.type;
       
       let milkType = "COW";
@@ -113,7 +114,8 @@ export default function FarmersPage() {
         addDocumentNonBlocking(collection(firestore, 'farmers'), {
           name: name.toString(),
           canNumber: canNumber.toString().padStart(3, '0'),
-          accountNumber: (accountNumber || "").toString(),
+          bankAccountNumber: (bankAccountNumber || "").toString(),
+          ifscCode: (ifscCode || "").toString(),
           milkType: milkType,
           active: true,
           createdAt: serverTimestamp(),
@@ -188,8 +190,8 @@ export default function FarmersPage() {
 
   const downloadExcelTemplate = () => {
     const templateData = [
-      { "Name": "Rajesh Kumar", "Can Number": "101", "Bank Account Number": "9876543210", "Milk Type": "COW" },
-      { "Name": "Suresh Singh", "Can Number": "102", "Bank Account Number": "1234567890", "Milk Type": "BUFFALO" }
+      { "Name": "Rajesh Kumar", "Can Number": "101", "Bank Account Number": "9876543210", "IFSC Code": "SBIN0001234", "Milk Type": "COW" },
+      { "Name": "Suresh Singh", "Can Number": "102", "Bank Account Number": "1234567890", "IFSC Code": "HDFC0005678", "Milk Type": "BUFFALO" }
     ];
     const ws = utils.json_to_sheet(templateData);
     const wb = utils.book_new();
@@ -206,7 +208,8 @@ export default function FarmersPage() {
       addDocumentNonBlocking(collection(firestore, 'farmers'), {
         name: `Farmer ${i}`,
         canNumber: i.toString().padStart(3, '0'),
-        accountNumber: `ACC-${i.toString().padStart(6, '0')}`,
+        bankAccountNumber: `ACC-${i.toString().padStart(6, '0')}`,
+        ifscCode: `IFSC${i.toString().padStart(4, '0')}`,
         milkType: i % 2 === 0 ? "BUFFALO" : "COW",
         active: true,
         createdAt: serverTimestamp(),
@@ -222,7 +225,7 @@ export default function FarmersPage() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
             <div>
               <h1 className="text-3xl font-black text-primary tracking-tight">Farmer Management</h1>
-              <p className="text-muted-foreground">Directory of suppliers and milk categorization.</p>
+              <p className="text-muted-foreground">Directory of suppliers and bank details.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => setIsAdding(!isAdding)} variant={isAdding ? "outline" : "default"} className="rounded-full">
@@ -245,7 +248,7 @@ export default function FarmersPage() {
                         Excel Bulk Import
                       </DialogTitle>
                       <DialogDescription className="text-primary-foreground/80">
-                        Upload your .xlsx file with Name, Can Number, Bank Account Number, and Milk Type.
+                        Upload your .xlsx file with Name, Can Number, Bank Account Number, IFSC Code, and Milk Type.
                       </DialogDescription>
                     </DialogHeader>
                   </div>
@@ -275,7 +278,7 @@ export default function FarmersPage() {
                           <Button variant="outline" size="sm" onClick={downloadExcelTemplate} className="rounded-full w-full bg-background shadow-sm hover:bg-primary hover:text-white transition-all">
                             <Download className="w-3 h-3 mr-2" /> Download Template (.xlsx)
                           </Button>
-                          <p className="text-[10px] text-muted-foreground italic text-center">Includes Bank Account Number</p>
+                          <p className="text-[10px] text-muted-foreground italic text-center">Includes Bank Account Number & IFSC</p>
                         </div>
                       </div>
                     </div>
@@ -288,7 +291,7 @@ export default function FarmersPage() {
                         </label>
                       </div>
                       <Textarea 
-                        placeholder="Name, Can Number, Bank Account Number, Milk Type&#10;John Doe, 101, 9123456789, COW" 
+                        placeholder="Name, Can Number, Bank Account Number, IFSC Code, Milk Type&#10;John Doe, 101, 9123456789, SBIN0001234, COW" 
                         value={importData}
                         onChange={(e) => setImportData(e.target.value)}
                         className="min-h-[120px] font-mono text-xs rounded-2xl border-primary/20 bg-background/50 focus:bg-background transition-colors"
@@ -328,7 +331,7 @@ export default function FarmersPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                   <div className="space-y-2">
                     <label className="text-xs font-black text-muted-foreground uppercase tracking-widest">Full Name</label>
                     <Input 
@@ -363,8 +366,17 @@ export default function FarmersPage() {
                     <label className="text-xs font-black text-muted-foreground uppercase tracking-widest">Bank Account Number</label>
                     <Input 
                       placeholder="e.g. 9123456789" 
-                      value={newFarmer.accountNumber}
-                      onChange={(e) => setNewFarmer({...newFarmer, accountNumber: e.target.value})}
+                      value={newFarmer.bankAccountNumber}
+                      onChange={(e) => setNewFarmer({...newFarmer, bankAccountNumber: e.target.value})}
+                      className="rounded-xl h-11 border-primary/10"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-muted-foreground uppercase tracking-widest">IFSC Code</label>
+                    <Input 
+                      placeholder="e.g. SBIN0001234" 
+                      value={newFarmer.ifscCode}
+                      onChange={(e) => setNewFarmer({...newFarmer, ifscCode: e.target.value})}
                       className="rounded-xl h-11 border-primary/10"
                     />
                   </div>
@@ -393,7 +405,7 @@ export default function FarmersPage() {
                   <TableHead className="w-[100px] font-black text-primary pl-6 py-5">CAN</TableHead>
                   <TableHead className="font-black text-primary">Farmer Name</TableHead>
                   <TableHead className="w-[120px] font-black text-primary">Milk Type</TableHead>
-                  <TableHead className="font-black text-primary">Bank Account Number</TableHead>
+                  <TableHead className="font-black text-primary">Bank Details</TableHead>
                   <TableHead className="text-right pr-6 font-black text-primary">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -421,7 +433,12 @@ export default function FarmersPage() {
                           {farmer.milkType || 'COW'}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground font-mono font-medium">{farmer.accountNumber || "—"}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col text-xs">
+                          <span className="text-muted-foreground font-mono font-medium">{farmer.bankAccountNumber || "—"}</span>
+                          {farmer.ifscCode && <span className="text-primary/60 font-black uppercase text-[9px] tracking-widest">{farmer.ifscCode}</span>}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right pr-6">
                         <Button variant="ghost" size="sm" className="rounded-full opacity-0 group-hover:opacity-100 transition-opacity font-bold text-primary">Edit Profile</Button>
                       </TableCell>

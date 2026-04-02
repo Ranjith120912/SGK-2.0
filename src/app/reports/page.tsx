@@ -567,7 +567,7 @@ export default function ReportsPage() {
                 
                 <div className="p-6 bg-muted/20 border-t text-center">
                   <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">
-                    Verified SRI GOPALA KRISHNA MILK DISTRIBUTION Report &bull; {format(new Date(), 'PPPP')}
+                    Verified SGK MILK Report &bull; {format(new Date(), 'PPPP')}
                   </p>
                 </div>
               </Card>

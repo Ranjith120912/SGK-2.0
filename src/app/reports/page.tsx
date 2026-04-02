@@ -28,7 +28,9 @@ import {
   IndianRupee,
   PieChart,
   CheckCircle2,
-  ListChecks
+  ListChecks,
+  TrendingUp,
+  Wallet
 } from "lucide-react";
 import { format, endOfMonth, startOfMonth } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -154,9 +156,12 @@ export default function ReportsPage() {
   });
 
   // Analytics Calculations
-  const totalCollectionDaily = dailyEntries?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
-  const totalSalesDaily = dailySales?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
-  const balanceDaily = totalCollectionDaily - totalSalesDaily;
+  const totalCollectionDailyVolume = dailyEntries?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
+  const totalSalesDailyVolume = dailySales?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
+
+  const totalFarmerCostDaily = dailyEntries?.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0) || 0;
+  const totalSalesRevenueDaily = dailySales?.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0) || 0;
+  const profitDaily = totalSalesRevenueDaily - totalFarmerCostDaily;
 
   const cowVolume = dailyEntries?.filter(e => {
     const f = farmers?.find(far => far.id === e.farmerId);
@@ -371,7 +376,7 @@ export default function ReportsPage() {
                 <Card className="rounded-3xl border-none shadow-xl bg-primary text-primary-foreground overflow-hidden">
                   <CardHeader className="pb-2">
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Collection Volume</p>
-                    <CardTitle className="text-4xl font-black">{totalCollectionDaily.toFixed(1)} L</CardTitle>
+                    <CardTitle className="text-4xl font-black">{totalCollectionDailyVolume.toFixed(1)} L</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center gap-1 text-xs font-bold opacity-90">
@@ -384,7 +389,7 @@ export default function ReportsPage() {
                 <Card className="rounded-3xl border-none shadow-xl bg-accent text-accent-foreground overflow-hidden">
                   <CardHeader className="pb-2">
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Distribution Volume</p>
-                    <CardTitle className="text-4xl font-black">{totalSalesDaily.toFixed(1)} L</CardTitle>
+                    <CardTitle className="text-4xl font-black">{totalSalesDailyVolume.toFixed(1)} L</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center gap-1 text-xs font-bold opacity-90">
@@ -396,15 +401,15 @@ export default function ReportsPage() {
 
                 <Card className="rounded-3xl border-none shadow-xl bg-card overflow-hidden">
                   <CardHeader className="pb-2">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Inventory Balance</p>
-                    <CardTitle className={cn("text-4xl font-black", balanceDaily >= 0 ? "text-green-600" : "text-destructive")}>
-                      {balanceDaily.toFixed(1)} L
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Daily Net Profit</p>
+                    <CardTitle className={cn("text-4xl font-black", profitDaily >= 0 ? "text-green-600" : "text-destructive")}>
+                      ₹ {profitDaily.toLocaleString()}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
-                      <Scale className="w-4 h-4" />
-                      Net stock difference
+                      <TrendingUp className={cn("w-4 h-4", profitDaily >= 0 ? "text-green-600" : "text-destructive")} />
+                      Sales - Farmer Costs
                     </div>
                   </CardContent>
                 </Card>
@@ -412,12 +417,12 @@ export default function ReportsPage() {
                 <Card className="rounded-3xl border-none shadow-xl bg-card overflow-hidden">
                   <CardHeader className="pb-2">
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Farmer Payables</p>
-                    <CardTitle className="text-3xl font-black text-primary">₹ {dailyEntries?.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0).toLocaleString()}</CardTitle>
+                    <CardTitle className="text-3xl font-black text-primary">₹ {totalFarmerCostDaily.toLocaleString()}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
-                      <IndianRupee className="w-4 h-4" />
-                      Estimated daily payouts
+                      <Wallet className="w-4 h-4" />
+                      Total daily payouts
                     </div>
                   </CardContent>
                 </Card>
@@ -437,7 +442,7 @@ export default function ReportsPage() {
                       <div className="h-4 bg-muted rounded-full overflow-hidden">
                         <div 
                           className="h-full bg-primary transition-all duration-1000" 
-                          style={{ width: `${totalCollectionDaily > 0 ? (cowVolume/totalCollectionDaily)*100 : 0}%` }}
+                          style={{ width: `${totalCollectionDailyVolume > 0 ? (cowVolume/totalCollectionDailyVolume)*100 : 0}%` }}
                         />
                       </div>
                     </div>
@@ -449,7 +454,7 @@ export default function ReportsPage() {
                       <div className="h-4 bg-muted rounded-full overflow-hidden">
                         <div 
                           className="h-full bg-accent transition-all duration-1000" 
-                          style={{ width: `${totalCollectionDaily > 0 ? (buffaloVolume/totalCollectionDaily)*100 : 0}%` }}
+                          style={{ width: `${totalCollectionDailyVolume > 0 ? (buffaloVolume/totalCollectionDailyVolume)*100 : 0}%` }}
                         />
                       </div>
                     </div>
@@ -753,3 +758,4 @@ export default function ReportsPage() {
     </div>
   );
 }
+

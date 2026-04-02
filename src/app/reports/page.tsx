@@ -22,7 +22,13 @@ import {
   ArrowLeft,
   Milk,
   Download,
-  CheckCircle2
+  CheckCircle2,
+  BarChart4,
+  ArrowUpRight,
+  ArrowDownRight,
+  Scale,
+  IndianRupee,
+  PieChart
 } from "lucide-react";
 import { format, endOfMonth, startOfMonth } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -109,14 +115,18 @@ export default function ReportsPage() {
       const day = parseInt(entry.date.split('-')[2]);
       return day >= c.start && day <= c.end;
     }) || [];
-    return { qty: cEntries.reduce((acc, curr) => acc + (curr.quantity || 0), 0) };
+    return { 
+      qty: cEntries.reduce((acc, curr) => acc + (curr.quantity || 0), 0),
+      amount: cEntries.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0)
+    };
   });
 
   const farmerCycleBreakdown = farmers?.map(farmer => {
     const fEntries = filteredCycleEntries?.filter(e => e.farmerId === farmer.id) || [];
     return {
       ...farmer,
-      totalQty: fEntries.reduce((acc, curr) => acc + (curr.quantity || 0), 0)
+      totalQty: fEntries.reduce((acc, curr) => acc + (curr.quantity || 0), 0),
+      totalAmount: fEntries.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0)
     };
   }).filter(f => f.totalQty > 0).sort((a, b) => {
     const aNum = parseInt(a.canNumber);
@@ -135,6 +145,21 @@ export default function ReportsPage() {
     const bB = buyers?.find(buy => buy.id === b.buyerId);
     return (bA?.buyerCode || "").localeCompare(bB?.buyerCode || "");
   });
+
+  // Analytics Calculations
+  const totalCollectionDaily = dailyEntries?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
+  const totalSalesDaily = dailySales?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
+  const balanceDaily = totalCollectionDaily - totalSalesDaily;
+
+  const cowVolume = dailyEntries?.filter(e => {
+    const f = farmers?.find(far => far.id === e.farmerId);
+    return f?.milkType === 'COW';
+  }).reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
+
+  const buffaloVolume = dailyEntries?.filter(e => {
+    const f = farmers?.find(far => far.id === e.farmerId);
+    return f?.milkType === 'BUFFALO';
+  }).reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
 
   const invoiceFarmer = farmers?.find(f => f.id === viewingInvoiceFarmerId);
   const invoiceEntries = filteredCycleEntries?.filter(e => e.farmerId === viewingInvoiceFarmerId).sort((a, b) => a.date.localeCompare(b.date));
@@ -273,23 +298,150 @@ export default function ReportsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
             <div>
-              <h1 className="text-3xl font-black text-primary tracking-tight">SGK MILK Reports</h1>
-              <p className="text-muted-foreground font-medium">Daily collection logs and 10-day supplier invoices.</p>
+              <h1 className="text-3xl font-black text-primary tracking-tight uppercase">SGK MILK Intelligence</h1>
+              <p className="text-muted-foreground font-medium">Enterprise collection logs, sales analytics and billing.</p>
             </div>
           </header>
 
-          <Tabs defaultValue="cycle" className="space-y-8">
-            <TabsList className="grid grid-cols-3 w-full sm:w-[600px] rounded-full p-1 bg-muted border border-primary/5">
-              <TabsTrigger value="cycle" className="rounded-full font-bold gap-2">
+          <Tabs defaultValue="overview" className="space-y-8">
+            <TabsList className="grid grid-cols-4 w-full sm:w-[800px] rounded-full p-1 bg-muted border border-primary/5">
+              <TabsTrigger value="overview" className="rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest">
+                <BarChart4 className="w-4 h-4" /> Overview
+              </TabsTrigger>
+              <TabsTrigger value="cycle" className="rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest">
                 <FileText className="w-4 h-4" /> Cycle Bill
               </TabsTrigger>
-              <TabsTrigger value="daily" className="rounded-full font-bold gap-2">
-                <ClipboardList className="w-4 h-4" /> Daily Logs
+              <TabsTrigger value="daily" className="rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest">
+                <ClipboardList className="w-4 h-4" /> Collection
               </TabsTrigger>
-              <TabsTrigger value="sales" className="rounded-full font-bold gap-2">
-                <ShoppingCart className="w-4 h-4" /> Sales Report
+              <TabsTrigger value="sales" className="rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest">
+                <ShoppingCart className="w-4 h-4" /> Sales
               </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="overview" className="space-y-8 animate-in fade-in duration-500">
+              <div className="flex justify-end mb-4">
+                <Input 
+                  type="date" 
+                  value={selectedDate} 
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="w-[200px] rounded-full font-bold border-primary/20 shadow-sm bg-card"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Card className="rounded-3xl border-none shadow-xl bg-primary text-primary-foreground overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Collection Volume</p>
+                    <CardTitle className="text-4xl font-black">{totalCollectionDaily.toFixed(1)} L</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-1 text-xs font-bold opacity-90">
+                      <ArrowUpRight className="w-4 h-4" />
+                      Incoming from farmers
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-3xl border-none shadow-xl bg-accent text-accent-foreground overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Distribution Volume</p>
+                    <CardTitle className="text-4xl font-black">{totalSalesDaily.toFixed(1)} L</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-1 text-xs font-bold opacity-90">
+                      <ArrowDownRight className="w-4 h-4" />
+                      Outgoing to buyers
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-3xl border-none shadow-xl bg-card overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Inventory Balance</p>
+                    <CardTitle className={cn("text-4xl font-black", balanceDaily >= 0 ? "text-green-600" : "text-destructive")}>
+                      {balanceDaily.toFixed(1)} L
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
+                      <Scale className="w-4 h-4" />
+                      Net stock difference
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-3xl border-none shadow-xl bg-card overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Farmer Payables</p>
+                    <CardTitle className="text-3xl font-black text-primary">₹ {dailyEntries?.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0).toLocaleString()}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
+                      <IndianRupee className="w-4 h-4" />
+                      Estimated daily payouts
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <Card className="rounded-[2.5rem] border-none shadow-xl bg-card p-8">
+                  <h3 className="text-xl font-black text-primary mb-6 flex items-center gap-2 uppercase tracking-tighter">
+                    <PieChart className="w-5 h-5" /> Milk Composition
+                  </h3>
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm font-black uppercase tracking-widest text-muted-foreground">
+                        <span>Cow Milk</span>
+                        <span className="text-primary">{cowVolume.toFixed(1)} L</span>
+                      </div>
+                      <div className="h-4 bg-muted rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-primary transition-all duration-1000" 
+                          style={{ width: `${totalCollectionDaily > 0 ? (cowVolume/totalCollectionDaily)*100 : 0}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm font-black uppercase tracking-widest text-muted-foreground">
+                        <span>Buffalo Milk</span>
+                        <span className="text-accent">{buffaloVolume.toFixed(1)} L</span>
+                      </div>
+                      <div className="h-4 bg-muted rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-accent transition-all duration-1000" 
+                          style={{ width: `${totalCollectionDaily > 0 ? (buffaloVolume/totalCollectionDaily)*100 : 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
+                <Card className="rounded-[2.5rem] border-none shadow-xl bg-card p-8">
+                  <h3 className="text-xl font-black text-primary mb-6 flex items-center gap-2 uppercase tracking-tighter">
+                    <BarChart4 className="w-5 h-5" /> Efficiency Summary
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-6 bg-muted/30 rounded-3xl text-center">
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Morning Yield</p>
+                      <p className="text-2xl font-black text-primary">
+                        {dailyEntries?.filter(e => e.session === 'Morning').reduce((acc, curr) => acc + (curr.quantity || 0), 0).toFixed(1)} L
+                      </p>
+                    </div>
+                    <div className="p-6 bg-muted/30 rounded-3xl text-center">
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Evening Yield</p>
+                      <p className="text-2xl font-black text-primary">
+                        {dailyEntries?.filter(e => e.session === 'Evening').reduce((acc, curr) => acc + (curr.quantity || 0), 0).toFixed(1)} L
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-6 p-4 border border-dashed border-primary/20 rounded-2xl text-[11px] text-muted-foreground font-medium text-center">
+                    Data for {format(new Date(selectedDate), 'PPPP')}
+                  </div>
+                </Card>
+              </div>
+            </TabsContent>
 
             <TabsContent value="cycle" className="space-y-8 animate-in fade-in duration-500">
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -307,7 +459,7 @@ export default function ReportsPage() {
                   </Select>
                 </div>
                 <div className="text-xs font-black text-muted-foreground uppercase tracking-widest">
-                  Cycle Bills strictly show total Litres collected
+                  10-Day Cycle Billing: Strictly showing collection Litres
                 </div>
               </div>
 
@@ -329,12 +481,12 @@ export default function ReportsPage() {
                         </Badge>
                         {activeCycle === idx && <ChevronRight className="w-5 h-5 text-primary animate-pulse" />}
                       </div>
-                      <CardTitle className="text-xl font-black mt-2">{cycle.range}</CardTitle>
+                      <CardTitle className="text-xl font-black mt-2 tracking-tighter">{cycle.range}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground font-bold text-xs uppercase tracking-tighter">Volume:</span>
-                        <span className="font-black text-primary text-2xl">{cycleStats[idx]?.qty.toFixed(1) || "0.0"} <small className="text-xs">L</small></span>
+                        <span className="font-black text-primary text-2xl tracking-tighter">{cycleStats[idx]?.qty.toFixed(1) || "0.0"} <small className="text-xs">L</small></span>
                       </div>
                     </CardContent>
                   </Card>
@@ -352,7 +504,7 @@ export default function ReportsPage() {
                   <div className="bg-primary px-8 py-4 rounded-3xl text-primary-foreground shadow-lg flex items-center gap-4">
                     <Milk className="w-6 h-6 opacity-50" />
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Total Litres Collected</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Cycle Litres Total</p>
                       <p className="text-3xl font-black tracking-tighter">{cycleStats[activeCycle]?.qty.toFixed(2)} L</p>
                     </div>
                   </div>
@@ -361,11 +513,11 @@ export default function ReportsPage() {
                 <Table>
                   <TableHeader className="bg-muted/50 border-b">
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-[120px] font-black text-primary pl-8 py-6">CAN</TableHead>
-                      <TableHead className="font-black text-primary">Farmer Name</TableHead>
-                      <TableHead className="font-black text-primary">Milk Type</TableHead>
-                      <TableHead className="text-right font-black text-primary">Total Litres</TableHead>
-                      <TableHead className="text-right pr-8 font-black text-primary">Invoice</TableHead>
+                      <TableHead className="w-[120px] font-black text-primary pl-8 py-6 uppercase text-[10px] tracking-widest">CAN</TableHead>
+                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Farmer Name</TableHead>
+                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Milk Type</TableHead>
+                      <TableHead className="text-right font-black text-primary uppercase text-[10px] tracking-widest">Total Litres</TableHead>
+                      <TableHead className="text-right pr-8 font-black text-primary uppercase text-[10px] tracking-widest">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -385,7 +537,7 @@ export default function ReportsPage() {
                     ) : (
                       farmerCycleBreakdown?.map((f) => (
                         <TableRow key={f.id} className="hover:bg-primary/5 transition-colors border-b last:border-0 group">
-                          <TableCell className="font-black text-primary pl-8 text-xl">{f.canNumber}</TableCell>
+                          <TableCell className="font-black text-primary pl-8 text-xl tracking-tighter">{f.canNumber}</TableCell>
                           <TableCell className="font-bold text-base">{f.name}</TableCell>
                           <TableCell>
                             <Badge variant={f.milkType === 'BUFFALO' ? "secondary" : "outline"} className="rounded-full font-black text-[10px] uppercase">
@@ -399,7 +551,7 @@ export default function ReportsPage() {
                             <Button 
                               variant="default" 
                               size="sm" 
-                              className="rounded-full font-bold shadow-sm"
+                              className="rounded-full font-black text-[10px] uppercase tracking-widest shadow-sm"
                               onClick={() => setViewingInvoiceFarmerId(f.id)}
                             >
                               <FileText className="w-3 h-3 mr-2" />
@@ -414,7 +566,7 @@ export default function ReportsPage() {
                 
                 <div className="p-6 bg-muted/20 border-t text-center">
                   <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">
-                    Verified SGK MILK Report &bull; {isClient ? format(new Date(), 'PPPP') : '...'}
+                    Verified SGK MILK Report &bull; {format(new Date(), 'PPPP')}
                   </p>
                 </div>
               </Card>
@@ -435,11 +587,11 @@ export default function ReportsPage() {
                 <Table>
                   <TableHeader className="bg-muted/50 border-b">
                     <TableRow>
-                      <TableHead className="w-[100px] font-black text-primary pl-8 py-5">CAN</TableHead>
-                      <TableHead className="font-black text-primary">Farmer Name</TableHead>
-                      <TableHead className="font-black text-primary">Session</TableHead>
-                      <TableHead className="font-black text-primary">Weight (Kg)</TableHead>
-                      <TableHead className="font-black text-primary text-right pr-8">Qty (Litre)</TableHead>
+                      <TableHead className="w-[100px] font-black text-primary pl-8 py-5 uppercase text-[10px] tracking-widest">CAN</TableHead>
+                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Farmer Name</TableHead>
+                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Session</TableHead>
+                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Weight (Kg)</TableHead>
+                      <TableHead className="font-black text-primary text-right pr-8 uppercase text-[10px] tracking-widest">Qty (Litre)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -452,7 +604,7 @@ export default function ReportsPage() {
                         const farmer = farmers?.find(f => f.id === entry.farmerId);
                         return (
                           <TableRow key={entry.id} className="hover:bg-primary/5 transition-colors border-b last:border-0">
-                            <TableCell className="font-black text-primary pl-8 text-lg">{farmer?.canNumber || "—"}</TableCell>
+                            <TableCell className="font-black text-primary pl-8 text-lg tracking-tighter">{farmer?.canNumber || "—"}</TableCell>
                             <TableCell>
                               <div className="flex flex-col">
                                 <span className="font-bold text-base">{farmer?.name || "Unknown"}</span>
@@ -492,10 +644,10 @@ export default function ReportsPage() {
                 <Table>
                   <TableHeader className="bg-muted/50 border-b">
                     <TableRow>
-                      <TableHead className="w-[100px] font-black text-primary pl-8 py-5">Code</TableHead>
-                      <TableHead className="font-black text-primary">Buyer Name</TableHead>
-                      <TableHead className="font-black text-primary">Session</TableHead>
-                      <TableHead className="font-black text-primary text-right pr-8">Qty Sold (Litre)</TableHead>
+                      <TableHead className="w-[100px] font-black text-primary pl-8 py-5 uppercase text-[10px] tracking-widest">Code</TableHead>
+                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Buyer Name</TableHead>
+                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Session</TableHead>
+                      <TableHead className="font-black text-primary text-right pr-8 uppercase text-[10px] tracking-widest">Qty Sold (Litre)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -508,7 +660,7 @@ export default function ReportsPage() {
                         const buyer = buyers?.find(b => b.id === sale.buyerId);
                         return (
                           <TableRow key={sale.id} className="hover:bg-accent/5 transition-colors border-b last:border-0">
-                            <TableCell className="font-black text-primary pl-8 text-lg">{buyer?.buyerCode || "—"}</TableCell>
+                            <TableCell className="font-black text-primary pl-8 text-lg tracking-tighter">{buyer?.buyerCode || "—"}</TableCell>
                             <TableCell className="font-bold text-base">{buyer?.name || "Unknown"}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className="rounded-full font-bold text-[10px] uppercase border-accent/20">

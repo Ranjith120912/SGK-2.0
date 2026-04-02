@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useCollection, useMemoFirebase, useFirestore } from "@/firebase";
 import { collection, query, where } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,7 +9,13 @@ import { format } from "date-fns";
 
 export function DashboardStats() {
   const firestore = useFirestore();
-  const today = format(new Date(), 'yyyy-MM-dd');
+  const [currentDate, setCurrentDate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setCurrentDate(new Date());
+  }, []);
+
+  const today = currentDate ? format(currentDate, 'yyyy-MM-dd') : null;
 
   const customersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -16,7 +23,7 @@ export function DashboardStats() {
   }, [firestore]);
 
   const entriesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !today) return null;
     return query(collection(firestore, 'entries'), where('date', '==', today));
   }, [firestore, today]);
 
@@ -87,7 +94,9 @@ export function DashboardStats() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Date</p>
-              <h3 className="text-2xl font-black text-primary">{format(new Date(), 'dd MMM, yyyy')}</h3>
+              <h3 className="text-2xl font-black text-primary">
+                {currentDate ? format(currentDate, 'dd MMM, yyyy') : 'Loading...'}
+              </h3>
             </div>
             <div className="p-2 bg-background rounded-xl">
               <Calendar className="w-5 h-5 text-primary" />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { useCollection, useMemoFirebase, useFirestore } from "@/firebase";
@@ -20,11 +20,14 @@ import { cn } from "@/lib/utils";
 export default function EntriesPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
-  const today = format(new Date(), 'yyyy-MM-dd');
-  const [date, setDate] = useState(today);
+  const [date, setDate] = useState<string>("");
   const [session, setSession] = useState<'Morning' | 'Evening'>('Morning');
   const [searchTerm, setSearchTerm] = useState("");
   const [quantities, setQuantities] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setDate(format(new Date(), 'yyyy-MM-dd'));
+  }, []);
 
   const customersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -32,7 +35,7 @@ export default function EntriesPage() {
   }, [firestore]);
 
   const entriesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !date) return null;
     return query(
       collection(firestore, 'entries'), 
       where('date', '==', date),
@@ -75,6 +78,18 @@ export default function EntriesPage() {
 
     toast({ title: "Saved", description: "Entry recorded successfully." });
   };
+
+  if (!date) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <Navbar />
+        <main className="flex-grow pt-24 pb-20 flex items-center justify-center">
+          <p className="text-muted-foreground">Initializing...</p>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">

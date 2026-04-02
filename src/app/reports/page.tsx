@@ -34,7 +34,8 @@ import {
   Activity,
   History,
   TrendingDown,
-  Info
+  Info,
+  Files
 } from "lucide-react";
 import { format, endOfMonth, startOfMonth, startOfYear, endOfYear, eachMonthOfInterval } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +56,7 @@ export default function ReportsPage() {
   const [activeCycle, setActiveCycle] = useState<number>(0);
   const [isClient, setIsClient] = useState(false);
   const [viewingInvoiceFarmerId, setViewingInvoiceFarmerId] = useState<string | null>(null);
+  const [viewingBulkInvoices, setViewingBulkInvoices] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
@@ -222,14 +224,14 @@ export default function ReportsPage() {
     return f?.milkType === 'BUFFALO';
   }).reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
 
-  const invoiceFarmer = farmers?.find(f => f.id === viewingInvoiceFarmerId);
-  const invoiceEntries = filteredCycleEntries?.filter(e => e.farmerId === viewingInvoiceFarmerId).sort((a, b) => a.date.localeCompare(b.date));
-
-  const consolidatedInvoiceData = useMemo(() => {
-    if (!invoiceEntries) return [];
-    const grouped: Record<string, { date: string, morning: number, evening: number, total: number }> = {};
+  const renderInvoice = (farmerId: string) => {
+    const invFarmer = farmers?.find(f => f.id === farmerId);
+    const invEntries = filteredCycleEntries?.filter(e => e.farmerId === farmerId).sort((a, b) => a.date.localeCompare(b.date));
     
-    invoiceEntries.forEach(entry => {
+    if (!invFarmer || !invEntries) return null;
+
+    const grouped: Record<string, { date: string, morning: number, evening: number, total: number }> = {};
+    invEntries.forEach(entry => {
       if (!grouped[entry.date]) {
         grouped[entry.date] = { date: entry.date, morning: 0, evening: 0, total: 0 };
       }
@@ -238,16 +240,111 @@ export default function ReportsPage() {
       grouped[entry.date].total = grouped[entry.date].morning + grouped[entry.date].evening;
     });
 
-    return Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date));
-  }, [invoiceEntries]);
+    const consolidated = Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date));
+    const invRate = invFarmer.milkType === 'BUFFALO' ? (ratesConfig?.buffaloRate || 0) : (ratesConfig?.cowRate || 0);
+    const totalL = consolidated.reduce((acc, curr) => acc + curr.total, 0);
+    const totalA = totalL * invRate;
 
-  const currentRate = useMemo(() => {
-    if (!invoiceFarmer || !ratesConfig) return 0;
-    return invoiceFarmer.milkType === 'BUFFALO' ? (ratesConfig.buffaloRate || 0) : (ratesConfig.cowRate || 0);
-  }, [invoiceFarmer, ratesConfig]);
+    return (
+      <div className="invoice-content bg-white p-12 border shadow-sm mb-8 invoice-page-break">
+        <div className="text-center mb-10">
+          <h1 className="text-2xl font-bold tracking-tight mb-1">SRI GOPALA KRISHNA MILK DISTRIBUTIONS</h1>
+          <h2 className="text-xl font-semibold uppercase tracking-widest">MILK INVOICE</h2>
+        </div>
 
-  const grandTotalLitres = consolidatedInvoiceData.reduce((acc, curr) => acc + curr.total, 0);
-  const grandTotalAmount = grandTotalLitres * currentRate;
+        <div className="grid grid-cols-2 gap-x-12 gap-y-4 mb-8 text-sm font-medium">
+          <div className="flex gap-4">
+            <span className="w-24 text-muted-foreground uppercase">Name:</span>
+            <span className="font-bold border-b border-black flex-grow uppercase">{invFarmer.name}</span>
+          </div>
+          <div className="flex gap-4">
+            <span className="w-24 text-muted-foreground uppercase">Date:</span>
+            <span className="font-bold border-b border-black flex-grow">{format(new Date(), 'dd/MM/yyyy')}</span>
+          </div>
+          <div className="flex gap-4">
+            <span className="w-24 text-muted-foreground uppercase">A/C No:</span>
+            <span className="font-bold border-b border-black flex-grow font-mono">{invFarmer.bankAccountNumber || "—"}</span>
+          </div>
+          <div className="flex gap-4">
+            <span className="w-24 text-muted-foreground uppercase">Period:</span>
+            <span className="font-bold border-b border-black flex-grow">
+              {currentCycle ? `${currentCycle.start}/${selectedMonth.split('-')[1]}/${selectedMonth.split('-')[0].slice(2)} to ${currentCycle.end}/${selectedMonth.split('-')[1]}/${selectedMonth.split('-')[0].slice(2)}` : "—"}
+            </span>
+          </div>
+          <div className="flex gap-4">
+            <span className="w-24 text-muted-foreground uppercase">Can No:</span>
+            <span className="font-bold border-b border-black flex-grow">{invFarmer.canNumber}</span>
+          </div>
+          <div className="flex gap-4 invisible">
+            <span className="w-24 text-muted-foreground uppercase">—</span>
+            <span className="font-bold border-b border-black flex-grow">—</span>
+          </div>
+          <div className="flex gap-4">
+            <span className="w-24 text-muted-foreground uppercase">Rate (₹):</span>
+            <span className="font-bold border-b border-black flex-grow">{invRate.toFixed(2)}</span>
+          </div>
+        </div>
+
+        <div className="border border-black">
+          <Table className="border-collapse">
+            <TableHeader className="bg-white">
+              <TableRow className="hover:bg-transparent border-b border-black">
+                <TableHead className="text-center border-r border-black font-bold text-black uppercase h-10 px-2">Date</TableHead>
+                <TableHead className="text-center border-r border-black font-bold text-black uppercase h-10 px-2">Morning (L)</TableHead>
+                <TableHead className="text-center border-r border-black font-bold text-black uppercase h-10 px-2">Evening (L)</TableHead>
+                <TableHead className="text-center border-r border-black font-bold text-black uppercase h-10 px-2">Total Litres</TableHead>
+                <TableHead className="text-center border-r border-black font-bold text-black uppercase h-10 px-2">Rate (₹)</TableHead>
+                <TableHead className="text-right font-bold text-black uppercase h-10 px-4">Amount (₹)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {consolidated.map((row) => (
+                <TableRow key={row.date} className="hover:bg-transparent border-b border-black last:border-b-0">
+                  <TableCell className="text-center border-r border-black py-1.5 font-medium">{format(new Date(row.date), 'dd/MM/yy')}</TableCell>
+                  <TableCell className="text-center border-r border-black py-1.5">{row.morning.toFixed(2)}</TableCell>
+                  <TableCell className="text-center border-r border-black py-1.5">{row.evening.toFixed(2)}</TableCell>
+                  <TableCell className="text-center border-r border-black py-1.5 font-bold">{row.total.toFixed(2)}</TableCell>
+                  <TableCell className="text-center border-r border-black py-1.5">{invRate.toFixed(2)}</TableCell>
+                  <TableCell className="text-right py-1.5 pr-4 font-mono">{ (row.total * invRate).toFixed(2) }</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+
+        <div className="mt-8 space-y-4">
+          <div className="flex justify-between items-center text-lg font-bold border-t border-black pt-4">
+            <span className="uppercase">Total</span>
+            <div className="flex gap-20">
+              <span className="w-32 text-center">{totalL.toFixed(2)}</span>
+              <span className="w-40 text-right font-mono">{totalA.toFixed(2)}</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-end gap-2 pt-8">
+            <div className="flex gap-4 text-base">
+              <span className="font-medium">Total Litres:</span>
+              <span className="font-bold w-24 text-right">{totalL.toFixed(2)}</span>
+            </div>
+            <div className="flex gap-4 text-base">
+              <span className="font-medium">Total Amount (₹):</span>
+              <span className="font-bold w-24 text-right font-mono">{totalA.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-20 flex justify-between items-end italic text-xs text-muted-foreground">
+          <p>Generated by SGK MILK Management System</p>
+          <div className="flex flex-col items-center gap-2">
+            <div className="relative flex flex-col items-center">
+              <CheckCircle2 className="w-16 h-16 text-primary/10 absolute -top-12 -rotate-12" />
+              <p className="border-t border-black w-48 text-center pt-2 font-bold text-black uppercase relative z-10">Authorized Signature</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   if (!isClient || !selectedMonth) {
     return (
@@ -261,7 +358,8 @@ export default function ReportsPage() {
     );
   }
 
-  if (viewingInvoiceFarmerId && invoiceFarmer) {
+  // Single Invoice View
+  if (viewingInvoiceFarmerId && !viewingBulkInvoices) {
     return (
       <div className="min-h-screen flex flex-col bg-white">
         <Navbar />
@@ -275,103 +373,35 @@ export default function ReportsPage() {
                 <Printer className="w-4 h-4 mr-2" /> Print Invoice
               </Button>
             </div>
+            {renderInvoice(viewingInvoiceFarmerId)}
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
-            <div className="invoice-content bg-white p-12 border shadow-sm">
-              <div className="text-center mb-10">
-                <h1 className="text-2xl font-bold tracking-tight mb-1">SRI GOPALA KRISHNA MILK DISTRIBUTIONS</h1>
-                <h2 className="text-xl font-semibold uppercase tracking-widest">MILK INVOICE</h2>
-              </div>
-
-              <div className="grid grid-cols-2 gap-x-12 gap-y-4 mb-8 text-sm font-medium">
-                <div className="flex gap-4">
-                  <span className="w-24 text-muted-foreground uppercase">Name:</span>
-                  <span className="font-bold border-b border-black flex-grow uppercase">{invoiceFarmer.name}</span>
+  // Bulk Invoices View
+  if (viewingBulkInvoices) {
+    return (
+      <div className="min-h-screen flex flex-col bg-white">
+        <Navbar />
+        <main className="flex-grow pt-24 pb-20 px-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex justify-between items-center mb-8 no-print">
+              <Button variant="outline" onClick={() => setViewingBulkInvoices(false)} className="rounded-full">
+                <ArrowLeft className="w-4 h-4 mr-2" /> Back to Bill
+              </Button>
+              <Button onClick={() => window.print()} className="rounded-full shadow-lg">
+                <Printer className="w-4 h-4 mr-2" /> Print All Invoices
+              </Button>
+            </div>
+            <div className="bulk-invoices-container">
+              {activeFarmerCycleBreakdown.map(f => (
+                <div key={f.id}>
+                  {renderInvoice(f.id)}
                 </div>
-                <div className="flex gap-4">
-                  <span className="w-24 text-muted-foreground uppercase">Date:</span>
-                  <span className="font-bold border-b border-black flex-grow">{format(new Date(), 'dd/MM/yyyy')}</span>
-                </div>
-                <div className="flex gap-4">
-                  <span className="w-24 text-muted-foreground uppercase">A/C No:</span>
-                  <span className="font-bold border-b border-black flex-grow font-mono">{invoiceFarmer.bankAccountNumber || "—"}</span>
-                </div>
-                <div className="flex gap-4">
-                  <span className="w-24 text-muted-foreground uppercase">Period:</span>
-                  <span className="font-bold border-b border-black flex-grow">
-                    {currentCycle ? `${currentCycle.start}/${selectedMonth.split('-')[1]}/${selectedMonth.split('-')[0].slice(2)} to ${currentCycle.end}/${selectedMonth.split('-')[1]}/${selectedMonth.split('-')[0].slice(2)}` : "—"}
-                  </span>
-                </div>
-                <div className="flex gap-4">
-                  <span className="w-24 text-muted-foreground uppercase">Can No:</span>
-                  <span className="font-bold border-b border-black flex-grow">{invoiceFarmer.canNumber}</span>
-                </div>
-                <div className="flex gap-4 invisible">
-                  <span className="w-24 text-muted-foreground uppercase">—</span>
-                  <span className="font-bold border-b border-black flex-grow">—</span>
-                </div>
-                <div className="flex gap-4">
-                  <span className="w-24 text-muted-foreground uppercase">Rate (₹):</span>
-                  <span className="font-bold border-b border-black flex-grow">{currentRate.toFixed(2)}</span>
-                </div>
-              </div>
-
-              <div className="border border-black">
-                <Table className="border-collapse">
-                  <TableHeader className="bg-white">
-                    <TableRow className="hover:bg-transparent border-b border-black">
-                      <TableHead className="text-center border-r border-black font-bold text-black uppercase h-10 px-2">Date</TableHead>
-                      <TableHead className="text-center border-r border-black font-bold text-black uppercase h-10 px-2">Morning (L)</TableHead>
-                      <TableHead className="text-center border-r border-black font-bold text-black uppercase h-10 px-2">Evening (L)</TableHead>
-                      <TableHead className="text-center border-r border-black font-bold text-black uppercase h-10 px-2">Total Litres</TableHead>
-                      <TableHead className="text-center border-r border-black font-bold text-black uppercase h-10 px-2">Rate (₹)</TableHead>
-                      <TableHead className="text-right font-bold text-black uppercase h-10 px-4">Amount (₹)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {consolidatedInvoiceData.map((row) => (
-                      <TableRow key={row.date} className="hover:bg-transparent border-b border-black last:border-b-0">
-                        <TableCell className="text-center border-r border-black py-1.5 font-medium">{format(new Date(row.date), 'dd/MM/yy')}</TableCell>
-                        <TableCell className="text-center border-r border-black py-1.5">{row.morning.toFixed(2)}</TableCell>
-                        <TableCell className="text-center border-r border-black py-1.5">{row.evening.toFixed(2)}</TableCell>
-                        <TableCell className="text-center border-r border-black py-1.5 font-bold">{row.total.toFixed(2)}</TableCell>
-                        <TableCell className="text-center border-r border-black py-1.5">{currentRate.toFixed(2)}</TableCell>
-                        <TableCell className="text-right py-1.5 pr-4 font-mono">{ (row.total * currentRate).toFixed(2) }</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <div className="mt-8 space-y-4">
-                <div className="flex justify-between items-center text-lg font-bold border-t border-black pt-4">
-                  <span className="uppercase">Total</span>
-                  <div className="flex gap-20">
-                    <span className="w-32 text-center">{grandTotalLitres.toFixed(2)}</span>
-                    <span className="w-40 text-right font-mono">{grandTotalAmount.toFixed(2)}</span>
-                  </div>
-                </div>
-
-                <div className="flex flex-col items-end gap-2 pt-8">
-                  <div className="flex gap-4 text-base">
-                    <span className="font-medium">Total Litres:</span>
-                    <span className="font-bold w-24 text-right">{grandTotalLitres.toFixed(2)}</span>
-                  </div>
-                  <div className="flex gap-4 text-base">
-                    <span className="font-medium">Total Amount (₹):</span>
-                    <span className="font-bold w-24 text-right font-mono">{grandTotalAmount.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-20 flex justify-between items-end italic text-xs text-muted-foreground">
-                <p>Generated by SGK MILK Management System</p>
-                <div className="flex flex-col items-center gap-2">
-                  <div className="relative flex flex-col items-center">
-                    <CheckCircle2 className="w-16 h-16 text-primary/10 absolute -top-12 -rotate-12" />
-                    <p className="border-t border-black w-48 text-center pt-2 font-bold text-black uppercase relative z-10">Authorized Signature</p>
-                  </div>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </main>
@@ -708,7 +738,7 @@ export default function ReportsPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {cycles.map((cycle, idx) => (
                       <Button 
                         key={cycle.id}
@@ -719,6 +749,14 @@ export default function ReportsPage() {
                         {cycle.label}
                       </Button>
                     ))}
+                    <Button 
+                      onClick={() => setViewingBulkInvoices(true)} 
+                      variant="secondary"
+                      className="rounded-full text-[10px] font-black uppercase tracking-widest h-8 ml-2"
+                      disabled={activeFarmerCycleBreakdown.length === 0}
+                    >
+                      <Files className="w-3.5 h-3.5 mr-2" /> Bulk Print Invoices
+                    </Button>
                   </div>
                 </div>
 
@@ -1001,12 +1039,21 @@ export default function ReportsPage() {
           @media print {
             .no-print { display: none !important; }
             .print-only { display: block !important; }
+            .invoice-page-break {
+              page-break-after: always;
+              break-after: page;
+              margin-bottom: 0;
+              border: none !important;
+              box-shadow: none !important;
+            }
             .master-summary-print { border: none !important; box-shadow: none !important; }
             .master-summary-print table { border-collapse: collapse !important; width: 100% !important; }
             .master-summary-print th, .master-summary-print td { border: 1px solid black !important; padding: 8px !important; }
             body * { visibility: hidden; }
+            .invoice-content, .invoice-content *, 
+            .bulk-invoices-container, .bulk-invoices-container *,
             .master-summary-print, .master-summary-print * { visibility: visible; }
-            .master-summary-print { position: absolute; left: 0; top: 0; }
+            .invoice-content, .master-summary-print, .bulk-invoices-container { position: absolute; left: 0; top: 0; width: 100%; }
           }
         `}</style>
       </div>

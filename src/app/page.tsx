@@ -35,7 +35,7 @@ export default function Home() {
               </div>
             </Link>
 
-            <Link href="/customers">
+            <Link href="/farmers">
               <div className="group p-8 bg-card border rounded-3xl hover:border-primary/50 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer flex flex-col items-center text-center space-y-4">
                 <div className="p-4 bg-accent/10 rounded-2xl group-hover:scale-110 transition-transform">
                   <Users className="w-8 h-8 text-accent" />

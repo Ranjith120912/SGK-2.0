@@ -5,8 +5,8 @@ import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { AuthInitializer } from '@/components/auth-initializer';
 
 export const metadata: Metadata = {
-  title: 'SGK MILK - Milk Distribution Management',
-  description: 'Professional milk collection and distribution software for dairy businesses.',
+  title: 'SGK MILK - Dairy Distribution Management',
+  description: 'Professional milk collection and distribution software for SGK MILK.',
 };
 
 export default function RootLayout({
@@ -19,7 +19,7 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
         <FirebaseClientProvider>

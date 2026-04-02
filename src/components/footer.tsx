@@ -10,15 +10,15 @@ export function Footer() {
   }, []);
 
   return (
-    <footer className="py-12 px-4 border-t border-primary/5 bg-background">
-      <div className="max-w-7xl mx-auto flex flex-col items-center gap-6">
-        <div className="flex gap-8 text-sm font-medium text-muted-foreground">
-          <a href="#" className="hover:text-primary transition-colors">Privacy</a>
-          <a href="#" className="hover:text-primary transition-colors">Terms</a>
-          <a href="#" className="hover:text-primary transition-colors">Support</a>
+    <footer className="py-12 px-4 border-t border-primary/5 bg-muted/30">
+      <div className="max-w-7xl mx-auto flex flex-col items-center gap-8">
+        <div className="flex flex-wrap justify-center gap-8 text-xs font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+          <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
+          <a href="#" className="hover:text-primary transition-colors">Terms of Service</a>
+          <a href="#" className="hover:text-primary transition-colors">Support Center</a>
         </div>
-        <div className="text-sm text-muted-foreground/60 font-body">
-          &copy; {year || '...'} SGK MILK Management System. All rights reserved.
+        <div className="text-[10px] text-muted-foreground/40 font-black uppercase tracking-[0.3em] text-center">
+          &copy; {year || '...'} SGK MILK Management System. Engineered for Dairy Excellence.
         </div>
       </div>
     </footer>

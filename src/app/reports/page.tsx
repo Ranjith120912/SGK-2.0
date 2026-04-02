@@ -30,9 +30,12 @@ import {
   CheckCircle2,
   ListChecks,
   TrendingUp,
-  Wallet
+  Wallet,
+  Activity,
+  History,
+  TrendingDown
 } from "lucide-react";
-import { format, endOfMonth, startOfMonth } from "date-fns";
+import { format, endOfMonth, startOfMonth, startOfYear, endOfYear, eachMonthOfInterval } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -155,10 +158,47 @@ export default function ReportsPage() {
     return (bA?.buyerCode || "").localeCompare(bB?.buyerCode || "");
   });
 
-  // Analytics Calculations
+  // Monthly Analytics
+  const monthlyEntries = allEntries?.filter(e => e.date.startsWith(selectedMonth)) || [];
+  const monthlySales = allSales?.filter(s => s.date.startsWith(selectedMonth)) || [];
+  
+  const totalMonthlyCollection = monthlyEntries.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
+  const totalMonthlyProcurementCost = monthlyEntries.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0);
+  const totalMonthlySalesRevenue = monthlySales.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0);
+  const monthlyProfit = totalMonthlySalesRevenue - totalMonthlyProcurementCost;
+
+  // Yearly Analytics
+  const currentYear = selectedMonth.split('-')[0];
+  const yearlyStats = useMemo(() => {
+    if (!allEntries || !allSales || !currentYear) return [];
+    
+    const months = eachMonthOfInterval({
+      start: startOfYear(new Date(parseInt(currentYear), 0, 1)),
+      end: endOfYear(new Date(parseInt(currentYear), 0, 1))
+    });
+
+    return months.map(monthDate => {
+      const monthPrefix = format(monthDate, 'yyyy-MM');
+      const mEntries = allEntries.filter(e => e.date.startsWith(monthPrefix));
+      const mSales = allSales.filter(s => s.date.startsWith(monthPrefix));
+      
+      const cost = mEntries.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0);
+      const revenue = mSales.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0);
+      
+      return {
+        month: format(monthDate, 'MMM'),
+        fullName: format(monthDate, 'MMMM'),
+        collection: mEntries.reduce((acc, curr) => acc + (curr.quantity || 0), 0),
+        cost,
+        revenue,
+        profit: revenue - cost
+      };
+    });
+  }, [allEntries, allSales, currentYear]);
+
+  // Analytics Calculations (Daily)
   const totalCollectionDailyVolume = dailyEntries?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
   const totalSalesDailyVolume = dailySales?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
-
   const totalFarmerCostDaily = dailyEntries?.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0) || 0;
   const totalSalesRevenueDaily = dailySales?.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0) || 0;
   const profitDaily = totalSalesRevenueDaily - totalFarmerCostDaily;
@@ -354,6 +394,9 @@ export default function ReportsPage() {
               <TabsTrigger value="master" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
                 <ListChecks className="w-3.5 h-3.5" /> Master Summary
               </TabsTrigger>
+              <TabsTrigger value="management" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
+                <Activity className="w-3.5 h-3.5" /> Internal logs
+              </TabsTrigger>
               <TabsTrigger value="daily" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
                 <ClipboardList className="w-3.5 h-3.5" /> Collection
               </TabsTrigger>
@@ -482,6 +525,114 @@ export default function ReportsPage() {
                   <div className="mt-6 p-4 border border-dashed border-primary/20 rounded-2xl text-[11px] text-muted-foreground font-medium text-center">
                     Data for {format(new Date(selectedDate), 'PPPP')}
                   </div>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="management" className="space-y-12 animate-in fade-in duration-500">
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <Calendar className="w-5 h-5 text-primary" />
+                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                    <SelectTrigger className="w-[200px] rounded-full font-bold border-primary/20 bg-card">
+                      <SelectValue placeholder="Select Month" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {monthOptions.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2 bg-primary/10 px-4 py-2 rounded-full border border-primary/20">
+                  <History className="w-4 h-4 text-primary" />
+                  <span className="text-xs font-black uppercase tracking-widest text-primary">Internal Audit Mode</span>
+                </div>
+              </div>
+
+              {/* Monthly Stats Section */}
+              <div className="space-y-6">
+                <h3 className="text-2xl font-black text-primary uppercase tracking-tighter flex items-center gap-2">
+                  <Calendar className="w-6 h-6" /> Monthly Management Summary
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <Card className="rounded-3xl border-none shadow-xl bg-card p-6">
+                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Monthly Procurement</p>
+                    <p className="text-2xl font-black text-primary">{totalMonthlyCollection.toFixed(1)} Litres</p>
+                    <p className="text-[10px] font-bold text-muted-foreground mt-2 italic">Total milk collected this month</p>
+                  </Card>
+                  <Card className="rounded-3xl border-none shadow-xl bg-card p-6">
+                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Procurement Cost</p>
+                    <p className="text-2xl font-black text-destructive">₹ {totalMonthlyProcurementCost.toLocaleString()}</p>
+                    <p className="text-[10px] font-bold text-muted-foreground mt-2 italic">Total paid to farmers</p>
+                  </Card>
+                  <Card className="rounded-3xl border-none shadow-xl bg-card p-6">
+                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Sales Revenue</p>
+                    <p className="text-2xl font-black text-green-600">₹ {totalMonthlySalesRevenue.toLocaleString()}</p>
+                    <p className="text-[10px] font-bold text-muted-foreground mt-2 italic">Total distribution income</p>
+                  </Card>
+                  <Card className="rounded-3xl border-none shadow-xl bg-primary text-primary-foreground p-6">
+                    <p className="text-[10px] font-black uppercase tracking-widest mb-1 opacity-80">Net Monthly Profit</p>
+                    <p className="text-2xl font-black">₹ {monthlyProfit.toLocaleString()}</p>
+                    <p className="text-[10px] font-bold mt-2 italic opacity-80">Operating surplus for {format(new Date(selectedMonth + "-01"), 'MMM')}</p>
+                  </Card>
+                </div>
+              </div>
+
+              {/* Yearly Stats Table */}
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-2xl font-black text-primary uppercase tracking-tighter flex items-center gap-2">
+                    <BarChart4 className="w-6 h-6" /> Yearly Growth & Performance ({currentYear})
+                  </h3>
+                  <Button variant="outline" size="sm" className="rounded-full h-8" onClick={() => window.print()}>
+                    <Printer className="w-4 h-4 mr-2" /> Export Annual
+                  </Button>
+                </div>
+                <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-2xl bg-card">
+                  <Table>
+                    <TableHeader className="bg-muted/50">
+                      <TableRow>
+                        <TableHead className="pl-8 py-5 font-black text-primary uppercase text-[10px] tracking-widest">Month</TableHead>
+                        <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Collection (L)</TableHead>
+                        <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest text-right">Farmer Cost (₹)</TableHead>
+                        <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest text-right">Sales Revenue (₹)</TableHead>
+                        <TableHead className="pr-8 font-black text-primary uppercase text-[10px] tracking-widest text-right">Net Profit (₹)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {yearlyStats.map((item) => (
+                        <TableRow key={item.month} className={cn("hover:bg-primary/5 transition-colors", item.profit < 0 && "bg-destructive/5")}>
+                          <TableCell className="pl-8 font-black text-lg text-primary">{item.fullName}</TableCell>
+                          <TableCell className="font-bold">{item.collection.toFixed(1)} L</TableCell>
+                          <TableCell className="text-right font-mono text-destructive">₹ {item.cost.toLocaleString()}</TableCell>
+                          <TableCell className="text-right font-mono text-green-600">₹ {item.revenue.toLocaleString()}</TableCell>
+                          <TableCell className="pr-8 text-right font-black text-xl tracking-tighter">
+                            <span className={item.profit >= 0 ? "text-primary" : "text-destructive"}>
+                              {item.profit >= 0 ? "+" : ""} ₹ {item.profit.toLocaleString()}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                    <TableFooter className="bg-primary/10">
+                      <TableRow>
+                        <TableCell className="pl-8 font-black uppercase text-xs">Annual Total</TableCell>
+                        <TableCell className="font-black text-primary">
+                          {yearlyStats.reduce((acc, curr) => acc + curr.collection, 0).toFixed(1)} L
+                        </TableCell>
+                        <TableCell className="text-right font-black text-destructive">
+                          ₹ {yearlyStats.reduce((acc, curr) => acc + curr.cost, 0).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right font-black text-green-600">
+                          ₹ {yearlyStats.reduce((acc, curr) => acc + curr.revenue, 0).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="pr-8 text-right font-black text-2xl tracking-tighter text-primary">
+                          ₹ {yearlyStats.reduce((acc, curr) => acc + curr.profit, 0).toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    </TableFooter>
+                  </Table>
                 </Card>
               </div>
             </TabsContent>
@@ -758,4 +909,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-

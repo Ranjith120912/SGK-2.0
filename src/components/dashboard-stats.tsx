@@ -101,7 +101,7 @@ export function DashboardStats() {
             </div>
           </div>
           <p className="mt-5 text-xs font-medium text-muted-foreground uppercase tracking-tighter">
-            {format(currentDate || new Date(), 'dd MMM, yyyy')}
+            {currentDate ? format(currentDate, 'dd MMM, yyyy') : 'Loading...'}
           </p>
         </CardContent>
       </Card>

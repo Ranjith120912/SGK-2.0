@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -14,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Settings as SettingsIcon, Milk, Save, CheckCircle2, ShoppingBag, Building2, Upload, X, Image as ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import Image from "next/image";
+import { cn } from "@/lib/utils";
 
 export default function SettingsPage() {
   const firestore = useFirestore();

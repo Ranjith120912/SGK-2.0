@@ -197,7 +197,7 @@ export default function ReportsPage() {
                 <div>
                   <div className="flex items-center gap-3 mb-2">
                     <Droplets className="w-8 h-8" />
-                    <h1 className="text-4xl font-black tracking-tighter uppercase">SGK MILK</h1>
+                    <h1 className="text-3xl font-black tracking-tighter uppercase leading-tight">SRI GOPALA KRISHNA MILK DISTRIBUTION</h1>
                   </div>
                   <p className="text-primary-foreground/80 font-bold uppercase tracking-[0.2em] text-xs">Payment Cycle Invoice</p>
                 </div>
@@ -280,7 +280,7 @@ export default function ReportsPage() {
                    </div>
                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-relaxed">
                      Generated on {format(new Date(), 'PPPP')}<br />
-                     SGK MILK Management System
+                     SRI GOPALA KRISHNA MILK DISTRIBUTION
                    </p>
                 </div>
               </div>
@@ -567,7 +567,7 @@ export default function ReportsPage() {
                 
                 <div className="p-6 bg-muted/20 border-t text-center">
                   <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">
-                    Verified SGK MILK Report &bull; {format(new Date(), 'PPPP')}
+                    Verified SRI GOPALA KRISHNA MILK DISTRIBUTION Report &bull; {format(new Date(), 'PPPP')}
                   </p>
                 </div>
               </Card>

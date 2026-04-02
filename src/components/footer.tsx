@@ -18,7 +18,7 @@ export function Footer() {
           <a href="#" className="hover:text-primary transition-colors">Support Center</a>
         </div>
         <div className="text-[10px] text-muted-foreground/40 font-black uppercase tracking-[0.3em] text-center">
-          &copy; {year || '...'} SGK MILK Management System. Engineered for Dairy Excellence.
+          &copy; {year || '...'} SGK MILK DISTRIBUTIONS. Engineered for Dairy Excellence.
         </div>
       </div>
     </footer>

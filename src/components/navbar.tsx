@@ -1,4 +1,3 @@
-
 import Link from "next/link";
 import { Droplets, Users, ClipboardList, BarChart3, Settings, ShoppingCart, UserCheck } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -12,7 +11,7 @@ export function Navbar() {
             <div className="p-2 bg-primary rounded-xl group-hover:scale-105 transition-transform duration-200 shadow-lg shadow-primary/20">
               <Droplets className="w-5 h-5 text-white" />
             </div>
-            <span className="font-headline font-black text-xl text-primary tracking-tighter uppercase">SGK MILK</span>
+            <span className="font-headline font-black text-xl text-primary tracking-tighter uppercase">SGK MILK DISTRIBUTIONS</span>
           </Link>
           <div className="hidden lg:flex items-center gap-6">
             <Link href="/" className="text-sm font-bold text-muted-foreground hover:text-primary transition-colors">

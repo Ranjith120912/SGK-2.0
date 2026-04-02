@@ -22,7 +22,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <header className="mb-10 text-center sm:text-left">
             <h1 className="text-4xl font-black text-primary tracking-tighter mb-2 uppercase">
-              SGK MILK Dashboard
+              SGK MILK DISTRIBUTIONS Dashboard
             </h1>
             <p className="text-muted-foreground font-medium">
               Enterprise Dairy Management & Distribution System.

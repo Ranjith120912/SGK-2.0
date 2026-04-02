@@ -1,4 +1,3 @@
-
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
@@ -7,8 +6,8 @@ import { AuthInitializer } from '@/components/auth-initializer';
 import { ThemeProvider } from '@/components/theme-provider';
 
 export const metadata: Metadata = {
-  title: 'SGK MILK - Dairy Distribution Management',
-  description: 'Professional milk collection and distribution software for SGK MILK.',
+  title: 'SGK MILK DISTRIBUTIONS - Dairy Management',
+  description: 'Professional milk collection and distribution software for SGK MILK DISTRIBUTIONS.',
 };
 
 export default function RootLayout({

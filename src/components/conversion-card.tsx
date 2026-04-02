@@ -117,7 +117,7 @@ export function ConversionCard() {
           </div>
           <div className="space-y-1">
             <CardTitle className="text-4xl font-headline font-bold text-primary tracking-tight uppercase">
-              SGK MILK
+              SGK MILK DISTRIBUTIONS
             </CardTitle>
             <CardDescription className="text-muted-foreground font-body text-base">
               Universal Weight-Volume Converter

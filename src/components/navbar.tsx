@@ -21,13 +21,13 @@ export function Navbar() {
               <ClipboardList className="w-4 h-4" />
               Collection
             </Link>
-            <Link href="/sales" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
-              <ShoppingCart className="w-4 h-4" />
-              Sales
-            </Link>
             <Link href="/farmers" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
               <Users className="w-4 h-4" />
               Farmers
+            </Link>
+            <Link href="/sales" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
+              <ShoppingCart className="w-4 h-4" />
+              Sales
             </Link>
             <Link href="/buyers" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
               <Contact className="w-4 h-4" />

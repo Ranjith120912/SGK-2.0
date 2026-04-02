@@ -3,7 +3,7 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { DashboardStats } from "@/components/dashboard-stats";
 import Link from "next/link";
-import { PlusCircle, ListChecks, Users, ShoppingCart, Contact } from "lucide-react";
+import { PlusCircle, Users, ShoppingCart, Contact } from "lucide-react";
 
 export default function Home() {
   return (
@@ -34,16 +34,6 @@ export default function Home() {
               </div>
             </Link>
 
-            <Link href="/sales">
-              <div className="group p-8 bg-card border rounded-3xl hover:border-accent/50 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer flex flex-col items-center text-center space-y-4 h-full">
-                <div className="p-4 bg-accent/10 rounded-2xl group-hover:scale-110 transition-transform">
-                  <ShoppingCart className="w-8 h-8 text-accent" />
-                </div>
-                <h3 className="text-xl font-bold text-primary">Daily Sales</h3>
-                <p className="text-sm text-muted-foreground">Track milk distribution and sales to buyers.</p>
-              </div>
-            </Link>
-
             <Link href="/farmers">
               <div className="group p-8 bg-card border rounded-3xl hover:border-primary/50 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer flex flex-col items-center text-center space-y-4 h-full">
                 <div className="p-4 bg-secondary/10 rounded-2xl group-hover:scale-110 transition-transform">
@@ -51,6 +41,16 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl font-bold text-primary">Farmers</h3>
                 <p className="text-sm text-muted-foreground">Manage your milk suppliers and accounts.</p>
+              </div>
+            </Link>
+
+            <Link href="/sales">
+              <div className="group p-8 bg-card border rounded-3xl hover:border-accent/50 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer flex flex-col items-center text-center space-y-4 h-full">
+                <div className="p-4 bg-accent/10 rounded-2xl group-hover:scale-110 transition-transform">
+                  <ShoppingCart className="w-8 h-8 text-accent" />
+                </div>
+                <h3 className="text-xl font-bold text-primary">Daily Sales</h3>
+                <p className="text-sm text-muted-foreground">Track milk distribution and sales to buyers.</p>
               </div>
             </Link>
 

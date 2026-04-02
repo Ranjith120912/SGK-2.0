@@ -13,9 +13,10 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { format } from "date-fns";
-import { Sun, Moon, Search, Scale, Droplets, CheckCircle2, Loader2 } from "lucide-react";
+import { Sun, Moon, Search, Scale, Droplets, CheckCircle2, Loader2, Milk } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 const CONVERSION_RATE = 0.96; // 1 Kg = 0.96 Litres
 
@@ -91,7 +92,7 @@ export default function EntriesPage() {
       rate: 0,
       totalAmount: 0,
       updatedAt: serverTimestamp(),
-      createdAt: serverTimestamp(), // Merger handles if it already exists
+      createdAt: serverTimestamp(),
     }, { merge: true });
 
     setTimeout(() => {
@@ -167,7 +168,7 @@ export default function EntriesPage() {
               <TableHeader className="bg-muted/50">
                 <TableRow>
                   <TableHead className="w-[80px] font-bold py-4 pl-6">CAN</TableHead>
-                  <TableHead className="font-bold">Farmer Name</TableHead>
+                  <TableHead className="font-bold">Farmer Details</TableHead>
                   <TableHead className="w-[180px] font-bold">Result (Litres)</TableHead>
                   <TableHead className="w-[220px] font-bold">Entry (Kg)</TableHead>
                   <TableHead className="w-[100px] text-right pr-6 font-bold">Status</TableHead>
@@ -187,7 +188,16 @@ export default function EntriesPage() {
                   return (
                     <TableRow key={farmer.id} className={cn(existingEntry && "bg-primary/5")}>
                       <TableCell className="font-black text-primary pl-6 text-lg">{farmer.canNumber}</TableCell>
-                      <TableCell className="font-semibold">{farmer.name}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <span className="font-bold text-base">{farmer.name}</span>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={farmer.milkType === 'BUFFALO' ? "secondary" : "outline"} className="text-[10px] h-4 rounded-full px-1.5">
+                              {farmer.milkType || 'COW'}
+                            </Badge>
+                          </div>
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
                           <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Calculated</span>

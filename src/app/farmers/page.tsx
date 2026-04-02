@@ -22,6 +22,13 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
+import { 
   UserPlus, 
   Database, 
   Search, 
@@ -31,18 +38,19 @@ import {
   CircleAlert, 
   Download, 
   FileSpreadsheet,
-  Table as TableIcon,
-  Upload
+  Upload,
+  Milk
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { read, utils, writeFile } from 'xlsx';
+import { Badge } from "@/components/ui/badge";
 
 export default function FarmersPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [isAdding, setIsAdding] = useState(false);
-  const [newFarmer, setNewFarmer] = useState({ name: "", canNumber: "", accountNumber: "" });
+  const [newFarmer, setNewFarmer] = useState({ name: "", canNumber: "", accountNumber: "", milkType: "COW" });
   const [importData, setImportData] = useState("");
   const [isImporting, setIsImporting] = useState(false);
 
@@ -78,7 +86,7 @@ export default function FarmersPage() {
       createdAt: serverTimestamp(),
     });
 
-    setNewFarmer({ name: "", canNumber: "", accountNumber: "" });
+    setNewFarmer({ name: "", canNumber: "", accountNumber: "", milkType: "COW" });
     setIsAdding(false);
     toast({ title: "Success", description: "Farmer added successfully." });
   };
@@ -96,12 +104,17 @@ export default function FarmersPage() {
       const name = item.Name || item.name || normalizedItem.name || normalizedItem.farmername;
       const canNumber = item['Can Number'] || item.canNumber || normalizedItem.cannumber || normalizedItem.can;
       const accountNumber = item['Account Number'] || item.accountNumber || normalizedItem.accountnumber || normalizedItem.account;
+      const milkTypeRaw = item['Milk Type'] || item.milkType || normalizedItem.milktype || normalizedItem.type;
+      
+      let milkType = "COW";
+      if (milkTypeRaw?.toString().toUpperCase().includes("BUFFALO")) milkType = "BUFFALO";
 
       if (name && canNumber) {
         addDocumentNonBlocking(collection(firestore, 'farmers'), {
           name: name.toString(),
           canNumber: canNumber.toString().padStart(3, '0'),
           accountNumber: (accountNumber || "").toString(),
+          milkType: milkType,
           active: true,
           createdAt: serverTimestamp(),
         });
@@ -175,8 +188,8 @@ export default function FarmersPage() {
 
   const downloadExcelTemplate = () => {
     const templateData = [
-      { "Name": "Rajesh Kumar", "Can Number": "101", "Account Number": "9876543210" },
-      { "Name": "Suresh Singh", "Can Number": "102", "Account Number": "1234567890" }
+      { "Name": "Rajesh Kumar", "Can Number": "101", "Account Number": "9876543210", "Milk Type": "COW" },
+      { "Name": "Suresh Singh", "Can Number": "102", "Account Number": "1234567890", "Milk Type": "BUFFALO" }
     ];
     const ws = utils.json_to_sheet(templateData);
     const wb = utils.book_new();
@@ -194,6 +207,7 @@ export default function FarmersPage() {
         name: `Farmer ${i}`,
         canNumber: i.toString().padStart(3, '0'),
         accountNumber: `ACC-${i.toString().padStart(6, '0')}`,
+        milkType: i % 2 === 0 ? "BUFFALO" : "COW",
         active: true,
         createdAt: serverTimestamp(),
       });
@@ -208,7 +222,7 @@ export default function FarmersPage() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
             <div>
               <h1 className="text-3xl font-black text-primary tracking-tight">Farmer Management</h1>
-              <p className="text-muted-foreground">Directory of suppliers and bank account details.</p>
+              <p className="text-muted-foreground">Directory of suppliers and milk categorization.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => setIsAdding(!isAdding)} variant={isAdding ? "outline" : "default"} className="rounded-full">
@@ -231,7 +245,7 @@ export default function FarmersPage() {
                         Excel Bulk Import
                       </DialogTitle>
                       <DialogDescription className="text-primary-foreground/80">
-                        Upload your .xlsx file or follow the 3-column format shown below.
+                        Upload your .xlsx file with Name, Can Number, Account Number, and Milk Type.
                       </DialogDescription>
                     </DialogHeader>
                   </div>
@@ -259,9 +273,9 @@ export default function FarmersPage() {
                         </div>
                         <div className="bg-muted/50 rounded-2xl p-4 border border-primary/10 flex flex-col items-center justify-center h-24 gap-2">
                           <Button variant="outline" size="sm" onClick={downloadExcelTemplate} className="rounded-full w-full bg-background shadow-sm hover:bg-primary hover:text-white transition-all">
-                            <Download className="w-3 h-3 mr-2" /> Download Excel (.xlsx)
+                            <Download className="w-3 h-3 mr-2" /> Download Template (.xlsx)
                           </Button>
-                          <p className="text-[10px] text-muted-foreground italic text-center">Standard 3-column template</p>
+                          <p className="text-[10px] text-muted-foreground italic text-center">Includes Milk Type column</p>
                         </div>
                       </div>
                     </div>
@@ -270,11 +284,11 @@ export default function FarmersPage() {
                       <div className="flex items-center justify-between">
                         <label className="text-sm font-bold text-primary flex items-center gap-2 uppercase tracking-wider">
                           <ClipboardList className="w-4 h-4" />
-                          Or Paste Column Data
+                          Or Paste Data
                         </label>
                       </div>
                       <Textarea 
-                        placeholder="Name, Can Number, Account Number&#10;John Doe, 101, 9123456789" 
+                        placeholder="Name, Can Number, Account Number, Milk Type&#10;John Doe, 101, 9123456789, COW" 
                         value={importData}
                         onChange={(e) => setImportData(e.target.value)}
                         className="min-h-[120px] font-mono text-xs rounded-2xl border-primary/20 bg-background/50 focus:bg-background transition-colors"
@@ -285,7 +299,7 @@ export default function FarmersPage() {
                   <div className="bg-muted/50 p-6 flex flex-col sm:flex-row gap-4 justify-between items-center border-t">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium italic">
                       <CircleAlert className="w-4 h-4 text-accent" />
-                      Headers required in first row
+                      Milk Type must be COW or BUFFALO
                     </div>
                     <div className="flex gap-2">
                       <Button variant="ghost" onClick={() => setIsImporting(false)} className="rounded-full">Cancel</Button>
@@ -300,7 +314,7 @@ export default function FarmersPage() {
 
               <Button variant="ghost" onClick={seedData} className="rounded-full text-muted-foreground border-dashed border-2 hover:bg-muted/50">
                 <Database className="w-4 h-4 mr-2" />
-                Seed 50 Samples
+                Seed Samples
               </Button>
             </div>
           </div>
@@ -314,7 +328,7 @@ export default function FarmersPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
                   <div className="space-y-2">
                     <label className="text-xs font-black text-muted-foreground uppercase tracking-widest">Full Name</label>
                     <Input 
@@ -332,6 +346,18 @@ export default function FarmersPage() {
                       onChange={(e) => setNewFarmer({...newFarmer, canNumber: e.target.value})}
                       className="rounded-xl h-11 border-primary/10"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-muted-foreground uppercase tracking-widest">Milk Type</label>
+                    <Select value={newFarmer.milkType} onValueChange={(v) => setNewFarmer({...newFarmer, milkType: v})}>
+                      <SelectTrigger className="rounded-xl h-11 border-primary/10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="COW">COW</SelectItem>
+                        <SelectItem value="BUFFALO">BUFFALO</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-black text-muted-foreground uppercase tracking-widest">Account Number</label>
@@ -364,18 +390,19 @@ export default function FarmersPage() {
             <Table>
               <TableHeader className="bg-muted/50 border-b">
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-[120px] font-black text-primary pl-6 py-5">CAN</TableHead>
+                  <TableHead className="w-[100px] font-black text-primary pl-6 py-5">CAN</TableHead>
                   <TableHead className="font-black text-primary">Farmer Name</TableHead>
+                  <TableHead className="w-[120px] font-black text-primary">Milk Type</TableHead>
                   <TableHead className="font-black text-primary">Account Number</TableHead>
                   <TableHead className="text-right pr-6 font-black text-primary">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={4} className="text-center py-20 text-muted-foreground animate-pulse font-medium">Loading farmer directory...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground animate-pulse font-medium">Loading farmer directory...</TableCell></TableRow>
                 ) : filteredFarmers?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-20">
+                    <TableCell colSpan={5} className="text-center py-20">
                       <div className="flex flex-col items-center gap-3">
                         <div className="p-4 bg-muted rounded-full">
                           <ClipboardList className="w-10 h-10 text-muted-foreground/30" />
@@ -389,6 +416,11 @@ export default function FarmersPage() {
                     <TableRow key={farmer.id} className="group hover:bg-primary/5 transition-colors border-b last:border-0">
                       <TableCell className="font-black text-primary pl-6 text-lg">{farmer.canNumber}</TableCell>
                       <TableCell className="font-bold text-base text-foreground/80">{farmer.name}</TableCell>
+                      <TableCell>
+                        <Badge variant={farmer.milkType === 'BUFFALO' ? "secondary" : "outline"} className="rounded-full font-bold">
+                          {farmer.milkType || 'COW'}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="text-muted-foreground font-mono font-medium">{farmer.accountNumber || "—"}</TableCell>
                       <TableCell className="text-right pr-6">
                         <Button variant="ghost" size="sm" className="rounded-full opacity-0 group-hover:opacity-100 transition-opacity font-bold text-primary">Edit Profile</Button>

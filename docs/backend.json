@@ -18,6 +18,11 @@
           "type": "string",
           "description": "Bank account number for payments"
         },
+        "milkType": {
+          "type": "string",
+          "enum": ["COW", "BUFFALO"],
+          "description": "Type of milk provided by the farmer"
+        },
         "active": {
           "type": "boolean",
           "description": "Whether the farmer is currently active"
@@ -27,7 +32,7 @@
           "format": "date-time"
         }
       },
-      "required": ["name", "canNumber"]
+      "required": ["name", "canNumber", "milkType"]
     },
     "MilkEntry": {
       "title": "Milk Entry",

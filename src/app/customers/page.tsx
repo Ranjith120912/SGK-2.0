@@ -239,7 +239,7 @@ export default function FarmersPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-muted-foreground uppercase">Account Number</label>
+                    <label className="text-xs font-bold text-muted-foreground uppercase">Bank Account Number</label>
                     <Input 
                       placeholder="e.g. 9123456789" 
                       value={newFarmer.accountNumber}
@@ -271,7 +271,7 @@ export default function FarmersPage() {
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="w-[120px] font-bold text-primary pl-6">CAN</TableHead>
                   <TableHead className="font-bold text-primary">Farmer Name</TableHead>
-                  <TableHead className="font-bold text-primary">Account Number</TableHead>
+                  <TableHead className="font-bold text-primary">Bank Account Number</TableHead>
                   <TableHead className="text-right pr-6 font-bold text-primary">Actions</TableHead>
                 </TableRow>
               </TableHeader>

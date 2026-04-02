@@ -103,7 +103,7 @@ export default function FarmersPage() {
 
       const name = item.Name || item.name || normalizedItem.name || normalizedItem.farmername;
       const canNumber = item['Can Number'] || item.canNumber || normalizedItem.cannumber || normalizedItem.can;
-      const accountNumber = item['Account Number'] || item.accountNumber || normalizedItem.accountnumber || normalizedItem.account;
+      const accountNumber = item['Bank Account Number'] || item['Account Number'] || item.accountNumber || normalizedItem.bankaccountnumber || normalizedItem.accountnumber || normalizedItem.account;
       const milkTypeRaw = item['Milk Type'] || item.milkType || normalizedItem.milktype || normalizedItem.type;
       
       let milkType = "COW";
@@ -188,8 +188,8 @@ export default function FarmersPage() {
 
   const downloadExcelTemplate = () => {
     const templateData = [
-      { "Name": "Rajesh Kumar", "Can Number": "101", "Account Number": "9876543210", "Milk Type": "COW" },
-      { "Name": "Suresh Singh", "Can Number": "102", "Account Number": "1234567890", "Milk Type": "BUFFALO" }
+      { "Name": "Rajesh Kumar", "Can Number": "101", "Bank Account Number": "9876543210", "Milk Type": "COW" },
+      { "Name": "Suresh Singh", "Can Number": "102", "Bank Account Number": "1234567890", "Milk Type": "BUFFALO" }
     ];
     const ws = utils.json_to_sheet(templateData);
     const wb = utils.book_new();
@@ -245,7 +245,7 @@ export default function FarmersPage() {
                         Excel Bulk Import
                       </DialogTitle>
                       <DialogDescription className="text-primary-foreground/80">
-                        Upload your .xlsx file with Name, Can Number, Account Number, and Milk Type.
+                        Upload your .xlsx file with Name, Can Number, Bank Account Number, and Milk Type.
                       </DialogDescription>
                     </DialogHeader>
                   </div>
@@ -275,7 +275,7 @@ export default function FarmersPage() {
                           <Button variant="outline" size="sm" onClick={downloadExcelTemplate} className="rounded-full w-full bg-background shadow-sm hover:bg-primary hover:text-white transition-all">
                             <Download className="w-3 h-3 mr-2" /> Download Template (.xlsx)
                           </Button>
-                          <p className="text-[10px] text-muted-foreground italic text-center">Includes Milk Type column</p>
+                          <p className="text-[10px] text-muted-foreground italic text-center">Includes Bank Account Number</p>
                         </div>
                       </div>
                     </div>
@@ -288,7 +288,7 @@ export default function FarmersPage() {
                         </label>
                       </div>
                       <Textarea 
-                        placeholder="Name, Can Number, Account Number, Milk Type&#10;John Doe, 101, 9123456789, COW" 
+                        placeholder="Name, Can Number, Bank Account Number, Milk Type&#10;John Doe, 101, 9123456789, COW" 
                         value={importData}
                         onChange={(e) => setImportData(e.target.value)}
                         className="min-h-[120px] font-mono text-xs rounded-2xl border-primary/20 bg-background/50 focus:bg-background transition-colors"
@@ -360,7 +360,7 @@ export default function FarmersPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-muted-foreground uppercase tracking-widest">Account Number</label>
+                    <label className="text-xs font-black text-muted-foreground uppercase tracking-widest">Bank Account Number</label>
                     <Input 
                       placeholder="e.g. 9123456789" 
                       value={newFarmer.accountNumber}
@@ -393,7 +393,7 @@ export default function FarmersPage() {
                   <TableHead className="w-[100px] font-black text-primary pl-6 py-5">CAN</TableHead>
                   <TableHead className="font-black text-primary">Farmer Name</TableHead>
                   <TableHead className="w-[120px] font-black text-primary">Milk Type</TableHead>
-                  <TableHead className="font-black text-primary">Account Number</TableHead>
+                  <TableHead className="font-black text-primary">Bank Account Number</TableHead>
                   <TableHead className="text-right pr-6 font-black text-primary">Actions</TableHead>
                 </TableRow>
               </TableHeader>

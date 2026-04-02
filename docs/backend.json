@@ -1,194 +1,88 @@
+
 {
   "entities": {
     "Customer": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Customer",
+      "description": "A milk distribution customer",
       "type": "object",
-      "description": "Represents a customer in the milk distribution system, storing their personal and contact information.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Customer entity."
-        },
         "name": {
           "type": "string",
-          "description": "The full name of the customer."
+          "description": "Full name of the customer"
         },
-        "address": {
+        "canNumber": {
           "type": "string",
-          "description": "The physical delivery address of the customer."
+          "description": "Unique CAN number assigned to the customer"
         },
         "phoneNumber": {
           "type": "string",
-          "description": "The primary contact phone number of the customer."
+          "description": "Contact phone number"
         },
-        "email": {
+        "active": {
+          "type": "boolean",
+          "description": "Whether the customer is currently active"
+        },
+        "createdAt": {
           "type": "string",
-          "description": "The contact email address of the customer.",
-          "format": "email"
+          "format": "date-time"
         }
       },
-      "required": [
-        "id",
-        "name",
-        "address",
-        "phoneNumber"
-      ]
+      "required": ["name", "canNumber"]
     },
-    "CanType": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "CanType",
+    "MilkEntry": {
+      "title": "Milk Entry",
+      "description": "A daily milk collection or distribution record",
       "type": "object",
-      "description": "Defines the different types and capacities of milk cans available for distribution.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the CanType entity."
-        },
-        "name": {
-          "type": "string",
-          "description": "A descriptive name for the can type (e.g., '1 Litre Milk Can', 'Half Litre Can')."
-        },
-        "capacityLitres": {
-          "type": "number",
-          "description": "The volume capacity of this can type in litres."
-        }
-      },
-      "required": [
-        "id",
-        "name",
-        "capacityLitres"
-      ]
-    },
-    "CustomerSubscription": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "CustomerSubscription",
-      "type": "object",
-      "description": "Represents a customer's recurring order for a specific type and quantity of milk cans for morning and evening deliveries.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the CustomerSubscription entity."
-        },
         "customerId": {
           "type": "string",
-          "description": "Reference to the Customer who owns this subscription. (Relationship: Customer 1:N CustomerSubscription)"
+          "description": "Reference to the customer ID"
         },
-        "canTypeId": {
+        "date": {
           "type": "string",
-          "description": "Reference to the CanType being subscribed to. (Relationship: CanType 1:N CustomerSubscription)"
+          "format": "date",
+          "description": "Date of entry (YYYY-MM-DD)"
         },
-        "quantityMorning": {
+        "session": {
+          "type": "string",
+          "enum": ["Morning", "Evening"],
+          "description": "The session time"
+        },
+        "quantity": {
           "type": "number",
-          "description": "The number of cans of the specified CanType to be delivered in the morning slot."
+          "description": "Quantity of milk in Litres"
         },
-        "quantityEvening": {
+        "fat": {
           "type": "number",
-          "description": "The number of cans of the specified CanType to be delivered in the evening slot."
+          "description": "Fat percentage"
         },
-        "startDate": {
-          "type": "string",
-          "description": "The date from which this subscription is active.",
-          "format": "date-time"
+        "snf": {
+          "type": "number",
+          "description": "SNF percentage"
         },
-        "endDate": {
-          "type": "string",
-          "description": "The optional date when this subscription is scheduled to end.",
-          "format": "date-time"
+        "rate": {
+          "type": "number",
+          "description": "Rate per litre"
         },
-        "isActive": {
-          "type": "boolean",
-          "description": "A flag indicating whether the subscription is currently active."
+        "totalAmount": {
+          "type": "number",
+          "description": "Total amount for this entry"
         }
       },
-      "required": [
-        "id",
-        "customerId",
-        "canTypeId",
-        "quantityMorning",
-        "quantityEvening",
-        "startDate",
-        "isActive"
-      ]
+      "required": ["customerId", "date", "session", "quantity"]
     }
   },
   "auth": {
-    "providers": [
-      "password",
-      "anonymous"
-    ]
+    "providers": ["password"]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/roles_admin/{adminUid}",
-        "definition": {
-          "entityName": "admin",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "A collection used for Database Access Control (DBAC) to define users with 'admin' privileges. Each document's ID is the UID of an administrator. No specific entity schema is provided for 'admin' so referencing 'User' implicitly as a placeholder for UID structure. Authorization relies on the *existence* of a document with the request.auth.uid.",
-          "params": [
-            {
-              "name": "adminUid",
-              "description": "The unique identifier (Firebase Auth UID) of an administrator."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/canTypes/{canTypeId}",
-        "definition": {
-          "entityName": "CanType",
-          "schema": {
-            "$ref": "#/backend/entities/CanType"
-          },
-          "description": "A top-level collection storing definitions for different types of milk cans. This is reference data, primarily read-only for general application use, with write access limited to administrators.",
-          "params": [
-            {
-              "name": "canTypeId",
-              "description": "The unique identifier for a specific milk can type."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/customers/{customerId}",
-        "definition": {
-          "entityName": "Customer",
-          "schema": {
-            "$ref": "#/backend/entities/Customer"
-          },
-          "description": "A top-level collection for storing detailed information about each customer. Access is restricted to authenticated administrators.",
-          "params": [
-            {
-              "name": "customerId",
-              "description": "The unique identifier for a customer."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/customers/{customerId}/subscriptions/{subscriptionId}",
-        "definition": {
-          "entityName": "CustomerSubscription",
-          "schema": {
-            "$ref": "#/backend/entities/CustomerSubscription"
-          },
-          "description": "A subcollection under a specific customer, containing their recurring milk delivery subscriptions. The 'customerId' in the path establishes clear ownership. Access is restricted to authenticated administrators.",
-          "params": [
-            {
-              "name": "customerId",
-              "description": "The unique identifier of the parent customer."
-            },
-            {
-              "name": "subscriptionId",
-              "description": "The unique identifier for a specific customer subscription."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "The Firestore structure is designed following the CORE DESIGN PRINCIPLES, emphasizing Authorization Independence, Structural Segregation, and DBAC. Given the user's primary request for a 'Milk Distribution app' managing customers and subscriptions, and the detailed entities provided, the structure focuses on securely storing and managing this data. The 'LitreLink' conversion feature is a calculation utility that does not require persistent data storage in Firestore based on the provided entities, and thus is not reflected in the data structure.\n\n**Authorization Independence:** This is achieved by centralizing authorization around an 'admin' role. Access to `/customers/{customerId}`, `/canTypes/{canTypeId}`, and `/customers/{customerId}/subscriptions/{subscriptionId}` is granted if the `request.auth.uid` is present in the `/roles_admin/{adminUid}` collection. This completely avoids the need for `get()` calls on parent documents or related entities for authorization. Each document's access is determined by a simple check against a global role list, ensuring atomic operations and ease of debugging rules.\n\n**QAPs (Rules are not Filters):**\n1.  **`/roles_admin/{adminUid}`:** This collection is explicitly for defining admin roles. Rules will permit `list` operations for authenticated users to check their own admin status, or for other admins to view the list of admins (if needed). Unauthorized users cannot list this collection.\n2.  **`/customers/{customerId}`:** This collection stores all customer details. Only authenticated administrators (those whose UIDs are present in `/roles_admin`) will have `list` access, ensuring that `list` operations return only authorized documents (i.e., all documents, but only to authorized users) without client-side filtering.\n3.  **`/canTypes/{canTypeId}`:** This collection stores static reference data for milk can types. Similarly, `list` access will be restricted to authenticated administrators, adhering to QAPs.\n4.  **`/customers/{customerId}/subscriptions/{subscriptionId}`:** This subcollection holds individual customer subscriptions. An administrator can `list` all subscriptions for a specific customer (`/customers/{customerId}/subscriptions`), and potentially perform collection group queries to list all subscriptions across all customers. In both cases, rules will permit `list` only for administrators, ensuring no client-side filtering is required for authorization.\n\n**Structural Segregation:**\n*   `Customer` data is in its own top-level collection (`/customers`).\n*   `CanType` (reference data) is in its own top-level collection (`/canTypes`).\n*   `CustomerSubscription` data is nested under its respective `Customer` (`/customers/{customerId}/subscriptions`), maintaining a clear and logical hierarchy for related data that shares a similar security posture (admin-managed).\n*   `Admin Roles` are managed in a distinct top-level collection (`/roles_admin`), cleanly separating authorization data from application data.\n\nThis design prioritizes simplicity and robust security rules, making the system easy to scale and debug."
+    "/customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Collection of milk customers"
+    },
+    "/entries/{entryId}": {
+      "schema": "MilkEntry",
+      "description": "Daily milk entry records"
+    }
   }
 }

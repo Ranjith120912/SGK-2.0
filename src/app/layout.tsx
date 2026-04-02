@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { AuthInitializer } from '@/components/auth-initializer';
 
 export const metadata: Metadata = {
   title: 'LitreLink - Milk Distribution Management',
@@ -22,6 +23,7 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <FirebaseClientProvider>
+          <AuthInitializer />
           {children}
           <Toaster />
         </FirebaseClientProvider>

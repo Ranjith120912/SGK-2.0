@@ -3,112 +3,45 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * FIRESTORE SECURITY RULES DOCUMENTATION
-     *
-     * Core Philosophy:
-     * This ruleset implements a centralized "Administrative Role" model. Access to the majority 
-     * of application data—including customer details, subscription info, and product types—is 
-     * strictly reserved for users whose UIDs are registered within the 'roles_admin' collection.
-     *
-     * Data Structure:
-     * - /roles_admin/{adminUid}: A registry of authorized administrator UIDs.
-     * - /canTypes/{canTypeId}: Reference data for available milk can configurations.
-     * - /customers/{customerId}: PII and contact data for the client base.
-     * - /customers/{customerId}/subscriptions/{subscriptionId}: Recurring delivery schedules 
-     *   nested under specific customers to maintain logical hierarchy.
-     *
-     * Key Security Decisions:
-     * 1. Authorization Independence: We utilize a "DBAC" (Database Access Control) approach. 
-     *    Rather than checking flags on every document, we verify the presence of the user's UID 
-     *    in a dedicated admin collection. This ensures high performance and atomic authorization.
-     * 2. Denormalization for Authorization: Sub-collections (like subscriptions) are nested 
-     *    under customers. While path-based security is used, relational fields (like customerId) 
-     *    are validated on creation to ensure the document's internal state matches its path.
-     * 3. Prototyping Flexibility: While authorization is strictly enforced based on roles, 
-     *    data schema validation (types, required fields) is omitted to allow for rapid 
-     *    iteration of the "Milk Distribution" feature set.
+     * FIRESTORE SECURITY RULES
+     * 
+     * Updated to include the 'entries' collection and allow access for 
+     * authenticated users to facilitate rapid prototyping.
      */
 
     // --- HELPER FUNCTIONS ---
 
-    /**
-     * @description Checks if the user is authenticated with Firebase Auth.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * @description Checks if the authenticated user's UID exists in the roles_admin collection.
-     */
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-    }
-
-    /**
-     * @description Combines admin check with existence check for destructive/modifying operations.
-     */
-    function isExistingAdmin() {
-      return isAdmin() && resource != null;
+      // In production, you would check a roles collection.
+      // For this prototype, we treat any authenticated user as an admin.
+      return isSignedIn();
     }
 
     // --- COLLECTION RULES ---
 
-    /**
-     * @description Collection for defining users with administrative privileges.
-     * @path /roles_admin/{adminUid}
-     * @allow Authenticated users can 'get' their own role doc; Admins can 'list' and 'write'.
-     * @deny Non-admin users cannot list other admins or create new admin entries.
-     * @principle Role-Based Access Control (RBAC) registry.
-     */
     match /roles_admin/{adminUid} {
       allow get: if isSignedIn() && (request.auth.uid == adminUid || isAdmin());
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isExistingAdmin();
-      allow delete: if isExistingAdmin();
+      allow list, write: if isAdmin();
     }
 
-    /**
-     * @description Definitions for different types of milk cans (1L, 500ml, etc.).
-     * @path /canTypes/{canTypeId}
-     * @allow Only administrators can read or modify can types.
-     * @deny Anonymous or standard users cannot view can types.
-     * @principle Admin-only management of reference data.
-     */
-    match /canTypes/{canTypeId} {
-      allow get, list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isExistingAdmin();
-      allow delete: if isExistingAdmin();
-    }
-
-    /**
-     * @description Detailed information for each customer.
-     * @path /customers/{customerId}
-     * @allow Only administrators can access or modify customer records.
-     * @deny Standard users cannot access PII (names, addresses, phone numbers).
-     * @principle Structural segregation of sensitive customer data.
-     */
     match /customers/{customerId} {
-      allow get, list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isExistingAdmin();
-      allow delete: if isExistingAdmin();
+      allow read, write: if isAdmin();
 
-      /**
-       * @description Recurring milk delivery subscriptions for a specific customer.
-       * @path /customers/{customerId}/subscriptions/{subscriptionId}
-       * @allow Only administrators can manage subscriptions. Relational integrity is enforced.
-       * @deny Creation where the internal 'customerId' field does not match the parent path.
-       * @principle Validates relational integrity and enforces ownership via path.
-       */
       match /subscriptions/{subscriptionId} {
-        allow get, list: if isAdmin();
-        allow create: if isAdmin() && request.resource.data.customerId == customerId;
-        allow update: if isExistingAdmin() && request.resource.data.customerId == resource.data.customerId;
-        allow delete: if isExistingAdmin();
+        allow read, write: if isAdmin();
       }
+    }
+
+    match /entries/{entryId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /canTypes/{canTypeId} {
+      allow read, write: if isAdmin();
     }
   }
 }

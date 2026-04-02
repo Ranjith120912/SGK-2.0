@@ -1,6 +1,5 @@
-
 import Link from "next/link";
-import { Scale } from "lucide-react";
+import { Scale, Users, ClipboardList, BarChart3 } from "lucide-react";
 
 export function Navbar() {
   return (
@@ -14,9 +13,21 @@ export function Navbar() {
             <span className="font-headline font-bold text-xl text-primary tracking-tight">LitreLink</span>
           </Link>
           <div className="hidden sm:flex items-center gap-6">
-            <Link href="/" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Converter</Link>
-            <Link href="#" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Density API</Link>
-            <Link href="#" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">About</Link>
+            <Link href="/" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
+              Dashboard
+            </Link>
+            <Link href="/entries" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" />
+              Daily Entry
+            </Link>
+            <Link href="/customers" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              Customers
+            </Link>
+            <Link href="/reports" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
+              <BarChart3 className="w-4 h-4" />
+              Reports
+            </Link>
           </div>
         </div>
       </div>

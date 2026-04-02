@@ -1,11 +1,11 @@
-
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
+import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 export const metadata: Metadata = {
-  title: 'LitreLink - Professional Kilogram to Litre Converter',
-  description: 'Instantly convert kilograms to litres with high precision using the standard density rate of 1 kg = 0.97 L.',
+  title: 'LitreLink - Milk Distribution Management',
+  description: 'Professional milk collection and distribution software for dairy businesses.',
 };
 
 export default function RootLayout({
@@ -21,8 +21,10 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-        {children}
-        <Toaster />
+        <FirebaseClientProvider>
+          {children}
+          <Toaster />
+        </FirebaseClientProvider>
       </body>
     </html>
   );

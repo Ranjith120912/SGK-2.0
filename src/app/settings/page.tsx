@@ -17,7 +17,12 @@ import { useToast } from "@/hooks/use-toast";
 export default function SettingsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
-  const [rates, setRates] = useState({ cowRate: "", buffaloRate: "", sellingRate: "" });
+  const [rates, setRates] = useState({ 
+    cowRate: "", 
+    buffaloRate: "", 
+    cowSellingRate: "",
+    buffaloSellingRate: "" 
+  });
   const [isSaving, setIsSaving] = useState(false);
 
   const settingsRef = useMemoFirebase(() => {
@@ -32,7 +37,8 @@ export default function SettingsPage() {
       setRates({
         cowRate: currentSettings.cowRate?.toString() || "",
         buffaloRate: currentSettings.buffaloRate?.toString() || "",
-        sellingRate: currentSettings.sellingRate?.toString() || ""
+        cowSellingRate: currentSettings.cowSellingRate?.toString() || "",
+        buffaloSellingRate: currentSettings.buffaloSellingRate?.toString() || ""
       });
     }
   }, [currentSettings]);
@@ -44,7 +50,8 @@ export default function SettingsPage() {
     const data = {
       cowRate: parseFloat(rates.cowRate) || 0,
       buffaloRate: parseFloat(rates.buffaloRate) || 0,
-      sellingRate: parseFloat(rates.sellingRate) || 0,
+      cowSellingRate: parseFloat(rates.cowSellingRate) || 0,
+      buffaloSellingRate: parseFloat(rates.buffaloSellingRate) || 0,
       updatedAt: serverTimestamp()
     };
 
@@ -107,13 +114,20 @@ export default function SettingsPage() {
                 </CardHeader>
                 <CardContent className="p-6 space-y-6">
                   <div className="space-y-3">
-                    <Label className="text-xs font-black uppercase tracking-widest text-accent/70">Selling Price</Label>
+                    <Label className="text-xs font-black uppercase tracking-widest text-accent/70">Cow Selling Price</Label>
                     <div className="relative">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-accent/60 font-bold">₹</span>
-                      <Input type="number" step="0.01" className="h-12 pl-8 rounded-xl font-bold border-accent/20 focus:border-accent" value={rates.sellingRate} onChange={(e) => setRates({ ...rates, sellingRate: e.target.value })} />
+                      <Input type="number" step="0.01" className="h-12 pl-8 rounded-xl font-bold border-accent/20 focus:border-accent" value={rates.cowSellingRate} onChange={(e) => setRates({ ...rates, cowSellingRate: e.target.value })} />
                     </div>
-                    <p className="text-[10px] text-muted-foreground italic">This rate is applied to all buyers during sales entry.</p>
                   </div>
+                  <div className="space-y-3">
+                    <Label className="text-xs font-black uppercase tracking-widest text-accent/70">Buffalo Selling Price</Label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-accent/60 font-bold">₹</span>
+                      <Input type="number" step="0.01" className="h-12 pl-8 rounded-xl font-bold border-accent/20 focus:border-accent" value={rates.buffaloSellingRate} onChange={(e) => setRates({ ...rates, buffaloSellingRate: e.target.value })} />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground italic">These rates are applied to buyers based on the milk type selected during entry.</p>
                 </CardContent>
               </Card>
             </div>

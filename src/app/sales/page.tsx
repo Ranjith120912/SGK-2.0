@@ -16,6 +16,8 @@ import { format } from "date-fns";
 import { Sun, Moon, Search, ShoppingCart, IndianRupee, Loader2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 
 export default function SalesPage() {
   const firestore = useFirestore();
@@ -24,6 +26,7 @@ export default function SalesPage() {
   const [session, setSession] = useState<'Morning' | 'Evening'>('Morning');
   const [searchTerm, setSearchTerm] = useState("");
   const [quantityValues, setQuantityValues] = useState<Record<string, string>>({});
+  const [milkTypes, setMilkTypes] = useState<Record<string, 'COW' | 'BUFFALO'>>({});
   const [savingStatus, setSavingStatus] = useState<Record<string, 'idle' | 'saving' | 'saved'>>({});
 
   useEffect(() => {
@@ -63,6 +66,11 @@ export default function SalesPage() {
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'idle' }));
   };
 
+  const handleMilkTypeChange = (buyerId: string, type: 'COW' | 'BUFFALO') => {
+    setMilkTypes(prev => ({ ...prev, [buyerId]: type }));
+    setSavingStatus(prev => ({ ...prev, [buyerId]: 'idle' }));
+  };
+
   const handleAutoSave = (buyerId: string) => {
     const value = quantityValues[buyerId];
     if (value === undefined || value === "") return;
@@ -72,18 +80,25 @@ export default function SalesPage() {
 
     if (!firestore) return;
 
+    const milkType = milkTypes[buyerId] || 'COW';
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
 
-    const currentRate = ratesConfig?.sellingRate || 0;
+    const currentRate = milkType === 'BUFFALO' 
+      ? (ratesConfig?.buffaloSellingRate || 0) 
+      : (ratesConfig?.cowSellingRate || 0);
+    
     const totalAmount = qty * currentRate;
 
-    const saleId = `${buyerId}_${date}_${session}`;
+    // Use a composite ID that includes milk type to allow multiple types per buyer if needed
+    // But for now keeping it simple: one type per session per buyer as requested
+    const saleId = `${buyerId}_${date}_${session}_${milkType}`;
     const docRef = doc(firestore, 'sales', saleId);
 
     setDocumentNonBlocking(docRef, {
       buyerId,
       date,
       session,
+      milkType,
       quantity: qty,
       rate: currentRate,
       totalAmount: totalAmount,
@@ -119,16 +134,23 @@ export default function SalesPage() {
             </div>
           </header>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input className="pl-10 h-12 bg-card rounded-2xl" placeholder="Search buyer code or name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
+            <div className="flex items-center gap-3 px-4 py-2 bg-primary/5 rounded-2xl border border-primary/10">
+              <IndianRupee className="w-5 h-5 text-primary" />
+              <div>
+                <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Cow Sell Rate</p>
+                <p className="text-lg font-black">₹ {ratesConfig?.cowSellingRate || 0}</p>
+              </div>
+            </div>
             <div className="flex items-center gap-3 px-4 py-2 bg-accent/5 rounded-2xl border border-accent/10">
               <IndianRupee className="w-5 h-5 text-accent" />
               <div>
-                <p className="text-xs font-bold text-accent uppercase tracking-widest">Selling Rate Applied</p>
-                <p className="text-lg font-black text-primary">₹ {ratesConfig?.sellingRate || 0} / Litre</p>
+                <p className="text-[10px] font-bold text-accent uppercase tracking-widest">Buffalo Sell Rate</p>
+                <p className="text-lg font-black">₹ {ratesConfig?.buffaloSellingRate || 0}</p>
               </div>
             </div>
           </div>
@@ -137,24 +159,41 @@ export default function SalesPage() {
             <Table>
               <TableHeader className="bg-muted/50">
                 <TableRow>
-                  <TableHead className="w-[100px] font-bold pl-6">Code</TableHead>
+                  <TableHead className="w-[80px] font-bold pl-6">Code</TableHead>
                   <TableHead className="font-bold">Buyer Name</TableHead>
-                  <TableHead className="w-[200px] font-bold">Quantity (Litre)</TableHead>
-                  <TableHead className="w-[150px] font-bold text-right">Amount (₹)</TableHead>
-                  <TableHead className="w-[100px] text-right pr-6 font-bold">Status</TableHead>
+                  <TableHead className="w-[150px] font-bold">Milk Type</TableHead>
+                  <TableHead className="w-[180px] font-bold">Quantity (Litre)</TableHead>
+                  <TableHead className="w-[120px] font-bold text-right">Amount (₹)</TableHead>
+                  <TableHead className="w-[80px] text-right pr-6 font-bold">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredBuyers?.map((buyer) => {
-                  const existingSale = sales?.find(s => s.buyerId === buyer.id);
+                  const currentMilkType = milkTypes[buyer.id] || 'COW';
+                  const existingSale = sales?.find(s => s.buyerId === buyer.id && s.milkType === currentMilkType);
                   const currentQty = quantityValues[buyer.id] !== undefined ? quantityValues[buyer.id] : (existingSale ? existingSale.quantity.toString() : "");
                   const status = savingStatus[buyer.id] || (existingSale ? 'saved' : 'idle');
-                  const previewAmount = (parseFloat(currentQty) || 0) * (ratesConfig?.sellingRate || 0);
+                  
+                  const activeRate = currentMilkType === 'BUFFALO' 
+                    ? (ratesConfig?.buffaloSellingRate || 0) 
+                    : (ratesConfig?.cowSellingRate || 0);
+                  const previewAmount = (parseFloat(currentQty) || 0) * activeRate;
 
                   return (
-                    <TableRow key={buyer.id} className={cn(existingSale && "bg-accent/5")}>
+                    <TableRow key={buyer.id} className={cn(existingSale && "bg-primary/5")}>
                       <TableCell className="font-black text-primary pl-6 text-lg">{buyer.buyerCode}</TableCell>
                       <TableCell className="font-bold">{buyer.name}</TableCell>
+                      <TableCell>
+                        <Select value={currentMilkType} onValueChange={(v) => handleMilkTypeChange(buyer.id, v as any)}>
+                          <SelectTrigger className="h-9 rounded-xl">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="COW">COW</SelectItem>
+                            <SelectItem value="BUFFALO">BUFFALO</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
                       <TableCell>
                         <div className="relative">
                           <Input 
@@ -164,6 +203,7 @@ export default function SalesPage() {
                             value={currentQty} 
                             onChange={(e) => handleQuantityChange(buyer.id, e.target.value)}
                             onBlur={() => handleAutoSave(buyer.id)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAutoSave(buyer.id)}
                           />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black opacity-30">L</span>
                         </div>

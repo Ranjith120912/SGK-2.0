@@ -110,6 +110,10 @@
           "type": "string",
           "enum": ["Morning", "Evening"]
         },
+        "milkType": {
+          "type": "string",
+          "enum": ["COW", "BUFFALO"]
+        },
         "quantity": {
           "type": "number"
         },
@@ -132,7 +136,10 @@
         "buffaloRate": {
           "type": "number"
         },
-        "sellingRate": {
+        "cowSellingRate": {
+          "type": "number"
+        },
+        "buffaloSellingRate": {
           "type": "number"
         },
         "updatedAt": {

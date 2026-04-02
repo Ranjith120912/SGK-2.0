@@ -1,5 +1,7 @@
+
 import Link from "next/link";
 import { Droplets, Users, ClipboardList, BarChart3, Settings, ShoppingCart, UserCheck } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function Navbar() {
   return (
@@ -40,6 +42,9 @@ export function Navbar() {
               <Settings className="w-4 h-4" />
               Settings
             </Link>
+            <div className="ml-4 border-l pl-4 border-primary/10">
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </div>

@@ -3,7 +3,7 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { DashboardStats } from "@/components/dashboard-stats";
 import Link from "next/link";
-import { PlusCircle, Users, BarChart3, Settings } from "lucide-react";
+import { PlusCircle, Users, Settings } from "lucide-react";
 
 export default function Home() {
   return (

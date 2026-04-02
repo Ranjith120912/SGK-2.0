@@ -31,9 +31,11 @@ import {
   AlertCircle, 
   Download, 
   FileSpreadsheet,
-  Table as TableIcon
+  Table as TableIcon,
+  Upload
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import * as XLSX from 'xlsx';
 
 export default function FarmersPage() {
   const firestore = useFirestore();
@@ -81,8 +83,39 @@ export default function FarmersPage() {
     toast({ title: "Success", description: "Farmer added successfully." });
   };
 
-  const handleBulkImport = () => {
+  const processImportArray = (data: any[]) => {
     if (!firestore) return;
+    let count = 0;
+    data.forEach((item: any) => {
+      // Normalize keys to find Name, Can Number, Account Number
+      const normalizedItem: any = {};
+      Object.keys(item).forEach(key => {
+        const normalizedKey = key.toLowerCase().replace(/\s+/g, '');
+        normalizedItem[normalizedKey] = item[key];
+      });
+
+      const name = item.Name || item.name || normalizedItem.name || normalizedItem.farmername;
+      const canNumber = item['Can Number'] || item.canNumber || normalizedItem.cannumber || normalizedItem.can;
+      const accountNumber = item['Account Number'] || item.accountNumber || normalizedItem.accountnumber || normalizedItem.account;
+
+      if (name && canNumber) {
+        addDocumentNonBlocking(collection(firestore, 'farmers'), {
+          name: name.toString(),
+          canNumber: canNumber.toString().padStart(3, '0'),
+          accountNumber: (accountNumber || "").toString(),
+          active: true,
+          createdAt: serverTimestamp(),
+        });
+        count++;
+      }
+    });
+
+    toast({ title: "Import Successful", description: `Added ${count} farmers.` });
+    setIsImporting(false);
+    setImportData("");
+  };
+
+  const handleBulkImportText = () => {
     try {
       let data: any[] = [];
       const trimmedData = importData.trim();
@@ -96,47 +129,61 @@ export default function FarmersPage() {
         if (lines.length < 1) throw new Error("No data found.");
 
         const firstLine = lines[0];
-        // Excel copy-paste from spreadsheet uses tabs (\t). CSV uses comma (,).
         const delimiter = firstLine.includes('\t') ? '\t' : (firstLine.includes(',') ? ',' : null);
         
         if (!delimiter) {
           throw new Error("Could not detect delimiter. Please use Comma (CSV) or paste directly from Excel (Tabs).");
         }
 
-        const headers = lines[0].split(delimiter).map(h => h.trim().toLowerCase().replace(/\s+/g, ''));
+        const headers = lines[0].split(delimiter).map(h => h.trim());
         
         data = lines.slice(1).filter(line => line.trim()).map(line => {
           const values = line.split(delimiter);
           const obj: any = {};
           headers.forEach((header, i) => {
-            if (header.includes('name')) obj.name = values[i]?.trim();
-            else if (header.includes('can')) obj.canNumber = values[i]?.trim();
-            else if (header.includes('account')) obj.accountNumber = values[i]?.trim();
+            obj[header] = values[i]?.trim();
           });
           return obj;
         });
       }
 
-      let count = 0;
-      data.forEach((item: any) => {
-        if (item.name && item.canNumber) {
-          addDocumentNonBlocking(collection(firestore, 'farmers'), {
-            name: item.name,
-            canNumber: item.canNumber.toString().padStart(3, '0'),
-            accountNumber: item.accountNumber || "",
-            active: true,
-            createdAt: serverTimestamp(),
-          });
-          count++;
-        }
-      });
-
-      toast({ title: "Import Successful", description: `Added ${count} farmers.` });
-      setImportData("");
-      setIsImporting(false);
+      processImportArray(data);
     } catch (e: any) {
-      toast({ title: "Import Failed", description: e.message || "Invalid format. Ensure you have Name, Can Number, and Account Number columns.", variant: "destructive" });
+      toast({ title: "Import Failed", description: e.message || "Invalid format.", variant: "destructive" });
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+        processImportArray(data);
+      } catch (error) {
+        toast({ title: "File Error", description: "Could not read the Excel file.", variant: "destructive" });
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const downloadExcelTemplate = () => {
+    const templateData = [
+      { "Name": "Rajesh Kumar", "Can Number": "101", "Account Number": "9876543210" },
+      { "Name": "Suresh Singh", "Can Number": "102", "Account Number": "1234567890" }
+    ];
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Farmers Template");
+    XLSX.writeFile(wb, "Farmers_Import_Template.xlsx");
+    
+    toast({ title: "Template Downloaded", description: "Excel (.xlsx) file is ready." });
   };
 
   const seedData = () => {
@@ -151,20 +198,6 @@ export default function FarmersPage() {
         createdAt: serverTimestamp(),
       });
     }
-  };
-
-  const downloadExcelTemplate = () => {
-    const csvContent = "Name,Can Number,Account Number\nRajesh Kumar,101,9876543210\nSuresh Singh,102,1234567890";
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", "farmers_template.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    toast({ title: "Template Ready", description: "Excel-compatible template downloaded." });
   };
 
   return (
@@ -198,73 +231,67 @@ export default function FarmersPage() {
                         Excel Bulk Import
                       </DialogTitle>
                       <DialogDescription className="text-primary-foreground/80">
-                        Follow the 3-column format shown below to import your farmer list.
+                        Upload your .xlsx file or follow the 3-column format shown below.
                       </DialogDescription>
                     </DialogHeader>
                   </div>
                   
                   <div className="p-6 space-y-6">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-bold flex items-center gap-2 text-primary uppercase tracking-wider">
-                          <TableIcon className="w-4 h-4" />
-                          Excel Column Structure
-                        </h4>
-                        <Button variant="outline" size="sm" onClick={downloadExcelTemplate} className="rounded-full h-8 text-xs">
-                          <Download className="w-3 h-3 mr-2" /> Download Template
-                        </Button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <label className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
+                          <Upload className="w-3 h-3" /> Step 1: Upload File
+                        </label>
+                        <Input 
+                          type="file" 
+                          accept=".xlsx, .xls, .csv" 
+                          onChange={handleFileUpload}
+                          className="rounded-xl h-24 border-dashed border-2 cursor-pointer hover:bg-muted/50 transition-colors file:hidden text-center pt-8 text-muted-foreground font-medium"
+                        />
+                        <p className="text-[10px] text-center text-muted-foreground">Drop your Excel file here or click to browse</p>
                       </div>
-                      
-                      <div className="border rounded-xl overflow-hidden bg-muted/30 shadow-inner">
-                        <Table className="text-[11px]">
-                          <TableHeader className="bg-muted">
-                            <TableRow className="hover:bg-transparent">
-                              <TableHead className="h-10 font-black text-primary border-r">Column A (Name)</TableHead>
-                              <TableHead className="h-10 font-black text-primary border-r">Column B (Can Number)</TableHead>
-                              <TableHead className="h-10 font-black text-primary">Column C (Account Number)</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            <TableRow className="hover:bg-transparent border-b">
-                              <TableCell className="py-3 border-r font-medium">Rajesh Kumar</TableCell>
-                              <TableCell className="py-3 border-r font-medium">101</TableCell>
-                              <TableCell className="py-3 font-medium">9876543210</TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-transparent">
-                              <TableCell className="py-3 border-r text-muted-foreground/50 italic">...</TableCell>
-                              <TableCell className="py-3 border-r text-muted-foreground/50 italic">...</TableCell>
-                              <TableCell className="py-3 text-muted-foreground/50 italic">...</TableCell>
-                            </TableRow>
-                          </TableBody>
-                        </Table>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
+                            <Download className="w-3 h-3" /> Step 2: Download Format
+                          </label>
+                        </div>
+                        <div className="bg-muted/50 rounded-2xl p-4 border border-primary/10 flex flex-col items-center justify-center h-24 gap-2">
+                          <Button variant="outline" size="sm" onClick={downloadExcelTemplate} className="rounded-full w-full bg-background shadow-sm hover:bg-primary hover:text-white transition-all">
+                            <Download className="w-3 h-3 mr-2" /> Download Excel (.xlsx)
+                          </Button>
+                          <p className="text-[10px] text-muted-foreground italic text-center">Standard 3-column template</p>
+                        </div>
                       </div>
                     </div>
 
                     <div className="space-y-3">
-                      <label className="text-sm font-bold text-primary flex items-center gap-2 uppercase tracking-wider">
-                        <ClipboardList className="w-4 h-4" />
-                        Paste Column Data
-                      </label>
-                      <p className="text-xs text-muted-foreground">Copy rows from your Excel sheet and paste them here. Include headers on the first line.</p>
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-bold text-primary flex items-center gap-2 uppercase tracking-wider">
+                          <ClipboardList className="w-4 h-4" />
+                          Or Paste Column Data
+                        </label>
+                      </div>
                       <Textarea 
-                        placeholder="Name,Can Number,Account Number&#10;John Doe,101,9123456789" 
+                        placeholder="Name, Can Number, Account Number&#10;John Doe, 101, 9123456789" 
                         value={importData}
                         onChange={(e) => setImportData(e.target.value)}
-                        className="min-h-[160px] font-mono text-xs rounded-2xl border-primary/20 bg-background/50 focus:bg-background transition-colors"
+                        className="min-h-[120px] font-mono text-xs rounded-2xl border-primary/20 bg-background/50 focus:bg-background transition-colors"
                       />
                     </div>
                   </div>
 
                   <div className="bg-muted/50 p-6 flex flex-col sm:flex-row gap-4 justify-between items-center border-t">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium italic">
-                      <AlertCircle className="w-4 h-4 text-accent animate-pulse" />
-                      Must include headers in the first row
+                      <AlertCircle className="w-4 h-4 text-accent" />
+                      Headers required in first row
                     </div>
                     <div className="flex gap-2">
                       <Button variant="ghost" onClick={() => setIsImporting(false)} className="rounded-full">Cancel</Button>
-                      <Button onClick={handleBulkImport} className="rounded-full px-8 shadow-md">
+                      <Button onClick={handleBulkImportText} className="rounded-full px-8 shadow-md" disabled={!importData}>
                         <CheckCircle2 className="w-4 h-4 mr-2" />
-                        Start Import
+                        Process Text
                       </Button>
                     </div>
                   </div>

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -99,7 +98,7 @@ export default function SettingsPage() {
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
       <main className="flex-grow pt-24 pb-20">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <header className="mb-10">
             <h1 className="text-3xl font-black text-primary tracking-tight flex items-center gap-3 uppercase">
               <SettingsIcon className="w-8 h-8" />
@@ -188,10 +187,11 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="rounded-[1.5rem] shadow-lg border-none bg-card/50 backdrop-blur-sm overflow-hidden">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Procurement Rates */}
+              <Card className="rounded-[1.5rem] shadow-lg border-none bg-card/50 backdrop-blur-sm overflow-hidden h-fit">
                 <CardHeader className="bg-primary/5 border-b border-primary/10 p-4">
-                  <CardTitle className="text-sm font-black flex items-center gap-2 text-primary uppercase tracking-tighter">
+                  <CardTitle className="text-xs font-black flex items-center gap-2 text-primary uppercase tracking-tighter">
                     <Milk className="w-4 h-4" />
                     Procurement Rates
                   </CardTitle>
@@ -214,9 +214,10 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
 
-              <Card className="rounded-[1.5rem] shadow-lg border-none bg-accent/5 backdrop-blur-sm overflow-hidden">
+              {/* Sales Rates */}
+              <Card className="rounded-[1.5rem] shadow-lg border-none bg-accent/5 backdrop-blur-sm overflow-hidden h-fit">
                 <CardHeader className="bg-accent/10 border-b border-accent/10 p-4">
-                  <CardTitle className="text-sm font-black flex items-center gap-2 text-accent uppercase tracking-tighter">
+                  <CardTitle className="text-xs font-black flex items-center gap-2 text-accent uppercase tracking-tighter">
                     <ShoppingBag className="w-4 h-4" />
                     Sales Rates
                   </CardTitle>
@@ -238,31 +239,37 @@ export default function SettingsPage() {
                   </div>
                 </CardContent>
               </Card>
-            </div>
 
-            <Card className="rounded-[1.5rem] shadow-lg border-none bg-card/50 backdrop-blur-sm overflow-hidden">
-              <CardHeader className="bg-muted/50 border-b p-4">
-                <CardTitle className="text-sm font-black flex items-center gap-2 text-foreground uppercase tracking-tighter">
-                  <Scale className="w-4 h-4" />
-                  Standards
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                <div className="max-w-[240px] space-y-2">
-                  <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Kg to Litre Rate</Label>
-                  <div className="relative">
-                    <Input 
-                      type="number" 
-                      step="0.001" 
-                      className="h-10 rounded-lg font-bold border-primary/10" 
-                      value={config.kgToLitreRate} 
-                      onChange={(e) => setConfig({ ...config, kgToLitreRate: e.target.value })} 
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-muted-foreground opacity-50 uppercase">Rate</span>
+              {/* Processing & Standards */}
+              <Card className="rounded-[1.5rem] shadow-lg border-none bg-card/50 backdrop-blur-sm overflow-hidden h-fit">
+                <CardHeader className="bg-muted/50 border-b p-4">
+                  <CardTitle className="text-xs font-black flex items-center gap-2 text-foreground uppercase tracking-tighter">
+                    <Scale className="w-4 h-4" />
+                    Processing & Standards
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Kg to Litre Rate</Label>
+                    <div className="relative">
+                      <Input 
+                        type="number" 
+                        step="0.001" 
+                        className="h-10 rounded-lg font-bold border-primary/10" 
+                        value={config.kgToLitreRate} 
+                        onChange={(e) => setConfig({ ...config, kgToLitreRate: e.target.value })} 
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-muted-foreground opacity-50 uppercase">Rate</span>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                  <div className="p-3 bg-primary/5 rounded-xl border border-primary/10">
+                    <p className="text-[9px] font-bold text-primary/60 uppercase tracking-tight leading-tight">
+                      Standard factor used for converting weighing scale input to volume for billing.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
             <div className="flex justify-end pt-4">
               <Button onClick={handleSave} disabled={isSaving || isLoading} className="rounded-full px-10 h-12 shadow-xl hover:scale-105 active:scale-95 transition-all font-black uppercase tracking-widest text-sm">

@@ -5,7 +5,7 @@ service cloud.firestore {
 
     /**
      * FIRESTORE SECURITY RULES
-     * Updated to support 'farmers' and 'entries' for dairy business management.
+     * Updated to support 'farmers', 'entries', and 'settings' for dairy business management.
      */
 
     function isSignedIn() {
@@ -22,6 +22,10 @@ service cloud.firestore {
     }
 
     match /entries/{entryId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /settings/{settingsId} {
       allow read, write: if isAdmin();
     }
 

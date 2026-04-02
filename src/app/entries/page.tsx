@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import { useCollection, useMemoFirebase, useFirestore } from "@/firebase";
+import { useCollection, useDoc, useMemoFirebase, useFirestore } from "@/firebase";
 import { collection, query, where, serverTimestamp, doc } from "firebase/firestore";
 import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { format } from "date-fns";
-import { Sun, Moon, Search, Scale, Droplets, CheckCircle2, Loader2, Milk } from "lucide-react";
+import { Sun, Moon, Search, Scale, Droplets, CheckCircle2, Loader2, IndianRupee } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -47,8 +47,14 @@ export default function EntriesPage() {
     );
   }, [firestore, date, session]);
 
+  const settingsRef = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return doc(firestore, 'settings', 'milk_rates');
+  }, [firestore]);
+
   const { data: farmers } = useCollection(farmersQuery);
   const { data: entries } = useCollection(entriesQuery);
+  const { data: ratesConfig } = useDoc(settingsRef);
 
   const filteredFarmers = farmers?.filter(f => 
     f.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -74,9 +80,20 @@ export default function EntriesPage() {
 
     if (!firestore) return;
 
+    const farmer = farmers?.find(f => f.id === farmerId);
+    if (!farmer) return;
+
     setSavingStatus(prev => ({ ...prev, [farmerId]: 'saving' }));
 
     const quantityLitre = kgValue * CONVERSION_RATE;
+    
+    // Determine rate based on milk type and settings
+    const currentRate = farmer.milkType === 'BUFFALO' 
+      ? (ratesConfig?.buffaloRate || 0) 
+      : (ratesConfig?.cowRate || 0);
+    
+    const totalAmount = quantityLitre * currentRate;
+
     const entryId = `${farmerId}_${date}_${session}`;
     const docRef = doc(firestore, 'entries', entryId);
 
@@ -89,8 +106,8 @@ export default function EntriesPage() {
       conversionRate: CONVERSION_RATE,
       fat: 0,
       snf: 0,
-      rate: 0,
-      totalAmount: 0,
+      rate: currentRate,
+      totalAmount: totalAmount,
       updatedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
     }, { merge: true });
@@ -119,7 +136,7 @@ export default function EntriesPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
             <div>
-              <h1 className="text-3xl font-black text-primary tracking-tight">Daily Collection (Kg → L)</h1>
+              <h1 className="text-3xl font-black text-primary tracking-tight">Daily Collection</h1>
               <p className="text-muted-foreground">Auto-saving entries for {format(new Date(date), 'MMMM dd, yyyy')}</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
@@ -144,8 +161,8 @@ export default function EntriesPage() {
             </div>
           </header>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div className="relative">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="md:col-span-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input 
                 className="pl-10 h-12 bg-card rounded-2xl border-primary/10 shadow-sm" 
@@ -157,8 +174,15 @@ export default function EntriesPage() {
             <div className="flex items-center gap-3 px-4 py-2 bg-primary/5 rounded-2xl border border-primary/10">
               <Scale className="w-5 h-5 text-primary" />
               <div className="text-xs">
-                <p className="font-bold text-primary">Conversion Applied Automatically</p>
-                <p className="text-muted-foreground">1 Kg = {CONVERSION_RATE} Litres</p>
+                <p className="font-bold text-primary">Weight Conversion</p>
+                <p className="text-muted-foreground">1 Kg = {CONVERSION_RATE} L</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 px-4 py-2 bg-accent/5 rounded-2xl border border-accent/10">
+              <IndianRupee className="w-5 h-5 text-accent" />
+              <div className="text-xs">
+                <p className="font-bold text-accent">Current Rates Applied</p>
+                <p className="text-muted-foreground">Cow: ₹{ratesConfig?.cowRate || 0} | Buf: ₹{ratesConfig?.buffaloRate || 0}</p>
               </div>
             </div>
           </div>
@@ -169,9 +193,10 @@ export default function EntriesPage() {
                 <TableRow>
                   <TableHead className="w-[80px] font-bold py-4 pl-6">CAN</TableHead>
                   <TableHead className="font-bold">Farmer Details</TableHead>
-                  <TableHead className="w-[180px] font-bold">Result (Litres)</TableHead>
-                  <TableHead className="w-[220px] font-bold">Entry (Kg)</TableHead>
-                  <TableHead className="w-[100px] text-right pr-6 font-bold">Status</TableHead>
+                  <TableHead className="w-[150px] font-bold">Calculation</TableHead>
+                  <TableHead className="w-[180px] font-bold">Entry (Kg)</TableHead>
+                  <TableHead className="w-[150px] font-bold">Amount (₹)</TableHead>
+                  <TableHead className="w-[80px] text-right pr-6 font-bold">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -184,6 +209,12 @@ export default function EntriesPage() {
                   const kgNum = parseFloat(currentKgStr);
                   const previewLitre = !isNaN(kgNum) ? (kgNum * CONVERSION_RATE).toFixed(2) : "0.00";
                   const status = savingStatus[farmer.id] || (existingEntry ? 'saved' : 'idle');
+                  
+                  // Live amount preview
+                  const currentRate = farmer.milkType === 'BUFFALO' 
+                    ? (ratesConfig?.buffaloRate || 0) 
+                    : (ratesConfig?.cowRate || 0);
+                  const previewAmount = !isNaN(kgNum) ? (parseFloat(previewLitre) * currentRate).toFixed(2) : "0.00";
 
                   return (
                     <TableRow key={farmer.id} className={cn(existingEntry && "bg-primary/5")}>
@@ -199,15 +230,10 @@ export default function EntriesPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Calculated</span>
-                          <span className={cn(
-                            "text-sm font-bold px-3 py-1 rounded-full flex items-center gap-1 w-fit transition-colors",
-                            existingEntry ? "text-primary bg-primary/10" : "text-muted-foreground bg-muted"
-                          )}>
-                            <Droplets className="w-3 h-3" /> {previewLitre} L
-                          </span>
+                        <div className="flex items-center gap-1 text-sm font-bold text-primary/70">
+                          <Droplets className="w-3 h-3" /> {previewLitre} L
                         </div>
+                        <div className="text-[9px] text-muted-foreground uppercase tracking-wider font-bold">@ ₹{currentRate}/L</div>
                       </TableCell>
                       <TableCell>
                         <div className="relative group">
@@ -224,6 +250,11 @@ export default function EntriesPage() {
                           <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground uppercase tracking-tighter">KG</span>
                         </div>
                       </TableCell>
+                      <TableCell>
+                        <div className="text-sm font-black text-foreground">
+                          ₹ {previewAmount}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right pr-6">
                         <div className="flex justify-end">
                           {status === 'saving' && <Loader2 className="w-5 h-5 animate-spin text-primary/40" />}
@@ -236,7 +267,7 @@ export default function EntriesPage() {
               </TableBody>
             </Table>
             <div className="p-4 bg-muted/20 text-center text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] border-t">
-              Tip: Values save automatically when you move to the next field
+              Auto-save active: Payment amounts are calculated based on Milk Type rates in Settings
             </div>
           </Card>
         </div>

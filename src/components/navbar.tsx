@@ -1,6 +1,6 @@
 
 import Link from "next/link";
-import { Scale, Users, ClipboardList, BarChart3 } from "lucide-react";
+import { Scale, Users, ClipboardList, BarChart3, Settings } from "lucide-react";
 
 export function Navbar() {
   return (
@@ -28,6 +28,10 @@ export function Navbar() {
             <Link href="/reports" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />
               Reports
+            </Link>
+            <Link href="/settings" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
+              <Settings className="w-4 h-4" />
+              Settings
             </Link>
           </div>
         </div>

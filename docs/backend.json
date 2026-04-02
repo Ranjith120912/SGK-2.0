@@ -83,6 +83,25 @@
         }
       },
       "required": ["farmerId", "date", "session", "quantity"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Global application configuration like milk rates",
+      "type": "object",
+      "properties": {
+        "cowRate": {
+          "type": "number",
+          "description": "Rate per litre for Cow milk"
+        },
+        "buffaloRate": {
+          "type": "number",
+          "description": "Rate per litre for Buffalo milk"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
     }
   },
   "auth": {
@@ -96,6 +115,10 @@
     "/entries/{entryId}": {
       "schema": "MilkEntry",
       "description": "Daily milk entry records"
+    },
+    "/settings/{settingsId}": {
+      "schema": "Settings",
+      "description": "Global configuration settings"
     }
   }
 }

@@ -10,10 +10,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, FileText, Droplets, ChevronRight, Loader2, ClipboardList, ShoppingCart, User } from "lucide-react";
+import { 
+  Calendar, 
+  FileText, 
+  Droplets, 
+  ChevronRight, 
+  Loader2, 
+  ClipboardList, 
+  ShoppingCart, 
+  Printer, 
+  ArrowLeft,
+  Milk,
+  Download
+} from "lucide-react";
 import { format, endOfMonth, startOfMonth } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 export default function ReportsPage() {
   const firestore = useFirestore();
@@ -21,6 +34,7 @@ export default function ReportsPage() {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [activeCycle, setActiveCycle] = useState<number>(0);
   const [isClient, setIsClient] = useState(false);
+  const [viewingInvoiceFarmerId, setViewingInvoiceFarmerId] = useState<string | null>(null);
 
   useEffect(() => {
     setIsClient(true);
@@ -29,7 +43,6 @@ export default function ReportsPage() {
     setSelectedDate(format(now, 'yyyy-MM-dd'));
   }, []);
 
-  // Generate Year-Month options for the last 12 months
   const monthOptions = useMemo(() => {
     if (!isClient) return [];
     const now = new Date();
@@ -42,7 +55,6 @@ export default function ReportsPage() {
     });
   }, [isClient]);
 
-  // Calculate cycles for selected month based on 10-day logic
   const cycles = useMemo(() => {
     if (!selectedMonth) return [];
     const [year, month] = selectedMonth.split('-').map(Number);
@@ -81,8 +93,8 @@ export default function ReportsPage() {
   const { data: allSales } = useCollection(salesQuery);
   const { data: buyers } = useCollection(buyersQuery);
 
-  // --- Cycle Bill Logic ---
   const currentCycle = cycles[activeCycle];
+  
   const filteredCycleEntries = allEntries?.filter(entry => {
     if (!selectedMonth || !entry.date.startsWith(selectedMonth)) return false;
     if (!currentCycle) return false;
@@ -111,19 +123,21 @@ export default function ReportsPage() {
     return (isNaN(aNum) || isNaN(bNum)) ? a.canNumber.localeCompare(b.canNumber) : aNum - bNum;
   });
 
-  // --- Daily Summary Logic ---
   const dailyEntries = allEntries?.filter(e => e.date === selectedDate).sort((a, b) => {
     const fA = farmers?.find(f => f.id === a.farmerId);
     const fB = farmers?.find(f => f.id === b.farmerId);
     return (fA?.canNumber || "").localeCompare(fB?.canNumber || "");
   });
 
-  // --- Sales Summary Logic ---
   const dailySales = allSales?.filter(s => s.date === selectedDate).sort((a, b) => {
     const bA = buyers?.find(buy => buy.id === a.buyerId);
     const bB = buyers?.find(buy => buy.id === b.buyerId);
     return (bA?.buyerCode || "").localeCompare(bB?.buyerCode || "");
   });
+
+  // Invoice Data
+  const invoiceFarmer = farmers?.find(f => f.id === viewingInvoiceFarmerId);
+  const invoiceEntries = filteredCycleEntries?.filter(e => e.farmerId === viewingInvoiceFarmerId).sort((a, b) => a.date.localeCompare(b.date));
 
   if (!isClient || !selectedMonth) {
     return (
@@ -131,6 +145,117 @@ export default function ReportsPage() {
         <Navbar />
         <main className="flex-grow pt-24 pb-20 flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (viewingInvoiceFarmerId && invoiceFarmer) {
+    return (
+      <div className="min-h-screen flex flex-col bg-white">
+        <Navbar />
+        <main className="flex-grow pt-24 pb-20 px-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex justify-between items-center mb-8 no-print">
+              <Button variant="ghost" onClick={() => setViewingInvoiceFarmerId(null)} className="rounded-full">
+                <ArrowLeft className="w-4 h-4 mr-2" /> Back to Bill
+              </Button>
+              <div className="flex gap-2">
+                <Button onClick={() => window.print()} className="rounded-full shadow-lg">
+                  <Printer className="w-4 h-4 mr-2" /> Print Invoice
+                </Button>
+              </div>
+            </div>
+
+            <Card className="rounded-[2.5rem] border-2 border-primary/10 shadow-none overflow-hidden invoice-content">
+              <div className="bg-primary p-10 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <Droplets className="w-8 h-8" />
+                    <h1 className="text-4xl font-black tracking-tighter uppercase">SGK MILK</h1>
+                  </div>
+                  <p className="text-primary-foreground/80 font-bold uppercase tracking-[0.2em] text-xs">Payment Cycle Invoice</p>
+                </div>
+                <div className="text-right">
+                  <h2 className="text-2xl font-black uppercase tracking-tighter mb-1">Period</h2>
+                  <p className="text-lg font-bold">{currentCycle?.label} • {currentCycle?.range}</p>
+                  <p className="text-sm opacity-80">{format(new Date(selectedMonth + "-01"), "MMMM yyyy")}</p>
+                </div>
+              </div>
+
+              <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-10 border-b">
+                <div>
+                  <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4">Farmer Details</h3>
+                  <div className="space-y-1">
+                    <p className="text-2xl font-black text-primary">{invoiceFarmer.name}</p>
+                    <p className="text-lg font-bold flex items-center gap-2">
+                      <Badge variant="outline" className="rounded-full font-black border-primary/20">CAN: {invoiceFarmer.canNumber}</Badge>
+                      <Badge className="rounded-full font-black uppercase">{invoiceFarmer.milkType || 'COW'}</Badge>
+                    </p>
+                  </div>
+                </div>
+                <div className="bg-muted/30 p-6 rounded-3xl space-y-3">
+                  <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Bank Information</h3>
+                  <div>
+                    <p className="text-xs font-bold text-muted-foreground uppercase">Account Number</p>
+                    <p className="font-mono font-bold text-lg">{invoiceFarmer.bankAccountNumber || "Not Provided"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-muted-foreground uppercase">IFSC Code</p>
+                    <p className="font-mono font-bold">{invoiceFarmer.ifscCode || "—"}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-0">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead className="pl-10 font-black text-primary">Date</TableHead>
+                      <TableHead className="font-black text-primary">Session</TableHead>
+                      <TableHead className="font-black text-primary">Weight (Kg)</TableHead>
+                      <TableHead className="text-right pr-10 font-black text-primary">Quantity (L)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invoiceEntries?.map((entry) => (
+                      <TableRow key={entry.id} className="border-b">
+                        <TableCell className="pl-10 font-bold">{format(new Date(entry.date), 'dd MMM, yyyy')}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="rounded-full font-bold uppercase text-[10px]">
+                            {entry.session}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-mono">{entry.kgWeight?.toFixed(2)}</TableCell>
+                        <TableCell className="text-right pr-10 font-black text-primary">
+                          {entry.quantity?.toFixed(2)} L
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="p-10 bg-primary/5 flex justify-between items-center">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-white rounded-2xl shadow-sm">
+                    <Milk className="w-8 h-8 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-muted-foreground uppercase tracking-widest">Total Cycle Volume</p>
+                    <p className="text-4xl font-black text-primary tracking-tighter">
+                      {invoiceEntries?.reduce((acc, curr) => acc + (curr.quantity || 0), 0).toFixed(2)} <small className="text-xl">L</small>
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-relaxed">
+                  System Generated Invoice<br />
+                  SGK MILK Management System
+                </div>
+              </div>
+            </Card>
+          </div>
         </main>
         <Footer />
       </div>
@@ -162,7 +287,6 @@ export default function ReportsPage() {
               </TabsTrigger>
             </TabsList>
 
-            {/* PAYMENT CYCLE BILL - LITRES ONLY */}
             <TabsContent value="cycle" className="space-y-8 animate-in fade-in duration-500">
               <div className="flex justify-end items-center gap-3">
                 <Calendar className="w-5 h-5 text-primary" />
@@ -228,19 +352,20 @@ export default function ReportsPage() {
                       <TableHead className="w-[120px] font-black text-primary pl-8 py-6">CAN</TableHead>
                       <TableHead className="font-black text-primary">Farmer Name</TableHead>
                       <TableHead className="font-black text-primary">Milk Type</TableHead>
-                      <TableHead className="text-right pr-8 font-black text-primary text-lg">Total Litres</TableHead>
+                      <TableHead className="text-right font-black text-primary">Total Litres</TableHead>
+                      <TableHead className="text-right pr-8 font-black text-primary">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {entriesLoading ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center py-20">
+                        <TableCell colSpan={5} className="text-center py-20">
                           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
                         </TableCell>
                       </TableRow>
                     ) : farmerCycleBreakdown?.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center py-32 text-muted-foreground">
+                        <TableCell colSpan={5} className="text-center py-32 text-muted-foreground">
                           <Droplets className="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
                           <p className="font-bold text-lg">No collection recorded for this cycle.</p>
                         </TableCell>
@@ -255,8 +380,18 @@ export default function ReportsPage() {
                               {f.milkType || 'COW'}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right pr-8">
+                          <TableCell className="text-right">
                             <span className="font-black text-primary text-2xl tracking-tighter">{f.totalQty.toFixed(2)} <small className="text-xs opacity-60">L</small></span>
+                          </TableCell>
+                          <TableCell className="text-right pr-8">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="rounded-full font-bold text-primary hover:bg-primary hover:text-white"
+                              onClick={() => setViewingInvoiceFarmerId(f.id)}
+                            >
+                              View Invoice
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))
@@ -266,13 +401,12 @@ export default function ReportsPage() {
                 
                 <div className="p-6 bg-muted/20 border-t text-center">
                   <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">
-                    Verified SGK MILK Report • {format(new Date(), 'PPPP')}
+                    Verified SGK MILK Report &bull; {format(new Date(), 'PPPP')}
                   </p>
                 </div>
               </Card>
             </TabsContent>
 
-            {/* DAILY SUMMARY */}
             <TabsContent value="daily" className="space-y-8 animate-in fade-in duration-500">
               <div className="flex justify-end">
                 <Input 
@@ -327,7 +461,6 @@ export default function ReportsPage() {
               </Card>
             </TabsContent>
 
-            {/* SALES REPORT */}
             <TabsContent value="sales" className="space-y-8 animate-in fade-in duration-500">
               <div className="flex justify-end">
                 <Input 

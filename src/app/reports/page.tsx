@@ -21,7 +21,8 @@ import {
   Printer, 
   ArrowLeft,
   Milk,
-  Download
+  Download,
+  CheckCircle2
 } from "lucide-react";
 import { format, endOfMonth, startOfMonth } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -135,7 +136,6 @@ export default function ReportsPage() {
     return (bA?.buyerCode || "").localeCompare(bB?.buyerCode || "");
   });
 
-  // Invoice Data
   const invoiceFarmer = farmers?.find(f => f.id === viewingInvoiceFarmerId);
   const invoiceEntries = filteredCycleEntries?.filter(e => e.farmerId === viewingInvoiceFarmerId).sort((a, b) => a.date.localeCompare(b.date));
 
@@ -158,14 +158,12 @@ export default function ReportsPage() {
         <main className="flex-grow pt-24 pb-20 px-4">
           <div className="max-w-4xl mx-auto">
             <div className="flex justify-between items-center mb-8 no-print">
-              <Button variant="ghost" onClick={() => setViewingInvoiceFarmerId(null)} className="rounded-full">
+              <Button variant="outline" onClick={() => setViewingInvoiceFarmerId(null)} className="rounded-full">
                 <ArrowLeft className="w-4 h-4 mr-2" /> Back to Bill
               </Button>
-              <div className="flex gap-2">
-                <Button onClick={() => window.print()} className="rounded-full shadow-lg">
-                  <Printer className="w-4 h-4 mr-2" /> Print Invoice
-                </Button>
-              </div>
+              <Button onClick={() => window.print()} className="rounded-full shadow-lg">
+                <Printer className="w-4 h-4 mr-2" /> Print Invoice
+              </Button>
             </div>
 
             <Card className="rounded-[2.5rem] border-2 border-primary/10 shadow-none overflow-hidden invoice-content">
@@ -189,10 +187,10 @@ export default function ReportsPage() {
                   <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4">Farmer Details</h3>
                   <div className="space-y-1">
                     <p className="text-2xl font-black text-primary">{invoiceFarmer.name}</p>
-                    <p className="text-lg font-bold flex items-center gap-2">
+                    <div className="flex items-center gap-2 mt-2">
                       <Badge variant="outline" className="rounded-full font-black border-primary/20">CAN: {invoiceFarmer.canNumber}</Badge>
                       <Badge className="rounded-full font-black uppercase">{invoiceFarmer.milkType || 'COW'}</Badge>
-                    </p>
+                    </div>
                   </div>
                 </div>
                 <div className="bg-muted/30 p-6 rounded-3xl space-y-3">
@@ -214,8 +212,8 @@ export default function ReportsPage() {
                     <TableRow>
                       <TableHead className="pl-10 font-black text-primary">Date</TableHead>
                       <TableHead className="font-black text-primary">Session</TableHead>
-                      <TableHead className="font-black text-primary">Weight (Kg)</TableHead>
-                      <TableHead className="text-right pr-10 font-black text-primary">Quantity (L)</TableHead>
+                      <TableHead className="font-black text-primary text-center">Weight (Kg)</TableHead>
+                      <TableHead className="text-right pr-10 font-black text-primary">Quantity (Litre)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -223,11 +221,11 @@ export default function ReportsPage() {
                       <TableRow key={entry.id} className="border-b">
                         <TableCell className="pl-10 font-bold">{format(new Date(entry.date), 'dd MMM, yyyy')}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="rounded-full font-bold uppercase text-[10px]">
+                          <Badge variant="outline" className="rounded-full font-bold uppercase text-[10px] border-primary/10">
                             {entry.session}
                           </Badge>
                         </TableCell>
-                        <TableCell className="font-mono">{entry.kgWeight?.toFixed(2)}</TableCell>
+                        <TableCell className="font-mono text-center">{entry.kgWeight?.toFixed(2)}</TableCell>
                         <TableCell className="text-right pr-10 font-black text-primary">
                           {entry.quantity?.toFixed(2)} L
                         </TableCell>
@@ -237,21 +235,27 @@ export default function ReportsPage() {
                 </Table>
               </div>
 
-              <div className="p-10 bg-primary/5 flex justify-between items-center">
+              <div className="p-10 bg-primary/5 flex flex-col sm:flex-row justify-between items-center gap-6">
                 <div className="flex items-center gap-4">
-                  <div className="p-3 bg-white rounded-2xl shadow-sm">
-                    <Milk className="w-8 h-8 text-primary" />
+                  <div className="p-4 bg-white rounded-3xl shadow-sm">
+                    <Milk className="w-10 h-10 text-primary" />
                   </div>
                   <div>
                     <p className="text-xs font-black text-muted-foreground uppercase tracking-widest">Total Cycle Volume</p>
-                    <p className="text-4xl font-black text-primary tracking-tighter">
-                      {invoiceEntries?.reduce((acc, curr) => acc + (curr.quantity || 0), 0).toFixed(2)} <small className="text-xl">L</small>
+                    <p className="text-5xl font-black text-primary tracking-tighter">
+                      {invoiceEntries?.reduce((acc, curr) => acc + (curr.quantity || 0), 0).toFixed(2)} <small className="text-2xl">L</small>
                     </p>
                   </div>
                 </div>
-                <div className="text-right text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-relaxed">
-                  System Generated Invoice<br />
-                  SGK MILK Management System
+                <div className="text-right flex flex-col items-end">
+                   <div className="flex items-center gap-2 mb-2">
+                     <CheckCircle2 className="w-5 h-5 text-primary" />
+                     <span className="text-sm font-black text-primary uppercase tracking-widest">Verified Report</span>
+                   </div>
+                   <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-relaxed">
+                     Generated on {format(new Date(), 'PPPP')}<br />
+                     SGK MILK Management System
+                   </p>
                 </div>
               </div>
             </Card>
@@ -270,17 +274,17 @@ export default function ReportsPage() {
           <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
             <div>
               <h1 className="text-3xl font-black text-primary tracking-tight">SGK MILK Reports</h1>
-              <p className="text-muted-foreground font-medium">Analytics for daily collection and 10-day payment cycles.</p>
+              <p className="text-muted-foreground font-medium">Daily collection logs and 10-day supplier invoices.</p>
             </div>
           </header>
 
           <Tabs defaultValue="cycle" className="space-y-8">
-            <TabsList className="grid grid-cols-3 w-full sm:w-[600px] rounded-full p-1 bg-muted">
+            <TabsList className="grid grid-cols-3 w-full sm:w-[600px] rounded-full p-1 bg-muted border border-primary/5">
               <TabsTrigger value="cycle" className="rounded-full font-bold gap-2">
                 <FileText className="w-4 h-4" /> Cycle Bill
               </TabsTrigger>
               <TabsTrigger value="daily" className="rounded-full font-bold gap-2">
-                <ClipboardList className="w-4 h-4" /> Daily Summary
+                <ClipboardList className="w-4 h-4" /> Daily Logs
               </TabsTrigger>
               <TabsTrigger value="sales" className="rounded-full font-bold gap-2">
                 <ShoppingCart className="w-4 h-4" /> Sales Report
@@ -288,18 +292,23 @@ export default function ReportsPage() {
             </TabsList>
 
             <TabsContent value="cycle" className="space-y-8 animate-in fade-in duration-500">
-              <div className="flex justify-end items-center gap-3">
-                <Calendar className="w-5 h-5 text-primary" />
-                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger className="w-[200px] rounded-full font-bold border-primary/20">
-                    <SelectValue placeholder="Select Month" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {monthOptions.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <Calendar className="w-5 h-5 text-primary" />
+                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                    <SelectTrigger className="w-[200px] rounded-full font-bold border-primary/20 bg-card">
+                      <SelectValue placeholder="Select Month" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {monthOptions.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="text-xs font-black text-muted-foreground uppercase tracking-widest">
+                  Cycle Bills strictly show total Litres collected
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -310,7 +319,7 @@ export default function ReportsPage() {
                     className={`relative overflow-hidden rounded-[2rem] cursor-pointer transition-all duration-300 border-2 ${
                       activeCycle === idx 
                       ? "border-primary bg-primary/5 shadow-xl scale-[1.02]" 
-                      : "border-transparent bg-card hover:bg-muted/50"
+                      : "border-transparent bg-card hover:border-primary/20"
                     }`}
                   >
                     <CardHeader className="pb-2">
@@ -332,7 +341,7 @@ export default function ReportsPage() {
                 ))}
               </div>
 
-              <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-2xl bg-card/50 backdrop-blur-sm">
+              <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-2xl bg-card">
                 <div className="p-8 border-b bg-primary/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
                     <h3 className="text-2xl font-black text-primary uppercase tracking-tighter">Cycle Quantity Bill</h3>
@@ -340,9 +349,12 @@ export default function ReportsPage() {
                       {currentCycle?.label} • {currentCycle?.range} • {format(new Date(selectedMonth + "-01"), "MMMM yyyy")}
                     </p>
                   </div>
-                  <div className="bg-primary px-6 py-3 rounded-2xl text-primary-foreground shadow-lg">
-                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Total Litres Collected</p>
-                    <p className="text-3xl font-black tracking-tighter">{cycleStats[activeCycle]?.qty.toFixed(2)} L</p>
+                  <div className="bg-primary px-8 py-4 rounded-3xl text-primary-foreground shadow-lg flex items-center gap-4">
+                    <Milk className="w-6 h-6 opacity-50" />
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Total Litres Collected</p>
+                      <p className="text-3xl font-black tracking-tighter">{cycleStats[activeCycle]?.qty.toFixed(2)} L</p>
+                    </div>
                   </div>
                 </div>
                 
@@ -353,7 +365,7 @@ export default function ReportsPage() {
                       <TableHead className="font-black text-primary">Farmer Name</TableHead>
                       <TableHead className="font-black text-primary">Milk Type</TableHead>
                       <TableHead className="text-right font-black text-primary">Total Litres</TableHead>
-                      <TableHead className="text-right pr-8 font-black text-primary">Actions</TableHead>
+                      <TableHead className="text-right pr-8 font-black text-primary">Invoice</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -376,7 +388,7 @@ export default function ReportsPage() {
                           <TableCell className="font-black text-primary pl-8 text-xl">{f.canNumber}</TableCell>
                           <TableCell className="font-bold text-base">{f.name}</TableCell>
                           <TableCell>
-                            <Badge variant={f.milkType === 'BUFFALO' ? "secondary" : "outline"} className="rounded-full font-black text-[10px]">
+                            <Badge variant={f.milkType === 'BUFFALO' ? "secondary" : "outline"} className="rounded-full font-black text-[10px] uppercase">
                               {f.milkType || 'COW'}
                             </Badge>
                           </TableCell>
@@ -385,11 +397,12 @@ export default function ReportsPage() {
                           </TableCell>
                           <TableCell className="text-right pr-8">
                             <Button 
-                              variant="ghost" 
+                              variant="default" 
                               size="sm" 
-                              className="rounded-full font-bold text-primary hover:bg-primary hover:text-white"
+                              className="rounded-full font-bold shadow-sm"
                               onClick={() => setViewingInvoiceFarmerId(f.id)}
                             >
+                              <FileText className="w-3 h-3 mr-2" />
                               View Invoice
                             </Button>
                           </TableCell>
@@ -401,31 +414,32 @@ export default function ReportsPage() {
                 
                 <div className="p-6 bg-muted/20 border-t text-center">
                   <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">
-                    Verified SGK MILK Report &bull; {format(new Date(), 'PPPP')}
+                    Verified SGK MILK Report &bull; {isClient ? format(new Date(), 'PPPP') : '...'}
                   </p>
                 </div>
               </Card>
             </TabsContent>
 
             <TabsContent value="daily" className="space-y-8 animate-in fade-in duration-500">
-              <div className="flex justify-end">
+              <div className="flex justify-end items-center gap-3">
+                <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">Select Date:</span>
                 <Input 
                   type="date" 
                   value={selectedDate} 
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-[200px] rounded-full font-bold border-primary/20 shadow-sm"
+                  className="w-[200px] rounded-full font-bold border-primary/20 shadow-sm bg-card"
                 />
               </div>
 
-              <Card className="rounded-[2rem] overflow-hidden border-none shadow-xl bg-card">
+              <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-xl bg-card">
                 <Table>
                   <TableHeader className="bg-muted/50 border-b">
                     <TableRow>
-                      <TableHead className="w-[100px] font-black text-primary pl-6">CAN</TableHead>
-                      <TableHead className="font-black text-primary">Farmer Details</TableHead>
+                      <TableHead className="w-[100px] font-black text-primary pl-8 py-5">CAN</TableHead>
+                      <TableHead className="font-black text-primary">Farmer Name</TableHead>
                       <TableHead className="font-black text-primary">Session</TableHead>
                       <TableHead className="font-black text-primary">Weight (Kg)</TableHead>
-                      <TableHead className="font-black text-primary text-right pr-6">Qty (Litre)</TableHead>
+                      <TableHead className="font-black text-primary text-right pr-8">Qty (Litre)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -437,8 +451,8 @@ export default function ReportsPage() {
                       dailyEntries.map(entry => {
                         const farmer = farmers?.find(f => f.id === entry.farmerId);
                         return (
-                          <TableRow key={entry.id} className="hover:bg-primary/5 transition-colors">
-                            <TableCell className="font-black text-primary pl-6 text-lg">{farmer?.canNumber || "—"}</TableCell>
+                          <TableRow key={entry.id} className="hover:bg-primary/5 transition-colors border-b last:border-0">
+                            <TableCell className="font-black text-primary pl-8 text-lg">{farmer?.canNumber || "—"}</TableCell>
                             <TableCell>
                               <div className="flex flex-col">
                                 <span className="font-bold text-base">{farmer?.name || "Unknown"}</span>
@@ -446,12 +460,14 @@ export default function ReportsPage() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge variant="outline" className="rounded-full font-bold text-[10px] uppercase">
+                              <Badge variant="outline" className="rounded-full font-bold text-[10px] uppercase border-primary/10">
                                 {entry.session}
                               </Badge>
                             </TableCell>
                             <TableCell className="font-mono text-base">{entry.kgWeight?.toFixed(2)}</TableCell>
-                            <TableCell className="text-right pr-6 font-black text-primary text-lg">{entry.quantity?.toFixed(2)} L</TableCell>
+                            <TableCell className="text-right pr-8 font-black text-primary text-xl tracking-tighter">
+                              {entry.quantity?.toFixed(2)} <small className="text-xs opacity-60">L</small>
+                            </TableCell>
                           </TableRow>
                         );
                       })
@@ -462,23 +478,24 @@ export default function ReportsPage() {
             </TabsContent>
 
             <TabsContent value="sales" className="space-y-8 animate-in fade-in duration-500">
-              <div className="flex justify-end">
+              <div className="flex justify-end items-center gap-3">
+                <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">Select Date:</span>
                 <Input 
                   type="date" 
                   value={selectedDate} 
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-[200px] rounded-full font-bold border-primary/20 shadow-sm"
+                  className="w-[200px] rounded-full font-bold border-primary/20 shadow-sm bg-card"
                 />
               </div>
 
-              <Card className="rounded-[2rem] overflow-hidden border-none shadow-xl bg-card">
+              <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-xl bg-card">
                 <Table>
                   <TableHeader className="bg-muted/50 border-b">
                     <TableRow>
-                      <TableHead className="w-[100px] font-black text-primary pl-6">Code</TableHead>
+                      <TableHead className="w-[100px] font-black text-primary pl-8 py-5">Code</TableHead>
                       <TableHead className="font-black text-primary">Buyer Name</TableHead>
                       <TableHead className="font-black text-primary">Session</TableHead>
-                      <TableHead className="font-black text-primary text-right pr-6">Qty Sold (Litre)</TableHead>
+                      <TableHead className="font-black text-primary text-right pr-8">Qty Sold (Litre)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -490,15 +507,17 @@ export default function ReportsPage() {
                       dailySales.map(sale => {
                         const buyer = buyers?.find(b => b.id === sale.buyerId);
                         return (
-                          <TableRow key={sale.id} className="hover:bg-accent/5 transition-colors">
-                            <TableCell className="font-black text-primary pl-6 text-lg">{buyer?.buyerCode || "—"}</TableCell>
+                          <TableRow key={sale.id} className="hover:bg-accent/5 transition-colors border-b last:border-0">
+                            <TableCell className="font-black text-primary pl-8 text-lg">{buyer?.buyerCode || "—"}</TableCell>
                             <TableCell className="font-bold text-base">{buyer?.name || "Unknown"}</TableCell>
                             <TableCell>
-                              <Badge variant="outline" className="rounded-full font-bold text-[10px] uppercase">
+                              <Badge variant="outline" className="rounded-full font-bold text-[10px] uppercase border-accent/20">
                                 {sale.session}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-right pr-6 font-black text-primary text-lg">{sale.quantity?.toFixed(2)} L</TableCell>
+                            <TableCell className="text-right pr-8 font-black text-primary text-xl tracking-tighter">
+                              {sale.quantity?.toFixed(2)} <small className="text-xs opacity-60">L</small>
+                            </TableCell>
                           </TableRow>
                         );
                       })

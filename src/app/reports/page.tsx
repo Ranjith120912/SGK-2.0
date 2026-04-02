@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { useCollection, useMemoFirebase, useFirestore } from "@/firebase";
@@ -15,30 +15,42 @@ import { Badge } from "@/components/ui/badge";
 
 export default function ReportsPage() {
   const firestore = useFirestore();
-  const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), 'yyyy-MM'));
+  const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [activeCycle, setActiveCycle] = useState<number>(0);
+  const [currentDate, setCurrentDate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    const now = new Date();
+    setCurrentDate(now);
+    setSelectedMonth(format(now, 'yyyy-MM'));
+  }, []);
 
   // Generate Year-Month options for the last 12 months
-  const monthOptions = Array.from({ length: 12 }).map((_, i) => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - i);
-    return {
-      value: format(d, 'yyyy-MM'),
-      label: format(d, 'MMMM yyyy')
-    };
-  });
+  const monthOptions = useMemo(() => {
+    if (!currentDate) return [];
+    return Array.from({ length: 12 }).map((_, i) => {
+      const d = new Date(currentDate);
+      d.setMonth(d.getMonth() - i);
+      return {
+        value: format(d, 'yyyy-MM'),
+        label: format(d, 'MMMM yyyy')
+      };
+    });
+  }, [currentDate]);
 
   // Calculate cycles for selected month
-  const [year, month] = selectedMonth.split('-').map(Number);
-  const monthStart = startOfMonth(new Date(year, month - 1));
-  const monthEnd = endOfMonth(new Date(year, month - 1));
-  const lastDay = monthEnd.getDate();
+  const cycles = useMemo(() => {
+    if (!selectedMonth) return [];
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const monthEnd = endOfMonth(new Date(year, month - 1));
+    const lastDay = monthEnd.getDate();
 
-  const cycles = [
-    { id: 0, label: "Cycle 1", range: "1st - 10th", start: 1, end: 10 },
-    { id: 1, label: "Cycle 2", range: "11th - 20th", start: 11, end: 20 },
-    { id: 2, label: "Cycle 3", range: `21st - ${lastDay}${lastDay === 31 ? ' (11 days)' : 'st'}`, start: 21, end: lastDay }
-  ];
+    return [
+      { id: 0, label: "Cycle 1", range: "1st - 10th", start: 1, end: 10 },
+      { id: 1, label: "Cycle 2", range: "11th - 20th", start: 11, end: 20 },
+      { id: 2, label: "Cycle 3", range: `21st - ${lastDay}${lastDay === 31 ? ' (11 days)' : 'st'}`, start: 21, end: lastDay }
+    ];
+  }, [selectedMonth]);
 
   const entriesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -56,7 +68,8 @@ export default function ReportsPage() {
   // Filter entries based on selected month and cycle
   const currentCycle = cycles[activeCycle];
   const filteredEntries = allEntries?.filter(entry => {
-    if (!entry.date.startsWith(selectedMonth)) return false;
+    if (!selectedMonth || !entry.date.startsWith(selectedMonth)) return false;
+    if (!currentCycle) return false;
     const day = parseInt(entry.date.split('-')[2]);
     return day >= currentCycle.start && day <= currentCycle.end;
   });
@@ -64,7 +77,7 @@ export default function ReportsPage() {
   // Calculate stats for all cycles in the month
   const cycleStats = cycles.map(c => {
     const cEntries = allEntries?.filter(entry => {
-      if (!entry.date.startsWith(selectedMonth)) return false;
+      if (!selectedMonth || !entry.date.startsWith(selectedMonth)) return false;
       const day = parseInt(entry.date.split('-')[2]);
       return day >= c.start && day <= c.end;
     }) || [];
@@ -85,6 +98,18 @@ export default function ReportsPage() {
       entryCount: fEntries.length
     };
   }).filter(f => f.totalQty > 0).sort((a, b) => parseInt(a.canNumber) - parseInt(b.canNumber));
+
+  if (!currentDate || !selectedMonth) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <Navbar />
+        <main className="flex-grow pt-24 pb-20 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -136,11 +161,11 @@ export default function ReportsPage() {
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground font-medium">Collection:</span>
-                      <span className="font-bold text-primary">{cycleStats[idx].qty.toFixed(1)} L</span>
+                      <span className="font-bold text-primary">{cycleStats[idx]?.qty.toFixed(1) || "0.0"} L</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground font-medium">Total Amount:</span>
-                      <span className="font-bold text-accent">₹ {cycleStats[idx].amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                      <span className="font-bold text-accent">₹ {cycleStats[idx]?.amount.toLocaleString('en-IN', { maximumFractionDigits: 0 }) || "0"}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -154,17 +179,17 @@ export default function ReportsPage() {
               <div>
                 <h3 className="text-xl font-black text-primary">Detailed Breakdown</h3>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">
-                  {currentCycle.label}: {currentCycle.range}
+                  {currentCycle?.label}: {currentCycle?.range}
                 </p>
               </div>
               <div className="flex gap-4">
                 <div className="text-right">
                   <p className="text-[10px] font-black text-muted-foreground uppercase">Total Quantity</p>
-                  <p className="text-lg font-black text-primary">{cycleStats[activeCycle].qty.toFixed(2)} L</p>
+                  <p className="text-lg font-black text-primary">{cycleStats[activeCycle]?.qty.toFixed(2) || "0.00"} L</p>
                 </div>
                 <div className="text-right border-l pl-4">
                   <p className="text-[10px] font-black text-muted-foreground uppercase">Total Amount</p>
-                  <p className="text-lg font-black text-accent">₹ {cycleStats[activeCycle].amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
+                  <p className="text-lg font-black text-accent">₹ {cycleStats[activeCycle]?.amount.toLocaleString('en-IN', { maximumFractionDigits: 2 }) || "0.00"}</p>
                 </div>
               </div>
             </div>
@@ -217,7 +242,7 @@ export default function ReportsPage() {
             
             <div className="p-6 bg-muted/20 border-t text-center">
               <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">
-                Verified SGK MILK Report &bull; {format(new Date(), 'PPPP')}
+                Verified SGK MILK Report &bull; {currentDate ? format(currentDate, 'PPPP') : '...'}
               </p>
             </div>
           </Card>

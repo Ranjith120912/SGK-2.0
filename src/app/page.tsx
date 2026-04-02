@@ -3,57 +3,48 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { DashboardStats } from "@/components/dashboard-stats";
 import Link from "next/link";
-import { PlusCircle, Users, Settings } from "lucide-react";
+import { PlusCircle, Users, Settings, ShoppingCart, BarChart3, UserCheck } from "lucide-react";
 
 export default function Home() {
+  const quickActions = [
+    { href: "/entries", label: "Collection", icon: PlusCircle, color: "text-primary", bg: "bg-primary/10" },
+    { href: "/sales", label: "Sales", icon: ShoppingCart, color: "text-accent", bg: "bg-accent/10" },
+    { href: "/farmers", label: "Farmers", icon: Users, color: "text-secondary", bg: "bg-secondary/10" },
+    { href: "/buyers", label: "Buyers", icon: UserCheck, color: "text-orange-500", bg: "bg-orange-500/10" },
+    { href: "/reports", label: "Reports", icon: BarChart3, color: "text-green-500", bg: "bg-green-500/10" },
+    { href: "/settings", label: "Settings", icon: Settings, color: "text-muted-foreground", bg: "bg-muted" },
+  ];
+
   return (
     <div className="min-h-screen flex flex-col font-body bg-background selection:bg-accent/30">
       <Navbar />
       
       <main className="flex-grow pt-24 pb-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <header className="mb-10">
+          <header className="mb-8">
             <h1 className="text-4xl font-black text-primary tracking-tight mb-2">
-              Milk Management Dashboard
+              Dairy Dashboard
             </h1>
             <p className="text-muted-foreground">
-              Monitor daily collection and manage your supplier network.
+              Real-time monitoring and management.
             </p>
           </header>
 
-          <DashboardStats />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
-            <Link href="/entries">
-              <div className="group p-8 bg-card border rounded-3xl hover:border-primary/50 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer flex flex-col items-center text-center space-y-4 h-full">
-                <div className="p-4 bg-primary/10 rounded-2xl group-hover:scale-110 transition-transform">
-                  <PlusCircle className="w-8 h-8 text-primary" />
+          {/* Compact Top Navigation / Quick Actions */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-10">
+            {quickActions.map((action) => (
+              <Link key={action.href} href={action.href}>
+                <div className="group p-4 bg-card border rounded-2xl hover:border-primary/50 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer flex flex-col items-center text-center space-y-2">
+                  <div className={`p-3 ${action.bg} rounded-xl group-hover:scale-110 transition-transform`}>
+                    <action.icon className={`w-6 h-6 ${action.color}`} />
+                  </div>
+                  <h3 className="text-sm font-black text-primary">{action.label}</h3>
                 </div>
-                <h3 className="text-xl font-bold text-primary">Daily Collection</h3>
-                <p className="text-sm text-muted-foreground">Record morning and evening milk collection from farmers.</p>
-              </div>
-            </Link>
-
-            <Link href="/farmers">
-              <div className="group p-8 bg-card border rounded-3xl hover:border-primary/50 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer flex flex-col items-center text-center space-y-4 h-full">
-                <div className="p-4 bg-secondary/10 rounded-2xl group-hover:scale-110 transition-transform">
-                  <Users className="w-8 h-8 text-secondary" />
-                </div>
-                <h3 className="text-xl font-bold text-primary">Farmers</h3>
-                <p className="text-sm text-muted-foreground">Manage your milk suppliers, bank accounts, and milk types.</p>
-              </div>
-            </Link>
-
-            <Link href="/settings">
-              <div className="group p-8 bg-card border rounded-3xl hover:border-primary/50 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer flex flex-col items-center text-center space-y-4 h-full">
-                <div className="p-4 bg-muted rounded-2xl group-hover:scale-110 transition-transform">
-                  <Settings className="w-8 h-8 text-primary" />
-                </div>
-                <h3 className="text-xl font-bold text-primary">Configuration</h3>
-                <p className="text-sm text-muted-foreground">Adjust Cow and Buffalo milk purchase rates (₹/Litre).</p>
-              </div>
-            </Link>
+              </Link>
+            ))}
           </div>
+
+          <DashboardStats />
         </div>
       </main>
 

@@ -70,6 +70,57 @@
         }
       }
     },
+    "Buyer": {
+      "title": "Buyer",
+      "description": "A milk distribution customer/buyer",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "buyerCode": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["name", "buyerCode"]
+    },
+    "Sale": {
+      "title": "Sale",
+      "description": "A daily milk sale record",
+      "type": "object",
+      "properties": {
+        "buyerId": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
+        "session": {
+          "type": "string",
+          "enum": ["Morning", "Evening"]
+        },
+        "quantity": {
+          "type": "number"
+        },
+        "rate": {
+          "type": "number"
+        },
+        "totalAmount": {
+          "type": "number"
+        }
+      }
+    },
     "Settings": {
       "title": "Settings",
       "description": "Global application configuration",
@@ -79,6 +130,9 @@
           "type": "number"
         },
         "buffaloRate": {
+          "type": "number"
+        },
+        "sellingRate": {
           "type": "number"
         },
         "updatedAt": {
@@ -99,6 +153,14 @@
     "/entries/{entryId}": {
       "schema": "MilkEntry",
       "description": "Daily collection records"
+    },
+    "/buyers/{buyerId}": {
+      "schema": "Buyer",
+      "description": "Collection of milk buyers"
+    },
+    "/sales/{saleId}": {
+      "schema": "Sale",
+      "description": "Daily sales records"
     },
     "/settings/{settingsId}": {
       "schema": "Settings",

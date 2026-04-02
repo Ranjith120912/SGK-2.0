@@ -106,7 +106,7 @@ export default function SalesPage() {
           <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
             <div>
               <h1 className="text-3xl font-black text-primary tracking-tight">Daily Sales</h1>
-              <p className="text-muted-foreground">Record milk distribution for {format(new Date(date), 'MMMM dd, yyyy')}</p>
+              <p className="text-muted-foreground">Record distribution for {format(new Date(date), 'MMMM dd, yyyy')}</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full sm:w-[200px] rounded-full" />

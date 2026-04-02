@@ -1,6 +1,6 @@
 
 import Link from "next/link";
-import { Scale, Users, ClipboardList, BarChart3, Settings } from "lucide-react";
+import { Scale, Users, ClipboardList, BarChart3, Settings, ShoppingCart, UserCheck } from "lucide-react";
 
 export function Navbar() {
   return (
@@ -21,9 +21,17 @@ export function Navbar() {
               <ClipboardList className="w-4 h-4" />
               Collection
             </Link>
+            <Link href="/sales" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
+              <ShoppingCart className="w-4 h-4" />
+              Sales
+            </Link>
             <Link href="/farmers" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
               <Users className="w-4 h-4" />
               Farmers
+            </Link>
+            <Link href="/buyers" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
+              <UserCheck className="w-4 h-4" />
+              Buyers
             </Link>
             <Link href="/reports" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />

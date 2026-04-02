@@ -130,6 +130,12 @@
       "description": "Global application configuration",
       "type": "object",
       "properties": {
+        "companyName": {
+          "type": "string"
+        },
+        "address": {
+          "type": "string"
+        },
         "cowRate": {
           "type": "number"
         },

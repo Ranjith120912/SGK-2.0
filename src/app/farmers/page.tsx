@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { useCollection, useMemoFirebase, useFirestore } from "@/firebase";
@@ -27,15 +27,15 @@ import {
   Search, 
   FileUp, 
   ClipboardList, 
-  CheckCircle2, 
-  AlertCircle, 
+  CircleCheck, 
+  CircleAlert, 
   Download, 
   FileSpreadsheet,
   Table as TableIcon,
   Upload
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import * as XLSX from 'xlsx';
+import { read, utils, writeFile } from 'xlsx';
 
 export default function FarmersPage() {
   const firestore = useFirestore();
@@ -87,7 +87,6 @@ export default function FarmersPage() {
     if (!firestore) return;
     let count = 0;
     data.forEach((item: any) => {
-      // Normalize keys to find Name, Can Number, Account Number
       const normalizedItem: any = {};
       Object.keys(item).forEach(key => {
         const normalizedKey = key.toLowerCase().replace(/\s+/g, '');
@@ -160,17 +159,18 @@ export default function FarmersPage() {
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const data = evt.target?.result;
+        if (!data) return;
+        const wb = read(data, { type: 'array' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
-        processImportArray(data);
+        const jsonData = utils.sheet_to_json(ws);
+        processImportArray(jsonData);
       } catch (error) {
         toast({ title: "File Error", description: "Could not read the Excel file.", variant: "destructive" });
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   const downloadExcelTemplate = () => {
@@ -178,10 +178,10 @@ export default function FarmersPage() {
       { "Name": "Rajesh Kumar", "Can Number": "101", "Account Number": "9876543210" },
       { "Name": "Suresh Singh", "Can Number": "102", "Account Number": "1234567890" }
     ];
-    const ws = XLSX.utils.json_to_sheet(templateData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Farmers Template");
-    XLSX.writeFile(wb, "Farmers_Import_Template.xlsx");
+    const ws = utils.json_to_sheet(templateData);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, "Farmers Template");
+    writeFile(wb, "Farmers_Import_Template.xlsx");
     
     toast({ title: "Template Downloaded", description: "Excel (.xlsx) file is ready." });
   };
@@ -284,13 +284,13 @@ export default function FarmersPage() {
 
                   <div className="bg-muted/50 p-6 flex flex-col sm:flex-row gap-4 justify-between items-center border-t">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium italic">
-                      <AlertCircle className="w-4 h-4 text-accent" />
+                      <CircleAlert className="w-4 h-4 text-accent" />
                       Headers required in first row
                     </div>
                     <div className="flex gap-2">
                       <Button variant="ghost" onClick={() => setIsImporting(false)} className="rounded-full">Cancel</Button>
                       <Button onClick={handleBulkImportText} className="rounded-full px-8 shadow-md" disabled={!importData}>
-                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        <CircleCheck className="w-4 h-4 mr-2" />
                         Process Text
                       </Button>
                     </div>

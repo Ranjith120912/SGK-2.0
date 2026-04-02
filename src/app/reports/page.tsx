@@ -7,7 +7,7 @@ import { Footer } from "@/components/footer";
 import { useCollection, useDoc, useMemoFirebase, useFirestore } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -339,21 +339,21 @@ export default function ReportsPage() {
           </header>
 
           <Tabs defaultValue="overview" className="space-y-8">
-            <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 w-full rounded-full p-1 bg-muted border border-primary/5">
-              <TabsTrigger value="overview" className="rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest">
-                <BarChart4 className="w-4 h-4" /> Overview
+            <TabsList className="flex flex-wrap h-auto gap-2 p-1.5 bg-muted rounded-2xl md:rounded-full border border-primary/5 w-full">
+              <TabsTrigger value="overview" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
+                <BarChart4 className="w-3.5 h-3.5" /> Overview
               </TabsTrigger>
-              <TabsTrigger value="cycle" className="rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest">
-                <FileText className="w-4 h-4" /> Cycle Bill
+              <TabsTrigger value="cycle" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
+                <FileText className="w-3.5 h-3.5" /> Cycle Bill
               </TabsTrigger>
-              <TabsTrigger value="master" className="rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest">
-                <ListChecks className="w-4 h-4" /> Master Summary
+              <TabsTrigger value="master" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
+                <ListChecks className="w-3.5 h-3.5" /> Master Summary
               </TabsTrigger>
-              <TabsTrigger value="daily" className="rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest">
-                <ClipboardList className="w-4 h-4" /> Collection
+              <TabsTrigger value="daily" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
+                <ClipboardList className="w-3.5 h-3.5" /> Collection
               </TabsTrigger>
-              <TabsTrigger value="sales" className="rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest">
-                <ShoppingCart className="w-4 h-4" /> Sales
+              <TabsTrigger value="sales" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
+                <ShoppingCart className="w-3.5 h-3.5" /> Sales
               </TabsTrigger>
             </TabsList>
 
@@ -753,4 +753,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-

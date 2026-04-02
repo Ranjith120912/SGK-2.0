@@ -152,6 +152,10 @@
         "buffaloSellingRate": {
           "type": "number"
         },
+        "kgToLitreRate": {
+          "type": "number",
+          "description": "Conversion factor from Kg to Litres (default 0.96)"
+        },
         "updatedAt": {
           "type": "string",
           "format": "date-time"

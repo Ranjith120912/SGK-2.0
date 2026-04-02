@@ -18,8 +18,6 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
-const CONVERSION_RATE = 0.96; // 1 Kg = 0.96 Litres
-
 export default function EntriesPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -56,6 +54,9 @@ export default function EntriesPage() {
   const { data: entries } = useCollection(entriesQuery);
   const { data: ratesConfig } = useDoc(settingsRef);
 
+  // Conversion factor from Settings (default to 0.96)
+  const conversionRate = ratesConfig?.kgToLitreRate || 0.96;
+
   const filteredFarmers = farmers?.filter(f => 
     f.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     f.canNumber.includes(searchTerm)
@@ -85,7 +86,7 @@ export default function EntriesPage() {
 
     setSavingStatus(prev => ({ ...prev, [farmerId]: 'saving' }));
 
-    const quantityLitre = kgValue * CONVERSION_RATE;
+    const quantityLitre = kgValue * conversionRate;
     
     // Determine rate based on milk type and settings
     const currentRate = farmer.milkType === 'BUFFALO' 
@@ -103,7 +104,7 @@ export default function EntriesPage() {
       session,
       kgWeight: kgValue,
       quantity: quantityLitre,
-      conversionRate: CONVERSION_RATE,
+      conversionRate: conversionRate,
       fat: 0,
       snf: 0,
       rate: currentRate,
@@ -175,7 +176,7 @@ export default function EntriesPage() {
               <Scale className="w-5 h-5 text-primary" />
               <div className="text-xs">
                 <p className="font-bold text-primary">Weight Conversion</p>
-                <p className="text-muted-foreground">1 Kg = {CONVERSION_RATE} L</p>
+                <p className="text-muted-foreground">1 Kg = {conversionRate} L</p>
               </div>
             </div>
             <div className="flex items-center gap-3 px-4 py-2 bg-accent/5 rounded-2xl border border-accent/10">
@@ -207,7 +208,7 @@ export default function EntriesPage() {
                     : (existingEntry ? existingEntry.kgWeight.toString() : "");
                   
                   const kgNum = parseFloat(currentKgStr);
-                  const previewLitre = !isNaN(kgNum) ? (kgNum * CONVERSION_RATE).toFixed(2) : "0.00";
+                  const previewLitre = !isNaN(kgNum) ? (kgNum * conversionRate).toFixed(2) : "0.00";
                   const status = savingStatus[farmer.id] || (existingEntry ? 'saved' : 'idle');
                   
                   // Live amount preview

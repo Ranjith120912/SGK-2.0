@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -11,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Settings as SettingsIcon, Milk, Save, CheckCircle2, ShoppingBag, Building2, Upload, X, Image as ImageIcon } from "lucide-react";
+import { Settings as SettingsIcon, Milk, Save, CheckCircle2, ShoppingBag, Building2, Upload, X, Image as ImageIcon, Scale } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -27,7 +28,8 @@ export default function SettingsPage() {
     cowRate: "", 
     buffaloRate: "", 
     cowSellingRate: "",
-    buffaloSellingRate: "" 
+    buffaloSellingRate: "",
+    kgToLitreRate: "0.96"
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -47,7 +49,8 @@ export default function SettingsPage() {
         cowRate: currentSettings.cowRate?.toString() || "",
         buffaloRate: currentSettings.buffaloRate?.toString() || "",
         cowSellingRate: currentSettings.cowSellingRate?.toString() || "",
-        buffaloSellingRate: currentSettings.buffaloSellingRate?.toString() || ""
+        buffaloSellingRate: currentSettings.buffaloSellingRate?.toString() || "",
+        kgToLitreRate: currentSettings.kgToLitreRate?.toString() || "0.96"
       });
     }
   }, [currentSettings]);
@@ -80,6 +83,7 @@ export default function SettingsPage() {
       buffaloRate: parseFloat(config.buffaloRate) || 0,
       cowSellingRate: parseFloat(config.cowSellingRate) || 0,
       buffaloSellingRate: parseFloat(config.buffaloSellingRate) || 0,
+      kgToLitreRate: parseFloat(config.kgToLitreRate) || 0.96,
       updatedAt: serverTimestamp()
     };
 
@@ -87,7 +91,7 @@ export default function SettingsPage() {
 
     setTimeout(() => {
       setIsSaving(false);
-      toast({ title: "Settings Saved", description: "Business details and rates updated successfully." });
+      toast({ title: "Settings Saved", description: "System configuration updated successfully." });
     }, 800);
   };
 
@@ -101,7 +105,7 @@ export default function SettingsPage() {
               <SettingsIcon className="w-8 h-8" />
               Configuration
             </h1>
-            <p className="text-muted-foreground font-medium">Manage your company profile, branding, and pricing rates.</p>
+            <p className="text-muted-foreground font-medium">Manage your company profile, pricing, and conversion standards.</p>
           </header>
 
           <div className="space-y-8">
@@ -182,21 +186,17 @@ export default function SettingsPage() {
                         />
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 mt-2">
-                      <ImageIcon className="w-3.5 h-3.5 text-muted-foreground" />
-                      <p className="text-[9px] text-muted-foreground uppercase font-black tracking-widest">Recommended: PNG with transparent background</p>
-                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <Card className="rounded-[2.5rem] shadow-xl border-none bg-card/50 backdrop-blur-sm overflow-hidden h-full">
                 <CardHeader className="bg-primary/5 border-b border-primary/10 p-8">
                   <CardTitle className="text-xl font-black flex items-center gap-3 text-primary uppercase tracking-tighter">
                     <Milk className="w-5 h-5" />
-                    Purchase Rates (Procurement)
+                    Procurement Rates
                   </CardTitle>
                   <CardDescription className="text-muted-foreground font-medium">Prices (₹/L) paid to farmers.</CardDescription>
                 </CardHeader>
@@ -205,24 +205,24 @@ export default function SettingsPage() {
                     <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Cow Milk Rate</Label>
                     <div className="relative">
                       <span className="absolute left-5 top-1/2 -translate-y-1/2 text-primary/40 font-black">₹</span>
-                      <Input type="number" step="0.01" className="h-14 pl-10 rounded-2xl font-black text-lg border-primary/10 focus:border-primary" value={config.cowRate} onChange={(e) => setConfig({ ...config, cowRate: e.target.value })} />
+                      <Input type="number" step="0.01" className="h-14 pl-10 rounded-2xl font-black text-lg border-primary/10" value={config.cowRate} onChange={(e) => setConfig({ ...config, cowRate: e.target.value })} />
                     </div>
                   </div>
                   <div className="space-y-4">
                     <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Buffalo Milk Rate</Label>
                     <div className="relative">
                       <span className="absolute left-5 top-1/2 -translate-y-1/2 text-primary/40 font-black">₹</span>
-                      <Input type="number" step="0.01" className="h-14 pl-10 rounded-2xl font-black text-lg border-primary/10 focus:border-primary" value={config.buffaloRate} onChange={(e) => setConfig({ ...config, buffaloRate: e.target.value })} />
+                      <Input type="number" step="0.01" className="h-14 pl-10 rounded-2xl font-black text-lg border-primary/10" value={config.buffaloRate} onChange={(e) => setConfig({ ...config, buffaloRate: e.target.value })} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="rounded-[2.5rem] shadow-xl border-2 border-accent/10 bg-accent/5 backdrop-blur-sm overflow-hidden h-full">
+              <Card className="rounded-[2.5rem] shadow-xl border-none bg-accent/5 backdrop-blur-sm overflow-hidden h-full">
                 <CardHeader className="bg-accent/10 border-b border-accent/10 p-8">
                   <CardTitle className="text-xl font-black flex items-center gap-3 text-accent uppercase tracking-tighter">
                     <ShoppingBag className="w-5 h-5" />
-                    Sales Rates (Distribution)
+                    Sales Rates
                   </CardTitle>
                   <CardDescription className="text-muted-foreground font-medium">Prices (₹/L) charged to buyers.</CardDescription>
                 </CardHeader>
@@ -231,19 +231,45 @@ export default function SettingsPage() {
                     <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-accent/70">Cow Selling Price</Label>
                     <div className="relative">
                       <span className="absolute left-5 top-1/2 -translate-y-1/2 text-accent/40 font-black">₹</span>
-                      <Input type="number" step="0.01" className="h-14 pl-10 rounded-2xl font-black text-lg border-accent/20 focus:border-accent" value={config.cowSellingRate} onChange={(e) => setConfig({ ...config, cowSellingRate: e.target.value })} />
+                      <Input type="number" step="0.01" className="h-14 pl-10 rounded-2xl font-black text-lg border-accent/20" value={config.cowSellingRate} onChange={(e) => setConfig({ ...config, cowSellingRate: e.target.value })} />
                     </div>
                   </div>
                   <div className="space-y-4">
                     <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-accent/70">Buffalo Selling Price</Label>
                     <div className="relative">
                       <span className="absolute left-5 top-1/2 -translate-y-1/2 text-accent/40 font-black">₹</span>
-                      <Input type="number" step="0.01" className="h-14 pl-10 rounded-2xl font-black text-lg border-accent/20 focus:border-accent" value={config.buffaloSellingRate} onChange={(e) => setConfig({ ...config, buffaloSellingRate: e.target.value })} />
+                      <Input type="number" step="0.01" className="h-14 pl-10 rounded-2xl font-black text-lg border-accent/20" value={config.buffaloSellingRate} onChange={(e) => setConfig({ ...config, buffaloSellingRate: e.target.value })} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
+
+            <Card className="rounded-[2.5rem] shadow-xl border-none bg-card/50 backdrop-blur-sm overflow-hidden">
+              <CardHeader className="bg-muted/50 border-b p-8">
+                <CardTitle className="text-xl font-black flex items-center gap-3 text-foreground uppercase tracking-tighter">
+                  <Scale className="w-5 h-5" />
+                  Processing & Standards
+                </CardTitle>
+                <CardDescription className="text-muted-foreground font-medium">Configure calculation factors and conversion rates.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-8">
+                <div className="max-w-md space-y-4">
+                  <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Kg to Litre Conversion Rate</Label>
+                  <div className="relative">
+                    <Input 
+                      type="number" 
+                      step="0.001" 
+                      className="h-14 rounded-2xl font-black text-lg border-primary/10" 
+                      value={config.kgToLitreRate} 
+                      onChange={(e) => setConfig({ ...config, kgToLitreRate: e.target.value })} 
+                    />
+                    <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground uppercase">Rate</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground italic font-medium">Standard is 0.96 (1 Kg = 0.96 Litres). Adjust based on density standards.</p>
+                </div>
+              </CardContent>
+            </Card>
 
             <div className="flex justify-end pt-6">
               <Button onClick={handleSave} disabled={isSaving || isLoading} className="rounded-full px-12 h-16 shadow-2xl hover:scale-105 active:scale-95 transition-all font-black uppercase tracking-widest text-lg">

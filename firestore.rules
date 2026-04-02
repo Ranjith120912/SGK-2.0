@@ -11,13 +11,7 @@ service cloud.firestore {
     match /farmers/{farmerId} {
       allow read, write: if isAdmin();
     }
-    match /buyers/{buyerId} {
-      allow read, write: if isAdmin();
-    }
     match /entries/{entryId} {
-      allow read, write: if isAdmin();
-    }
-    match /sales/{saleId} {
       allow read, write: if isAdmin();
     }
     match /settings/{settingsId} {

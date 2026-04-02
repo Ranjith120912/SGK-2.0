@@ -38,33 +38,6 @@
       },
       "required": ["name", "canNumber", "milkType"]
     },
-    "Buyer": {
-      "title": "Buyer",
-      "description": "A customer who buys milk",
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "description": "Full name of the buyer"
-        },
-        "buyerCode": {
-          "type": "string",
-          "description": "Unique code for the buyer"
-        },
-        "phone": {
-          "type": "string",
-          "description": "Contact phone number"
-        },
-        "active": {
-          "type": "boolean"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      },
-      "required": ["name", "buyerCode"]
-    },
     "MilkEntry": {
       "title": "Milk Entry",
       "description": "A daily milk collection record from a farmer",
@@ -97,34 +70,6 @@
         }
       }
     },
-    "Sale": {
-      "title": "Sale",
-      "description": "A record of milk sold to a buyer",
-      "type": "object",
-      "properties": {
-        "buyerId": {
-          "type": "string"
-        },
-        "date": {
-          "type": "string",
-          "format": "date"
-        },
-        "session": {
-          "type": "string",
-          "enum": ["Morning", "Evening"]
-        },
-        "quantity": {
-          "type": "number",
-          "description": "Quantity in Litres"
-        },
-        "rate": {
-          "type": "number"
-        },
-        "totalAmount": {
-          "type": "number"
-        }
-      }
-    },
     "Settings": {
       "title": "Settings",
       "description": "Global application configuration",
@@ -135,10 +80,6 @@
         },
         "buffaloRate": {
           "type": "number"
-        },
-        "sellingRate": {
-          "type": "number",
-          "description": "Standard selling rate per litre"
         },
         "updatedAt": {
           "type": "string",
@@ -155,17 +96,9 @@
       "schema": "Farmer",
       "description": "Collection of milk suppliers"
     },
-    "/buyers/{buyerId}": {
-      "schema": "Buyer",
-      "description": "Collection of milk buyers"
-    },
     "/entries/{entryId}": {
       "schema": "MilkEntry",
       "description": "Daily collection records"
-    },
-    "/sales/{saleId}": {
-      "schema": "Sale",
-      "description": "Daily sales records"
     },
     "/settings/{settingsId}": {
       "schema": "Settings",

@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { useCollection, useMemoFirebase, useFirestore } from "@/firebase";
 import { collection, query, where } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
-import { Droplets, Users, TrendingUp, Calendar, ShoppingCart } from "lucide-react";
+import { Droplets, Users, Calendar, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 
 export function DashboardStats() {
@@ -28,17 +28,12 @@ export function DashboardStats() {
     return query(collection(firestore, 'entries'), where('date', '==', today));
   }, [firestore, today]);
 
-  const salesQuery = useMemoFirebase(() => {
-    if (!firestore || !today) return null;
-    return query(collection(firestore, 'sales'), where('date', '==', today));
-  }, [firestore, today]);
-
   const { data: farmers } = useCollection(farmersQuery);
   const { data: todayEntries } = useCollection(entriesQuery);
-  const { data: todaySales } = useCollection(salesQuery);
 
   const totalCollection = todayEntries?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
-  const totalSales = todaySales?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
+  const morningEntries = todayEntries?.filter(e => e.session === 'Morning').length || 0;
+  const eveningEntries = todayEntries?.filter(e => e.session === 'Evening').length || 0;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -53,7 +48,7 @@ export function DashboardStats() {
               <Droplets className="w-5 h-5 text-primary" />
             </div>
           </div>
-          <p className="mt-4 text-xs font-medium text-muted-foreground italic">Today's total purchase</p>
+          <p className="mt-4 text-xs font-medium text-muted-foreground italic">Total volume for today</p>
         </CardContent>
       </Card>
 
@@ -61,14 +56,14 @@ export function DashboardStats() {
         <CardContent className="p-6">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs font-bold text-accent/60 uppercase tracking-widest mb-1">Sales (L)</p>
-              <h3 className="text-3xl font-black text-accent">{totalSales.toFixed(1)} L</h3>
+              <p className="text-xs font-bold text-accent/60 uppercase tracking-widest mb-1">Suppliers Active</p>
+              <h3 className="text-3xl font-black text-primary">{farmers?.length || 0}</h3>
             </div>
             <div className="p-2 bg-accent/10 rounded-xl">
-              <ShoppingCart className="w-5 h-5 text-accent" />
+              <Users className="w-5 h-5 text-accent" />
             </div>
           </div>
-          <p className="mt-4 text-xs font-medium text-muted-foreground italic">Today's total sold</p>
+          <p className="mt-4 text-xs font-medium text-muted-foreground italic">Total registered farmers</p>
         </CardContent>
       </Card>
 
@@ -76,14 +71,14 @@ export function DashboardStats() {
         <CardContent className="p-6">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs font-bold text-secondary/60 uppercase tracking-widest mb-1">Inventory Balance</p>
-              <h3 className="text-3xl font-black text-primary">{(totalCollection - totalSales).toFixed(1)} L</h3>
+              <p className="text-xs font-bold text-secondary/60 uppercase tracking-widest mb-1">Morning Session</p>
+              <h3 className="text-3xl font-black text-primary">{morningEntries}</h3>
             </div>
             <div className="p-2 bg-secondary/10 rounded-xl">
-              <TrendingUp className="w-5 h-5 text-secondary" />
+              <Calendar className="w-5 h-5 text-secondary" />
             </div>
           </div>
-          <p className="mt-4 text-xs font-medium text-muted-foreground italic">Current surplus/deficit</p>
+          <p className="mt-4 text-xs font-medium text-muted-foreground italic">Entries recorded</p>
         </CardContent>
       </Card>
 
@@ -91,13 +86,11 @@ export function DashboardStats() {
         <CardContent className="p-6">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Suppliers</p>
-              <h3 className="text-2xl font-black text-primary">
-                {farmers?.length || 0} Active
-              </h3>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Evening Session</p>
+              <h3 className="text-3xl font-black text-primary">{eveningEntries}</h3>
             </div>
             <div className="p-2 bg-background rounded-xl">
-              <Users className="w-5 h-5 text-primary" />
+              <TrendingUp className="w-5 h-5 text-primary" />
             </div>
           </div>
           <p className="mt-5 text-xs font-medium text-muted-foreground uppercase tracking-tighter">

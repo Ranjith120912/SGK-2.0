@@ -3,7 +3,7 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { DashboardStats } from "@/components/dashboard-stats";
 import Link from "next/link";
-import { PlusCircle, Users, ShoppingCart, Contact } from "lucide-react";
+import { PlusCircle, Users, BarChart3, Settings } from "lucide-react";
 
 export default function Home() {
   return (
@@ -17,13 +17,13 @@ export default function Home() {
               Milk Management Dashboard
             </h1>
             <p className="text-muted-foreground">
-              Monitor daily collection and manage your distribution network.
+              Monitor daily collection and manage your supplier network.
             </p>
           </header>
 
           <DashboardStats />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
             <Link href="/entries">
               <div className="group p-8 bg-card border rounded-3xl hover:border-primary/50 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer flex flex-col items-center text-center space-y-4 h-full">
                 <div className="p-4 bg-primary/10 rounded-2xl group-hover:scale-110 transition-transform">
@@ -40,27 +40,17 @@ export default function Home() {
                   <Users className="w-8 h-8 text-secondary" />
                 </div>
                 <h3 className="text-xl font-bold text-primary">Farmers</h3>
-                <p className="text-sm text-muted-foreground">Manage your milk suppliers and accounts.</p>
+                <p className="text-sm text-muted-foreground">Manage your milk suppliers, bank accounts, and milk types.</p>
               </div>
             </Link>
 
-            <Link href="/sales">
-              <div className="group p-8 bg-card border rounded-3xl hover:border-accent/50 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer flex flex-col items-center text-center space-y-4 h-full">
-                <div className="p-4 bg-accent/10 rounded-2xl group-hover:scale-110 transition-transform">
-                  <ShoppingCart className="w-8 h-8 text-accent" />
-                </div>
-                <h3 className="text-xl font-bold text-primary">Daily Sales</h3>
-                <p className="text-sm text-muted-foreground">Track milk distribution and sales to buyers.</p>
-              </div>
-            </Link>
-
-            <Link href="/buyers">
+            <Link href="/settings">
               <div className="group p-8 bg-card border rounded-3xl hover:border-primary/50 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer flex flex-col items-center text-center space-y-4 h-full">
                 <div className="p-4 bg-muted rounded-2xl group-hover:scale-110 transition-transform">
-                  <Contact className="w-8 h-8 text-primary" />
+                  <Settings className="w-8 h-8 text-primary" />
                 </div>
-                <h3 className="text-xl font-bold text-primary">Buyers</h3>
-                <p className="text-sm text-muted-foreground">Manage customers who buy milk from you.</p>
+                <h3 className="text-xl font-bold text-primary">Configuration</h3>
+                <p className="text-sm text-muted-foreground">Adjust Cow and Buffalo milk purchase rates (₹/Litre).</p>
               </div>
             </Link>
           </div>

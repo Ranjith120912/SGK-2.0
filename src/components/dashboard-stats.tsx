@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { useCollection, useMemoFirebase, useFirestore } from "@/firebase";
 import { collection, query, where } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
-import { Droplets, Users, TrendingUp, Calendar } from "lucide-react";
+import { Droplets, Users, TrendingUp, Calendar, ShoppingCart } from "lucide-react";
 import { format } from "date-fns";
 
 export function DashboardStats() {
@@ -28,12 +28,17 @@ export function DashboardStats() {
     return query(collection(firestore, 'entries'), where('date', '==', today));
   }, [firestore, today]);
 
+  const salesQuery = useMemoFirebase(() => {
+    if (!firestore || !today) return null;
+    return query(collection(firestore, 'sales'), where('date', '==', today));
+  }, [firestore, today]);
+
   const { data: farmers } = useCollection(farmersQuery);
   const { data: todayEntries } = useCollection(entriesQuery);
+  const { data: todaySales } = useCollection(salesQuery);
 
-  const totalLitres = todayEntries?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
-  const morningLitres = todayEntries?.filter(e => e.session === 'Morning').reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
-  const eveningLitres = todayEntries?.filter(e => e.session === 'Evening').reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
+  const totalCollection = todayEntries?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
+  const totalSales = todaySales?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -41,17 +46,14 @@ export function DashboardStats() {
         <CardContent className="p-6">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs font-bold text-primary/60 uppercase tracking-widest mb-1">Total Litres Today</p>
-              <h3 className="text-3xl font-black text-primary">{totalLitres.toFixed(1)} L</h3>
+              <p className="text-xs font-bold text-primary/60 uppercase tracking-widest mb-1">Collection (L)</p>
+              <h3 className="text-3xl font-black text-primary">{totalCollection.toFixed(1)} L</h3>
             </div>
             <div className="p-2 bg-primary/10 rounded-xl">
               <Droplets className="w-5 h-5 text-primary" />
             </div>
           </div>
-          <div className="mt-4 flex gap-4 text-xs font-medium text-muted-foreground">
-            <span>M: {morningLitres.toFixed(1)}L</span>
-            <span>E: {eveningLitres.toFixed(1)}L</span>
-          </div>
+          <p className="mt-4 text-xs font-medium text-muted-foreground italic">Today's total purchase</p>
         </CardContent>
       </Card>
 
@@ -59,17 +61,14 @@ export function DashboardStats() {
         <CardContent className="p-6">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs font-bold text-accent/60 uppercase tracking-widest mb-1">Total Farmers</p>
-              <h3 className="text-3xl font-black text-primary">{farmers?.length || 0}</h3>
+              <p className="text-xs font-bold text-accent/60 uppercase tracking-widest mb-1">Sales (L)</p>
+              <h3 className="text-3xl font-black text-accent">{totalSales.toFixed(1)} L</h3>
             </div>
             <div className="p-2 bg-accent/10 rounded-xl">
-              <Users className="w-5 h-5 text-accent" />
+              <ShoppingCart className="w-5 h-5 text-accent" />
             </div>
           </div>
-          <p className="mt-4 text-xs font-medium text-muted-foreground flex items-center gap-1">
-            <TrendingUp className="w-3 h-3 text-green-500" />
-            Active suppliers
-          </p>
+          <p className="mt-4 text-xs font-medium text-muted-foreground italic">Today's total sold</p>
         </CardContent>
       </Card>
 
@@ -77,16 +76,14 @@ export function DashboardStats() {
         <CardContent className="p-6">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs font-bold text-secondary/60 uppercase tracking-widest mb-1">Entries Made</p>
-              <h3 className="text-3xl font-black text-primary">{todayEntries?.length || 0}</h3>
+              <p className="text-xs font-bold text-secondary/60 uppercase tracking-widest mb-1">Inventory Balance</p>
+              <h3 className="text-3xl font-black text-primary">{(totalCollection - totalSales).toFixed(1)} L</h3>
             </div>
             <div className="p-2 bg-secondary/10 rounded-xl">
               <TrendingUp className="w-5 h-5 text-secondary" />
             </div>
           </div>
-          <p className="mt-4 text-xs font-medium text-muted-foreground">
-            {((todayEntries?.length || 0) / (farmers?.length || 1) * 100).toFixed(0)}% completion rate
-          </p>
+          <p className="mt-4 text-xs font-medium text-muted-foreground italic">Current surplus/deficit</p>
         </CardContent>
       </Card>
 
@@ -94,17 +91,17 @@ export function DashboardStats() {
         <CardContent className="p-6">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Date</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Suppliers</p>
               <h3 className="text-2xl font-black text-primary">
-                {currentDate ? format(currentDate, 'dd MMM, yyyy') : 'Loading...'}
+                {farmers?.length || 0} Active
               </h3>
             </div>
             <div className="p-2 bg-background rounded-xl">
-              <Calendar className="w-5 h-5 text-primary" />
+              <Users className="w-5 h-5 text-primary" />
             </div>
           </div>
-          <p className="mt-5 text-xs font-medium text-muted-foreground">
-            Status: Collection ongoing
+          <p className="mt-5 text-xs font-medium text-muted-foreground uppercase tracking-tighter">
+            {format(currentDate || new Date(), 'dd MMM, yyyy')}
           </p>
         </CardContent>
       </Card>

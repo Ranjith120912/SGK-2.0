@@ -1,6 +1,6 @@
 
 import Link from "next/link";
-import { Scale, Users, ClipboardList, BarChart3, Settings } from "lucide-react";
+import { Scale, Users, ClipboardList, BarChart3, Settings, ShoppingCart, Contact } from "lucide-react";
 
 export function Navbar() {
   return (
@@ -13,17 +13,25 @@ export function Navbar() {
             </div>
             <span className="font-headline font-bold text-xl text-primary tracking-tight">LitreLink</span>
           </Link>
-          <div className="hidden sm:flex items-center gap-6">
-            <Link href="/" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
+          <div className="hidden lg:flex items-center gap-6">
+            <Link href="/" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
               Dashboard
             </Link>
             <Link href="/entries" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
               <ClipboardList className="w-4 h-4" />
-              Daily Entry
+              Collection
+            </Link>
+            <Link href="/sales" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
+              <ShoppingCart className="w-4 h-4" />
+              Sales
             </Link>
             <Link href="/farmers" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
               <Users className="w-4 h-4" />
               Farmers
+            </Link>
+            <Link href="/buyers" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
+              <Contact className="w-4 h-4" />
+              Buyers
             </Link>
             <Link href="/reports" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />

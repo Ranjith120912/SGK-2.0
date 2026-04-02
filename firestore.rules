@@ -2,37 +2,26 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    /**
-     * FIRESTORE SECURITY RULES
-     * Updated to support 'farmers', 'entries', and 'settings' for dairy business management.
-     */
-
     function isSignedIn() {
       return request.auth != null;
     }
-
     function isAdmin() {
-      // For the prototype, any signed-in user is treated as admin
       return isSignedIn();
     }
-
     match /farmers/{farmerId} {
       allow read, write: if isAdmin();
     }
-
+    match /buyers/{buyerId} {
+      allow read, write: if isAdmin();
+    }
     match /entries/{entryId} {
       allow read, write: if isAdmin();
     }
-
-    match /settings/{settingsId} {
+    match /sales/{saleId} {
       allow read, write: if isAdmin();
     }
-
-    // Role-based access placeholder
-    match /roles_admin/{adminUid} {
-      allow get: if isSignedIn() && (request.auth.uid == adminUid || isAdmin());
-      allow list, write: if isAdmin();
+    match /settings/{settingsId} {
+      allow read, write: if isAdmin();
     }
   }
 }

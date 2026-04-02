@@ -38,64 +38,107 @@
       },
       "required": ["name", "canNumber", "milkType"]
     },
+    "Buyer": {
+      "title": "Buyer",
+      "description": "A customer who buys milk",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Full name of the buyer"
+        },
+        "buyerCode": {
+          "type": "string",
+          "description": "Unique code for the buyer"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Contact phone number"
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["name", "buyerCode"]
+    },
     "MilkEntry": {
       "title": "Milk Entry",
-      "description": "A daily milk collection or distribution record",
+      "description": "A daily milk collection record from a farmer",
       "type": "object",
       "properties": {
         "farmerId": {
-          "type": "string",
-          "description": "Reference to the farmer ID"
+          "type": "string"
         },
         "date": {
           "type": "string",
-          "format": "date",
-          "description": "Date of entry (YYYY-MM-DD)"
+          "format": "date"
         },
         "session": {
           "type": "string",
-          "enum": ["Morning", "Evening"],
-          "description": "The session time"
+          "enum": ["Morning", "Evening"]
         },
         "quantity": {
           "type": "number",
-          "description": "Quantity of milk in Litres"
+          "description": "Quantity in Litres"
         },
         "kgWeight": {
           "type": "number",
-          "description": "Original weight in Kilograms"
-        },
-        "fat": {
-          "type": "number",
-          "description": "Fat percentage"
-        },
-        "snf": {
-          "type": "number",
-          "description": "SNF percentage"
+          "description": "Weight in Kg"
         },
         "rate": {
-          "type": "number",
-          "description": "Rate per litre"
+          "type": "number"
         },
         "totalAmount": {
-          "type": "number",
-          "description": "Total amount for this entry"
+          "type": "number"
         }
-      },
-      "required": ["farmerId", "date", "session", "quantity"]
+      }
+    },
+    "Sale": {
+      "title": "Sale",
+      "description": "A record of milk sold to a buyer",
+      "type": "object",
+      "properties": {
+        "buyerId": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
+        "session": {
+          "type": "string",
+          "enum": ["Morning", "Evening"]
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Quantity in Litres"
+        },
+        "rate": {
+          "type": "number"
+        },
+        "totalAmount": {
+          "type": "number"
+        }
+      }
     },
     "Settings": {
       "title": "Settings",
-      "description": "Global application configuration like milk rates",
+      "description": "Global application configuration",
       "type": "object",
       "properties": {
         "cowRate": {
-          "type": "number",
-          "description": "Rate per litre for Cow milk"
+          "type": "number"
         },
         "buffaloRate": {
+          "type": "number"
+        },
+        "sellingRate": {
           "type": "number",
-          "description": "Rate per litre for Buffalo milk"
+          "description": "Standard selling rate per litre"
         },
         "updatedAt": {
           "type": "string",
@@ -110,15 +153,23 @@
   "firestore": {
     "/farmers/{farmerId}": {
       "schema": "Farmer",
-      "description": "Collection of milk farmers"
+      "description": "Collection of milk suppliers"
+    },
+    "/buyers/{buyerId}": {
+      "schema": "Buyer",
+      "description": "Collection of milk buyers"
     },
     "/entries/{entryId}": {
       "schema": "MilkEntry",
-      "description": "Daily milk entry records"
+      "description": "Daily collection records"
+    },
+    "/sales/{saleId}": {
+      "schema": "Sale",
+      "description": "Daily sales records"
     },
     "/settings/{settingsId}": {
       "schema": "Settings",
-      "description": "Global configuration settings"
+      "description": "Global settings"
     }
   }
 }

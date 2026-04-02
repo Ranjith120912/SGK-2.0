@@ -11,13 +11,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, Milk, Save, CheckCircle2 } from "lucide-react";
+import { Settings as SettingsIcon, Milk, Save, CheckCircle2, ShoppingBag } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function SettingsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
-  const [rates, setRates] = useState({ cowRate: "", buffaloRate: "" });
+  const [rates, setRates] = useState({ cowRate: "", buffaloRate: "", sellingRate: "" });
   const [isSaving, setIsSaving] = useState(false);
 
   const settingsRef = useMemoFirebase(() => {
@@ -31,7 +31,8 @@ export default function SettingsPage() {
     if (currentSettings) {
       setRates({
         cowRate: currentSettings.cowRate?.toString() || "",
-        buffaloRate: currentSettings.buffaloRate?.toString() || ""
+        buffaloRate: currentSettings.buffaloRate?.toString() || "",
+        sellingRate: currentSettings.sellingRate?.toString() || ""
       });
     }
   }, [currentSettings]);
@@ -43,6 +44,7 @@ export default function SettingsPage() {
     const data = {
       cowRate: parseFloat(rates.cowRate) || 0,
       buffaloRate: parseFloat(rates.buffaloRate) || 0,
+      sellingRate: parseFloat(rates.sellingRate) || 0,
       updatedAt: serverTimestamp()
     };
 
@@ -50,10 +52,7 @@ export default function SettingsPage() {
 
     setTimeout(() => {
       setIsSaving(false);
-      toast({
-        title: "Settings Saved",
-        description: "Milk rates have been updated successfully.",
-      });
+      toast({ title: "Settings Saved", description: "Rates have been updated successfully." });
     }, 800);
   };
 
@@ -67,66 +66,64 @@ export default function SettingsPage() {
               <SettingsIcon className="w-8 h-8" />
               Configuration
             </h1>
-            <p className="text-muted-foreground">Manage global rates and system preferences.</p>
+            <p className="text-muted-foreground">Manage purchase and selling rates.</p>
           </header>
 
-          <Card className="rounded-3xl shadow-xl border-none bg-card/50 backdrop-blur-sm overflow-hidden">
-            <CardHeader className="bg-primary/5 border-b border-primary/10">
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Milk className="w-5 h-5 text-primary" />
-                Milk Rate Settings
-              </CardTitle>
-              <CardDescription>Define separate purchase rates for Cow and Buffalo milk.</CardDescription>
-            </CardHeader>
-            <CardContent className="p-8 space-y-8">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-                <div className="space-y-3">
-                  <Label htmlFor="cowRate" className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Cow Milk Rate (₹/Litre)</Label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">₹</span>
-                    <Input 
-                      id="cowRate"
-                      type="number"
-                      placeholder="0.00"
-                      step="0.01"
-                      className="h-14 pl-8 rounded-2xl text-xl font-bold border-primary/10"
-                      value={rates.cowRate}
-                      onChange={(e) => setRates({ ...rates, cowRate: e.target.value })}
-                    />
+          <div className="space-y-6">
+            <Card className="rounded-3xl shadow-xl border-none bg-card/50 backdrop-blur-sm overflow-hidden">
+              <CardHeader className="bg-primary/5 border-b border-primary/10">
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <Milk className="w-5 h-5 text-primary" />
+                  Purchase Rates (Farmers)
+                </CardTitle>
+                <CardDescription>Separate purchase rates for different milk types.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-8 space-y-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                  <div className="space-y-3">
+                    <Label className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Cow Rate (₹/L)</Label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">₹</span>
+                      <Input type="number" step="0.01" className="h-14 pl-8 rounded-2xl text-xl font-bold" value={rates.cowRate} onChange={(e) => setRates({ ...rates, cowRate: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Buffalo Rate (₹/L)</Label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">₹</span>
+                      <Input type="number" step="0.01" className="h-14 pl-8 rounded-2xl text-xl font-bold" value={rates.buffaloRate} onChange={(e) => setRates({ ...rates, buffaloRate: e.target.value })} />
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-3">
-                  <Label htmlFor="buffaloRate" className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Buffalo Milk Rate (₹/Litre)</Label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">₹</span>
-                    <Input 
-                      id="buffaloRate"
-                      type="number"
-                      placeholder="0.00"
-                      step="0.01"
-                      className="h-14 pl-8 rounded-2xl text-xl font-bold border-primary/10"
-                      value={rates.buffaloRate}
-                      onChange={(e) => setRates({ ...rates, buffaloRate: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
+              </CardContent>
+            </Card>
 
-              <div className="pt-6 border-t flex items-center justify-between">
-                <p className="text-xs text-muted-foreground italic max-w-[200px]">
-                  These rates will be used to calculate daily payment amounts for all farmers.
-                </p>
-                <Button 
-                  onClick={handleSave} 
-                  disabled={isSaving || isLoading}
-                  className="rounded-full px-10 h-12 shadow-lg hover:shadow-primary/20 transition-all"
-                >
-                  {isSaving ? <CheckCircle2 className="w-5 h-5 animate-pulse" /> : <Save className="w-5 h-5 mr-2" />}
-                  {isSaving ? "Updating..." : "Save Rates"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+            <Card className="rounded-3xl shadow-xl border-none bg-card/50 backdrop-blur-sm overflow-hidden">
+              <CardHeader className="bg-accent/5 border-b border-accent/10">
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <ShoppingBag className="w-5 h-5 text-accent" />
+                  Selling Rate (Buyers)
+                </CardTitle>
+                <CardDescription>Standard rate for distributing milk to buyers.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-8">
+                <div className="space-y-3 max-w-sm">
+                  <Label className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Standard Selling Rate (₹/L)</Label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">₹</span>
+                    <Input type="number" step="0.01" className="h-14 pl-8 rounded-2xl text-xl font-bold" value={rates.sellingRate} onChange={(e) => setRates({ ...rates, sellingRate: e.target.value })} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="flex justify-end">
+              <Button onClick={handleSave} disabled={isSaving || isLoading} className="rounded-full px-10 h-12 shadow-lg">
+                {isSaving ? <CheckCircle2 className="w-5 h-5 animate-pulse" /> : <Save className="w-5 h-5 mr-2" />}
+                {isSaving ? "Updating..." : "Save All Rates"}
+              </Button>
+            </div>
+          </div>
         </div>
       </main>
       <Footer />

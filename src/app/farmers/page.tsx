@@ -29,7 +29,6 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { 
   UserPlus, 
-  Database, 
   Search, 
   FileUp, 
   ClipboardList, 
@@ -38,8 +37,7 @@ import {
   FileSpreadsheet,
   Upload,
   Trash2,
-  X,
-  AlertTriangle
+  X
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { read, utils, writeFile } from 'xlsx';
@@ -266,22 +264,6 @@ export default function FarmersPage() {
     toast({ title: "Template Downloaded", description: "Excel template is ready." });
   };
 
-  const seedData = () => {
-    if (!firestore) return;
-    toast({ title: "Seeding...", description: "Adding 50 sample farmers." });
-    for (let i = 1; i <= 50; i++) {
-      addDocumentNonBlocking(collection(firestore, 'farmers'), {
-        name: `Sample Farmer ${i}`,
-        canNumber: i.toString().padStart(3, '0'),
-        bankAccountNumber: `ACC-${i.toString().padStart(6, '0')}`,
-        ifscCode: `IFSC${i.toString().padStart(4, '0')}`,
-        milkType: i % 2 === 0 ? "BUFFALO" : "COW",
-        active: true,
-        createdAt: serverTimestamp(),
-      });
-    }
-  };
-
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
@@ -379,21 +361,15 @@ export default function FarmersPage() {
                 </DialogContent>
               </Dialog>
 
-              <div className="flex gap-1">
-                <Button variant="ghost" onClick={seedData} className="rounded-l-full text-muted-foreground border border-dashed hover:bg-muted/50">
-                  <Database className="w-3 h-3 mr-2" />
-                  Seed Samples
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  onClick={handleDeleteAll} 
-                  className="rounded-r-full text-destructive border border-dashed hover:bg-destructive/10"
-                  disabled={!farmers || farmers.length === 0}
-                >
-                  <Trash2 className="w-3 h-3 mr-2" />
-                  Clear All
-                </Button>
-              </div>
+              <Button 
+                variant="ghost" 
+                onClick={handleDeleteAll} 
+                className="rounded-full text-destructive border border-dashed hover:bg-destructive/10"
+                disabled={!farmers || farmers.length === 0}
+              >
+                <Trash2 className="w-3 h-3 mr-2" />
+                Clear All
+              </Button>
             </div>
           </div>
 

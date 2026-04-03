@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -21,7 +20,7 @@ import {
   DialogFooter
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { UserPlus, Database, Search, FileUp, ClipboardList, CheckCircle2, AlertCircle, Download } from "lucide-react";
+import { UserPlus, Search, FileUp, ClipboardList, CheckCircle2, AlertCircle, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function FarmersPage() {
@@ -89,20 +88,6 @@ export default function FarmersPage() {
       setIsImporting(false);
     } catch (e: any) {
       toast({ title: "Import Failed", description: e.message || "Invalid JSON format.", variant: "destructive" });
-    }
-  };
-
-  const seedData = () => {
-    if (!firestore) return;
-    toast({ title: "Seeding...", description: "Adding 50 sample farmers." });
-    for (let i = 1; i <= 50; i++) {
-      addDocumentNonBlocking(collection(firestore, 'farmers'), {
-        name: `Farmer ${i}`,
-        canNumber: i.toString().padStart(3, '0'),
-        accountNumber: `ACC-${i.toString().padStart(6, '0')}`,
-        active: true,
-        createdAt: serverTimestamp(),
-      });
     }
   };
 
@@ -202,11 +187,6 @@ export default function FarmersPage() {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
-
-              <Button variant="ghost" onClick={seedData} className="rounded-full text-muted-foreground">
-                <Database className="w-4 h-4 mr-2" />
-                Seed 50
-              </Button>
             </div>
           </div>
 

@@ -101,9 +101,16 @@ export default function ReportsPage() {
   }, [allEntries, selectedMonth, currentCycle]);
 
   const monthStats = useMemo(() => {
-    if (!allEntries || !allSales || !selectedMonth) return null;
-    const mEntries = allEntries.filter(e => e.date.startsWith(selectedMonth));
-    const mSales = allSales.filter(s => s.date.startsWith(selectedMonth));
+    if (!allEntries || !allSales || !selectedMonth) return {
+      totalEntryQty: 0,
+      totalSaleQty: 0,
+      totalEntryAmt: 0,
+      totalSaleAmt: 0,
+      profit: 0
+    };
+    
+    const mEntries = allEntries.filter(e => e.date === selectedMonth || e.date.startsWith(selectedMonth));
+    const mSales = allSales.filter(s => s.date === selectedMonth || s.date.startsWith(selectedMonth));
 
     const totalEntryQty = mEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
     const totalSaleQty = mSales.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
@@ -127,7 +134,6 @@ export default function ReportsPage() {
     const currentYear = now.getFullYear();
     
     // Financial year starts in April (index 3). 
-    // If current month is Jan-Mar (0-2), the fiscal year started in previous calendar year.
     const fiscalStartYear = currentMonth < 3 ? currentYear - 1 : currentYear;
     
     return Array.from({ length: 12 }).map((_, i) => {
@@ -357,32 +363,32 @@ export default function ReportsPage() {
                 <Card className="rounded-[2rem] border-none shadow-xl bg-primary text-primary-foreground p-8 flex flex-col justify-between">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Collection Volume</p>
                   <div className="mt-4">
-                    <p className="text-4xl font-black">{monthStats?.totalEntryQty.toFixed(2) || "0.00"}</p>
+                    <p className="text-4xl font-black">{monthStats.totalEntryQty.toFixed(2)}</p>
                     <p className="text-xs font-bold uppercase tracking-widest">Litres</p>
                   </div>
                 </Card>
                 <Card className="rounded-[2rem] border-none shadow-xl bg-accent text-accent-foreground p-8 flex flex-col justify-between">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Sales Volume</p>
                   <div className="mt-4">
-                    <p className="text-4xl font-black">{monthStats?.totalSaleQty.toFixed(2) || "0.00"}</p>
+                    <p className="text-4xl font-black">{monthStats.totalSaleQty.toFixed(2)}</p>
                     <p className="text-xs font-bold uppercase tracking-widest">Litres</p>
                   </div>
                 </Card>
                 <Card className="rounded-[2rem] border-none shadow-xl bg-card p-8 flex flex-col justify-between">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Net Profit</p>
                   <div className="mt-4">
-                    <p className={cn("text-4xl font-black", (monthStats?.profit || 0) >= 0 ? "text-green-600" : "text-destructive")}>
-                      ₹ {monthStats?.profit.toFixed(2) || "0.00"}
+                    <p className={cn("text-4xl font-black", monthStats.profit >= 0 ? "text-green-600" : "text-destructive")}>
+                      ₹ {monthStats.profit.toFixed(2)}
                     </p>
-                    <Badge variant={(monthStats?.profit || 0) >= 0 ? "default" : "destructive"} className="mt-2 rounded-full font-black text-[9px] uppercase">
-                      {(monthStats?.profit || 0) >= 0 ? "+ Profit" : "- Loss"}
+                    <Badge variant={monthStats.profit >= 0 ? "default" : "destructive"} className="mt-2 rounded-full font-black text-[9px] uppercase">
+                      {monthStats.profit >= 0 ? "+ Profit" : "- Loss"}
                     </Badge>
                   </div>
                 </Card>
                 <Card className="rounded-[2rem] border-none shadow-xl bg-card p-8 flex flex-col justify-between border-2 border-primary/5">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Farmer Payouts</p>
                   <div className="mt-4">
-                    <p className="text-3xl font-black text-primary">₹ {monthStats?.totalEntryAmt.toFixed(2) || "0.00"}</p>
+                    <p className="text-3xl font-black text-primary">₹ {monthStats.totalEntryAmt.toFixed(2)}</p>
                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Settlement Pending</p>
                   </div>
                 </Card>

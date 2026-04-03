@@ -31,7 +31,7 @@ export function DashboardStats() {
   const { data: todayEntries } = useCollection(entriesQuery);
   const { data: buyers } = useCollection(buyersQuery);
 
-  const totalCollection = todayEntries?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
+  const totalCollection = todayEntries?.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0) || 0;
   const morningEntries = todayEntries?.filter(e => e.session === 'Morning').length || 0;
   const eveningEntries = todayEntries?.filter(e => e.session === 'Evening').length || 0;
 

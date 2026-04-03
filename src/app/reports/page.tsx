@@ -11,26 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   FileText, 
-  Droplets, 
   Loader2, 
-  ClipboardList, 
-  ShoppingCart, 
-  Printer, 
+  Files,
   ArrowLeft,
   BarChart4,
-  ArrowUpRight,
-  ArrowDownRight,
-  IndianRupee,
-  CheckCircle2,
-  TrendingUp,
-  Wallet,
-  Activity,
-  History,
-  Files,
-  Search
+  Printer
 } from "lucide-react";
 import { format, endOfMonth } from "date-fns";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -46,7 +33,6 @@ export default function ReportsPage() {
   const [isClient, setIsClient] = useState(false);
   const [viewingInvoiceFarmerId, setViewingInvoiceFarmerId] = useState<string | null>(null);
   const [viewingBulkInvoices, setViewingBulkInvoices] = useState(false);
-  const [auditSearch, setAuditSearch] = useState("");
 
   useEffect(() => {
     setIsClient(true);
@@ -140,15 +126,6 @@ export default function ReportsPage() {
     });
   }, [allSales, selectedDate, buyers]);
 
-  const monthlyEntries = useMemo(() => allEntries?.filter(e => e.date.startsWith(selectedMonth)) || [], [allEntries, selectedMonth]);
-  const monthlySales = useMemo(() => allSales?.filter(s => s.date.startsWith(selectedMonth)) || [], [allSales, selectedMonth]);
-  
-  const totalMonthlyCollection = monthlyEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
-  const totalMonthlyWeight = monthlyEntries.reduce((acc, curr) => acc + (Number(curr.kgWeight) || 0), 0);
-  const totalMonthlyProcurementCost = monthlyEntries.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
-  const totalMonthlySalesRevenue = monthlySales.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
-  const monthlyProfit = totalMonthlySalesRevenue - totalMonthlyProcurementCost;
-
   const totalCollectionDailyVolume = dailyEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
   const totalSalesDailyVolume = dailySales.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
   const totalFarmerCostDaily = dailyEntries.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
@@ -170,16 +147,6 @@ export default function ReportsPage() {
       return (isNaN(aNum) || isNaN(bNum)) ? a.canNumber.localeCompare(b.canNumber) : aNum - bNum;
     });
   }, [farmers, filteredCycleEntries]);
-
-  const filteredAuditEntries = useMemo(() => {
-    return monthlyEntries.filter(e => {
-      const farmer = farmers?.find(f => f.id === e.farmerId);
-      const search = auditSearch.toLowerCase();
-      return (farmer?.name.toLowerCase().includes(search) || 
-              farmer?.canNumber.includes(search) || 
-              e.date.includes(search));
-    }).sort((a, b) => b.date.localeCompare(a.date));
-  }, [monthlyEntries, farmers, auditSearch]);
 
   const renderInvoice = (farmerId: string) => {
     const invFarmer = farmers?.find(f => f.id === farmerId);
@@ -365,15 +332,12 @@ export default function ReportsPage() {
             </header>
 
             <Tabs defaultValue="overview" className="space-y-8">
-              <TabsList className="flex flex-wrap h-auto gap-2 p-1.5 bg-muted rounded-2xl w-full border border-primary/5">
+              <TabsList className="flex flex-wrap h-auto gap-2 p-1.5 bg-muted rounded-2xl w-full border border-primary/5 max-w-md">
                 <TabsTrigger value="overview" className="flex-1 rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest px-4 py-2.5">
                   <BarChart4 className="w-3.5 h-3.5" /> Overview
                 </TabsTrigger>
                 <TabsTrigger value="cycle" className="flex-1 rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest px-4 py-2.5">
                   <FileText className="w-3.5 h-3.5" /> Cycle Bill
-                </TabsTrigger>
-                <TabsTrigger value="management" className="flex-1 rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest px-4 py-2.5">
-                  <Activity className="w-3.5 h-3.5" /> Audit Logs
                 </TabsTrigger>
               </TabsList>
 
@@ -402,87 +366,8 @@ export default function ReportsPage() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="management" className="space-y-12 animate-in fade-in duration-500">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-                  <div className="flex items-center gap-3">
-                    <h3 className="text-xl font-black text-primary uppercase tracking-tighter">Detailed Audit</h3>
-                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                      <SelectTrigger className="w-[200px] rounded-full font-bold"><SelectValue /></SelectTrigger>
-                      <SelectContent>{monthOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div className="relative w-full sm:w-[300px]">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input 
-                      placeholder="Search entries..." 
-                      className="pl-10 rounded-full h-10" 
-                      value={auditSearch}
-                      onChange={(e) => setAuditSearch(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <Card className="rounded-3xl border-none shadow-xl bg-card p-6">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Monthly Collection</p>
-                    <p className="text-3xl font-black text-primary mt-2">{totalMonthlyCollection.toFixed(2)} L</p>
-                  </Card>
-                  <Card className="rounded-3xl border-none shadow-xl bg-card p-6">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Procurement Cost</p>
-                    <p className="text-3xl font-black text-destructive mt-2">₹ {totalMonthlyProcurementCost.toFixed(2)}</p>
-                  </Card>
-                  <Card className="rounded-3xl border-none shadow-xl bg-card p-6">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Sales Revenue</p>
-                    <p className="text-3xl font-black text-green-600 mt-2">₹ {totalMonthlySalesRevenue.toFixed(2)}</p>
-                  </Card>
-                  <Card className="rounded-3xl border-none shadow-xl bg-primary text-primary-foreground p-6">
-                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Net Profit</p>
-                    <p className="text-3xl font-black mt-2">₹ {monthlyProfit.toFixed(2)}</p>
-                  </Card>
-                </div>
-                <Card className="rounded-2xl overflow-hidden border-none shadow-lg bg-card/50 backdrop-blur-sm">
-                  <Table>
-                    <TableHeader className="bg-muted">
-                      <TableRow>
-                        <TableHead className="font-bold">Date</TableHead>
-                        <TableHead className="font-bold">Session</TableHead>
-                        <TableHead className="font-bold">Supplier (CAN)</TableHead>
-                        <TableHead className="font-bold text-right">Qty (Litre)</TableHead>
-                        <TableHead className="font-bold text-right">Total (₹)</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredAuditEntries.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center py-20 text-muted-foreground italic font-medium">
-                            No logs found for the selected month/search.
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        filteredAuditEntries.map((entry) => {
-                          const farmer = farmers?.find(f => f.id === entry.farmerId);
-                          return (
-                            <TableRow key={entry.id} className="hover:bg-primary/5">
-                              <TableCell className="font-medium">{format(new Date(entry.date), 'dd MMM yyyy')}</TableCell>
-                              <TableCell><Badge variant="outline" className="text-[9px] font-black uppercase">{entry.session}</Badge></TableCell>
-                              <TableCell className="font-bold text-primary">
-                                {farmer ? `${farmer.name} (${farmer.canNumber})` : "Unknown Supplier"}
-                              </TableCell>
-                              <TableCell className="text-right font-black text-primary">{entry.quantity.toFixed(2)}</TableCell>
-                              <TableCell className="text-right font-black">₹{entry.totalAmount.toFixed(2)}</TableCell>
-                            </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
-                  <div className="p-4 bg-muted/20 text-center text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] border-t">
-                    Showing {filteredAuditEntries.length} entries for {selectedMonth}
-                  </div>
-                </Card>
-              </TabsContent>
-
               <TabsContent value="cycle" className="space-y-8 animate-in fade-in duration-500">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
                   <div className="flex items-center gap-3">
                     <h3 className="text-xl font-black text-primary uppercase tracking-tighter">Cycle Bill</h3>
                     <Select value={selectedMonth} onValueChange={setSelectedMonth}>

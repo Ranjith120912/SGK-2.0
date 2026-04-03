@@ -10,7 +10,7 @@ export function Footer() {
   }, []);
 
   return (
-    <footer className="py-12 px-4 border-t border-primary/5 bg-muted/30">
+    <footer className="py-12 px-4 border-t border-primary/5 bg-muted/30 no-print">
       <div className="max-w-7xl mx-auto flex flex-col items-center gap-8">
         <div className="flex flex-wrap justify-center gap-8 text-xs font-black uppercase tracking-[0.2em] text-muted-foreground/60">
           <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>

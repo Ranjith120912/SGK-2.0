@@ -74,21 +74,69 @@
 
 /* Print Utilities */
 @media print {
-  .no-print { display: none !important; }
-  .print-only { display: block !important; }
+  @page {
+    margin: 1.5cm;
+    size: A4;
+  }
+
+  .no-print, 
+  .theme-toggle, 
+  nav, 
+  footer, 
+  button, 
+  [role="tablist"],
+  .tabs-list {
+    display: none !important;
+  }
+
+  body, html {
+    background: white !important;
+    color: black !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .invoice-content, 
+  .master-summary-print {
+    display: block !important;
+    visibility: visible !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    position: static !important;
+    background: white !important;
+  }
+
   .invoice-page-break {
     page-break-after: always;
     break-after: page;
   }
-  body * { visibility: hidden; }
-  .invoice-content, .invoice-content *, 
-  .bulk-invoices-container, .bulk-invoices-container *,
-  .master-summary-print, .master-summary-print * { visibility: visible; }
-  .invoice-content, .master-summary-print, .bulk-invoices-container { 
-    position: absolute; 
-    left: 0; 
-    top: 0; 
-    width: 100%; 
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color: black !important;
   }
-  .text-black { color: black !important; }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    border: 1px solid #000 !important;
+  }
+  
+  th, td {
+    border: 1px solid #000 !important;
+  }
+
+  .text-primary {
+    color: #000 !important;
+  }
+
+  .text-muted-foreground {
+    color: #333 !important;
+  }
 }

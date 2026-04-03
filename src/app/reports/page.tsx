@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -13,7 +14,6 @@ import {
   Calendar, 
   FileText, 
   Droplets, 
-  ChevronRight, 
   Loader2, 
   ClipboardList, 
   ShoppingCart, 
@@ -23,7 +23,6 @@ import {
   BarChart4,
   ArrowUpRight,
   ArrowDownRight,
-  Scale,
   IndianRupee,
   PieChart,
   CheckCircle2,
@@ -32,7 +31,6 @@ import {
   Wallet,
   Activity,
   History,
-  TrendingDown,
   Info,
   Files
 } from "lucide-react";
@@ -127,7 +125,7 @@ export default function ReportsPage() {
     if (!currentCycle) return false;
     const day = parseInt(entry.date.split('-')[2]);
     return day >= currentCycle.start && day <= currentCycle.end;
-  });
+  }) || [];
 
   const cycleStats = cycles.map(c => {
     const cEntries = allEntries?.filter(entry => {
@@ -136,19 +134,19 @@ export default function ReportsPage() {
       return day >= c.start && day <= c.end;
     }) || [];
     return { 
-      qty: cEntries.reduce((acc, curr) => acc + (curr.quantity || 0), 0),
-      amount: cEntries.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0)
+      qty: cEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0),
+      amount: cEntries.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0)
     };
   });
 
   const farmerCycleMasterList = useMemo(() => {
     if (!farmers) return [];
     return farmers.map(farmer => {
-      const fEntries = filteredCycleEntries?.filter(e => e.farmerId === farmer.id) || [];
+      const fEntries = filteredCycleEntries.filter(e => e.farmerId === farmer.id);
       return {
         ...farmer,
-        totalQty: fEntries.reduce((acc, curr) => acc + (curr.quantity || 0), 0),
-        totalAmount: fEntries.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0)
+        totalQty: fEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0),
+        totalAmount: fEntries.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0)
       };
     }).sort((a, b) => {
       const aNum = parseInt(a.canNumber);
@@ -163,20 +161,20 @@ export default function ReportsPage() {
     const fA = farmers?.find(f => f.id === a.farmerId);
     const fB = farmers?.find(f => f.id === b.farmerId);
     return (fA?.canNumber || "").localeCompare(fB?.canNumber || "");
-  });
+  }) || [];
 
   const dailySales = allSales?.filter(s => s.date === selectedDate).sort((a, b) => {
     const bA = buyers?.find(buy => buy.id === a.buyerId);
     const bB = buyers?.find(buy => buy.id === b.buyerId);
     return (bA?.buyerCode || "").localeCompare(bB?.buyerCode || "");
-  });
+  }) || [];
 
   const monthlyEntries = allEntries?.filter(e => e.date.startsWith(selectedMonth)) || [];
   const monthlySales = allSales?.filter(s => s.date.startsWith(selectedMonth)) || [];
   
-  const totalMonthlyCollection = monthlyEntries.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
-  const totalMonthlyProcurementCost = monthlyEntries.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0);
-  const totalMonthlySalesRevenue = monthlySales.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0);
+  const totalMonthlyCollection = monthlyEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
+  const totalMonthlyProcurementCost = monthlyEntries.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
+  const totalMonthlySalesRevenue = monthlySales.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
   const monthlyProfit = totalMonthlySalesRevenue - totalMonthlyProcurementCost;
 
   const currentYear = selectedMonth ? selectedMonth.split('-')[0] : format(new Date(), 'yyyy');
@@ -193,13 +191,13 @@ export default function ReportsPage() {
       const mEntries = allEntries.filter(e => e.date.startsWith(monthPrefix));
       const mSales = allSales.filter(s => s.date.startsWith(monthPrefix));
       
-      const cost = mEntries.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0);
-      const revenue = mSales.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0);
+      const cost = mEntries.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
+      const revenue = mSales.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
       
       return {
         month: format(monthDate, 'MMM'),
         fullName: format(monthDate, 'MMMM'),
-        collection: mEntries.reduce((acc, curr) => acc + (curr.quantity || 0), 0),
+        collection: mEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0),
         cost,
         revenue,
         profit: revenue - cost
@@ -207,25 +205,25 @@ export default function ReportsPage() {
     });
   }, [allEntries, allSales, currentYear]);
 
-  const totalCollectionDailyVolume = dailyEntries?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
-  const totalSalesDailyVolume = dailySales?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
-  const totalFarmerCostDaily = dailyEntries?.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0) || 0;
-  const totalSalesRevenueDaily = dailySales?.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0) || 0;
+  const totalCollectionDailyVolume = dailyEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
+  const totalSalesDailyVolume = dailySales.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
+  const totalFarmerCostDaily = dailyEntries.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
+  const totalSalesRevenueDaily = dailySales.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
   const profitDaily = totalSalesRevenueDaily - totalFarmerCostDaily;
 
-  const cowVolume = dailyEntries?.filter(e => {
+  const cowVolume = dailyEntries.filter(e => {
     const f = farmers?.find(far => far.id === e.farmerId);
     return f?.milkType === 'COW';
-  }).reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
+  }).reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
 
-  const buffaloVolume = dailyEntries?.filter(e => {
+  const buffaloVolume = dailyEntries.filter(e => {
     const f = farmers?.find(far => far.id === e.farmerId);
     return f?.milkType === 'BUFFALO';
-  }).reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
+  }).reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
 
   const renderInvoice = (farmerId: string) => {
     const invFarmer = farmers?.find(f => f.id === farmerId);
-    const invEntries = filteredCycleEntries?.filter(e => e.farmerId === farmerId).sort((a, b) => a.date.localeCompare(b.date));
+    const invEntries = filteredCycleEntries.filter(e => e.farmerId === farmerId).sort((a, b) => a.date.localeCompare(b.date));
     
     if (!invFarmer || !invEntries) return null;
 
@@ -234,13 +232,13 @@ export default function ReportsPage() {
       if (!grouped[entry.date]) {
         grouped[entry.date] = { date: entry.date, morning: 0, evening: 0, total: 0 };
       }
-      if (entry.session === 'Morning') grouped[entry.date].morning += entry.quantity || 0;
-      if (entry.session === 'Evening') grouped[entry.date].evening += entry.quantity || 0;
+      if (entry.session === 'Morning') grouped[entry.date].morning += Number(entry.quantity) || 0;
+      if (entry.session === 'Evening') grouped[entry.date].evening += Number(entry.quantity) || 0;
       grouped[entry.date].total = grouped[entry.date].morning + grouped[entry.date].evening;
     });
 
     const consolidated = Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date));
-    const invRate = invFarmer.milkType === 'BUFFALO' ? (ratesConfig?.buffaloRate || 0) : (ratesConfig?.cowRate || 0);
+    const invRate = invFarmer.milkType === 'BUFFALO' ? (Number(ratesConfig?.buffaloRate) || 0) : (Number(ratesConfig?.cowRate) || 0);
     const totalL = consolidated.reduce((acc, curr) => acc + curr.total, 0);
     const totalA = totalL * invRate;
 
@@ -580,13 +578,13 @@ export default function ReportsPage() {
                       <div className="p-6 bg-muted/30 rounded-3xl text-center">
                         <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Morning Yield</p>
                         <p className="text-2xl font-black text-primary">
-                          {dailyEntries?.filter(e => e.session === 'Morning').reduce((acc, curr) => acc + (curr.quantity || 0), 0).toFixed(1)} L
+                          {dailyEntries.filter(e => e.session === 'Morning').reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0).toFixed(1)} L
                         </p>
                       </div>
                       <div className="p-6 bg-muted/30 rounded-3xl text-center">
                         <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Evening Yield</p>
                         <p className="text-2xl font-black text-primary">
-                          {dailyEntries?.filter(e => e.session === 'Evening').reduce((acc, curr) => acc + (curr.quantity || 0), 0).toFixed(1)} L
+                          {dailyEntries.filter(e => e.session === 'Evening').reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0).toFixed(1)} L
                         </p>
                       </div>
                     </div>
@@ -800,10 +798,10 @@ export default function ReportsPage() {
                     <TableBody>
                       {entriesLoading ? (
                         <TableRow><TableCell colSpan={5} className="text-center py-20"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>
-                      ) : activeFarmerCycleBreakdown?.length === 0 ? (
+                      ) : activeFarmerCycleBreakdown.length === 0 ? (
                         <TableRow><TableCell colSpan={5} className="text-center py-32 text-muted-foreground">No active suppliers found for this cycle.</TableCell></TableRow>
                       ) : (
-                        activeFarmerCycleBreakdown?.map((f) => (
+                        activeFarmerCycleBreakdown.map((f) => (
                           <TableRow key={f.id} className="hover:bg-primary/5 transition-colors border-b last:border-0">
                             <TableCell className="font-black text-primary pl-8 text-xl tracking-tighter">{f.canNumber}</TableCell>
                             <TableCell className="font-bold">{f.name}</TableCell>
@@ -907,10 +905,10 @@ export default function ReportsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {farmerCycleMasterList?.length === 0 ? (
+                      {farmerCycleMasterList.length === 0 ? (
                         <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground">No farmers registered in directory.</TableCell></TableRow>
                       ) : (
-                        farmerCycleMasterList?.map((f) => (
+                        farmerCycleMasterList.map((f) => (
                           <TableRow key={f.id} className={cn("hover:bg-primary/5 transition-colors border-b last:border-0", f.totalQty === 0 && "opacity-60")}>
                             <TableCell className="font-black text-primary pl-8 text-lg">{f.canNumber}</TableCell>
                             <TableCell className="font-bold uppercase text-sm">{f.name}</TableCell>
@@ -921,7 +919,7 @@ export default function ReportsPage() {
                         ))
                       )}
                     </TableBody>
-                    {farmerCycleMasterList && farmerCycleMasterList.length > 0 && (
+                    {farmerCycleMasterList.length > 0 && (
                       <TableFooter className="bg-muted/50">
                         <TableRow className="hover:bg-transparent">
                           <TableCell colSpan={3} className="pl-8 font-black text-primary uppercase tracking-widest">Grand Total</TableCell>
@@ -968,7 +966,7 @@ export default function ReportsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {!dailyEntries || dailyEntries.length === 0 ? (
+                      {dailyEntries.length === 0 ? (
                         <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground">No records found for {selectedDate}.</TableCell></TableRow>
                       ) : (
                         dailyEntries.map(entry => {
@@ -978,8 +976,8 @@ export default function ReportsPage() {
                               <TableCell className="font-black text-primary pl-8 text-lg">{farmer?.canNumber || "—"}</TableCell>
                               <TableCell className="font-bold">{farmer?.name || "Unknown"}</TableCell>
                               <TableCell><Badge variant="outline">{entry.session}</Badge></TableCell>
-                              <TableCell>{entry.kgWeight?.toFixed(2)}</TableCell>
-                              <TableCell className="text-right pr-8 font-black text-primary">{entry.quantity?.toFixed(2)} L</TableCell>
+                              <TableCell>{(Number(entry.kgWeight) || 0).toFixed(2)}</TableCell>
+                              <TableCell className="text-right pr-8 font-black text-primary">{(Number(entry.quantity) || 0).toFixed(2)} L</TableCell>
                             </TableRow>
                           );
                         })
@@ -1022,7 +1020,7 @@ export default function ReportsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {!dailySales || dailySales.length === 0 ? (
+                      {dailySales.length === 0 ? (
                         <TableRow><TableCell colSpan={4} className="text-center py-20 text-muted-foreground">No distribution records found.</TableCell></TableRow>
                       ) : (
                         dailySales.map(sale => {
@@ -1032,7 +1030,7 @@ export default function ReportsPage() {
                               <TableCell className="font-black text-primary pl-8 text-lg">{buyer?.buyerCode || "—"}</TableCell>
                               <TableCell className="font-bold">{buyer?.name || "Unknown"}</TableCell>
                               <TableCell><Badge variant="outline">{sale.session}</Badge></TableCell>
-                              <TableCell className="text-right pr-8 font-black text-primary">{sale.quantity?.toFixed(2)} L</TableCell>
+                              <TableCell className="text-right pr-8 font-black text-primary">{(Number(sale.quantity) || 0).toFixed(2)} L</TableCell>
                             </TableRow>
                           );
                         })

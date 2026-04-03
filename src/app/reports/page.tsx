@@ -28,10 +28,9 @@ import { Badge } from "@/components/ui/badge";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
-declare module "jspdf" {
-  interface jsPDF {
-    autoTable: any;
-  }
+// Type definition for jsPDF with autotable plugin
+interface jsPDFWithPlugin extends jsPDF {
+  autoTable: (options: any) => jsPDF;
 }
 
 export default function ReportsPage() {
@@ -159,11 +158,11 @@ export default function ReportsPage() {
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
-    // Fiscal Year starts in April. If current month is Jan/Feb/Mar (0,1,2), we are in fiscal year starting last year.
+    // Fiscal Year starts in April (index 3).
     const fiscalStartYear = currentMonth < 3 ? currentYear - 1 : currentYear;
     
     return Array.from({ length: 12 }).map((_, i) => {
-      const monthIndex = (3 + i) % 12; // Start from April (index 3)
+      const monthIndex = (3 + i) % 12; // Start from April
       const year = fiscalStartYear + (3 + i >= 12 ? 1 : 0);
       const d = new Date(year, monthIndex, 1);
       const monthStr = format(d, 'yyyy-MM');
@@ -188,7 +187,7 @@ export default function ReportsPage() {
 
   // PDF Download Handlers
   const handleDownloadRosterPDF = () => {
-    const doc = new jsPDF('l', 'mm', 'a4');
+    const doc = new jsPDF('l', 'mm', 'a4') as jsPDFWithPlugin;
     const companyName = ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS";
     const cycleLabel = currentCycle?.label || "";
     const monthLabel = monthOptions.find(o => o.value === selectedMonth)?.label || "";
@@ -225,7 +224,7 @@ export default function ReportsPage() {
     const f = farmers?.find(f => f.id === farmerId);
     if (!f) return;
 
-    const doc = new jsPDF();
+    const doc = new jsPDF() as jsPDFWithPlugin;
     const companyName = ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS";
     const invEntries = filteredCycleEntries.filter(e => e.farmerId === farmerId).sort((a, b) => a.date.localeCompare(b.date));
     
@@ -265,7 +264,7 @@ export default function ReportsPage() {
   const handleDownloadBulkInvoicesPDF = () => {
     if (activeInvoices.length === 0) return;
 
-    const doc = new jsPDF();
+    const doc = new jsPDF() as jsPDFWithPlugin;
     const companyName = ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS";
 
     activeInvoices.forEach((f, idx) => {

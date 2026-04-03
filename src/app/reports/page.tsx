@@ -24,7 +24,7 @@ import {
   IndianRupee,
   CalendarDays
 } from "lucide-react";
-import { format, endOfMonth, startOfMonth, subMonths } from "date-fns";
+import { format, endOfMonth, startOfMonth, subMonths, startOfYear, addMonths } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -128,10 +128,21 @@ export default function ReportsPage() {
     if (!allEntries || !allSales || !isClient) return [];
     
     const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-indexed, Jan is 0
+    
+    // Determine the start of the fiscal year (April starts the FY)
+    // If we are before April (Jan, Feb, March), the fiscal year started last year
+    const fiscalStartYear = currentMonth < 3 ? currentYear - 1 : currentYear;
+    
+    // Generate 12 months from April of the fiscalStartYear
     return Array.from({ length: 12 }).map((_, i) => {
-      const d = subMonths(now, i);
+      const monthIndex = (3 + i) % 12; // Start from April (3)
+      const year = fiscalStartYear + (3 + i >= 12 ? 1 : 0);
+      
+      const d = new Date(year, monthIndex, 1);
       const monthStr = format(d, 'yyyy-MM');
-      const monthName = format(d, 'MMMM');
+      const monthName = format(d, 'MMMM yyyy');
       
       const mEntries = allEntries.filter(e => e.date.startsWith(monthStr));
       const mSales = allSales.filter(s => s.date.startsWith(monthStr));
@@ -488,7 +499,7 @@ export default function ReportsPage() {
                 <Table>
                   <TableHeader className="bg-muted/50 border-b">
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest pl-10 py-6">Month</TableHead>
+                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest pl-10 py-6">Month (Fiscal Cycle)</TableHead>
                       <TableHead className="text-center font-black text-primary uppercase text-[10px] tracking-widest py-6">Collection (L)</TableHead>
                       <TableHead className="text-center font-black text-primary uppercase text-[10px] tracking-widest py-6">Farmer Cost (₹)</TableHead>
                       <TableHead className="text-center font-black text-primary uppercase text-[10px] tracking-widest py-6">Sales Revenue (₹)</TableHead>

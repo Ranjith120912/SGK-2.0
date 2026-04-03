@@ -23,7 +23,8 @@ import {
   Scale,
   RefreshCcw,
   DatabaseZap,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -129,6 +130,10 @@ export default function SettingsPage() {
     setIsResetting(true);
     
     // Batch deletion simulation (non-blocking per document)
+    const entryCount = allEntries?.length || 0;
+    const saleCount = allSales?.length || 0;
+    const farmerCount = allFarmers?.length || 0;
+
     allEntries?.forEach(e => deleteDocumentNonBlocking(doc(firestore, 'entries', e.id)));
     allSales?.forEach(s => deleteDocumentNonBlocking(doc(firestore, 'sales', s.id)));
     allFarmers?.forEach(f => deleteDocumentNonBlocking(doc(firestore, 'farmers', f.id)));
@@ -136,11 +141,11 @@ export default function SettingsPage() {
     setTimeout(() => {
       setIsResetting(false);
       toast({ 
-        title: "Master Reset Complete", 
-        description: "All database records have been wiped.",
+        title: "Master Reset Initiated", 
+        description: `Wiping ${entryCount} entries, ${saleCount} sales, and ${farmerCount} farmers.`,
         variant: "destructive"
       });
-    }, 1500);
+    }, 1000);
   };
 
   return (
@@ -158,27 +163,48 @@ export default function SettingsPage() {
           <div className="space-y-8">
             <Card className="rounded-[2rem] border-2 border-destructive/20 bg-destructive/5 overflow-hidden shadow-xl">
               <CardHeader className="bg-destructive/10">
-                <CardTitle className="text-xl font-black flex items-center gap-3 text-destructive uppercase">
-                  <DatabaseZap className="w-6 h-6" /> Master Data Wipe
-                </CardTitle>
+                <div className="flex justify-between items-center">
+                  <CardTitle className="text-xl font-black flex items-center gap-3 text-destructive uppercase">
+                    <DatabaseZap className="w-6 h-6" /> Master Data Wipe
+                  </CardTitle>
+                  <div className="flex gap-4">
+                    <div className="text-center">
+                      <p className="text-[10px] font-black uppercase text-muted-foreground">Farmers</p>
+                      <p className="text-lg font-black text-destructive">{allFarmers?.length ?? '...'}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[10px] font-black uppercase text-muted-foreground">Entries</p>
+                      <p className="text-lg font-black text-destructive">{allEntries?.length ?? '...'}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[10px] font-black uppercase text-muted-foreground">Sales</p>
+                      <p className="text-lg font-black text-destructive">{allSales?.length ?? '...'}</p>
+                    </div>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="p-6 flex flex-col sm:flex-row justify-between items-center gap-6">
                 <div className="flex gap-4">
                   <AlertTriangle className="w-10 h-10 text-destructive animate-pulse" />
-                  <p className="text-sm font-semibold text-destructive/80 leading-relaxed">
-                    Total system reset. Deletes ALL farmers, collection logs, and sales records permanently.
-                  </p>
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-destructive leading-tight uppercase tracking-tight">System Purge Warning</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      This will permanently delete ALL suppliers, collection logs, and sales records across your entire organization.
+                    </p>
+                  </div>
                 </div>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" size="lg" className="rounded-full px-10 h-14 font-black uppercase shadow-xl" disabled={isResetting}>
-                      {isResetting ? <RefreshCcw className="animate-spin mr-2" /> : <RefreshCcw className="mr-2" />} Master Reset
+                      {isResetting ? <Loader2 className="animate-spin mr-2" /> : <RefreshCcw className="mr-2" />} System Reset
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent className="rounded-3xl">
                     <AlertDialogHeader>
-                      <AlertDialogTitle className="font-black text-destructive uppercase">Confirm Wipe</AlertDialogTitle>
-                      <AlertDialogDescription>Permanently delete all suppliers and transaction history? This cannot be undone.</AlertDialogDescription>
+                      <AlertDialogTitle className="font-black text-destructive uppercase">Confirm Total Wipe</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        You are about to delete all records from the database. This action is irreversible and will reset all reporting metrics to zero.
+                      </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel className="rounded-full">Abort</AlertDialogCancel>

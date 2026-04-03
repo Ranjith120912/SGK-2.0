@@ -26,7 +26,8 @@ import {
   Wallet,
   Activity,
   History,
-  Files
+  Files,
+  Search
 } from "lucide-react";
 import { format, endOfMonth } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +46,7 @@ export default function ReportsPage() {
   const [isClient, setIsClient] = useState(false);
   const [viewingInvoiceFarmerId, setViewingInvoiceFarmerId] = useState<string | null>(null);
   const [viewingBulkInvoices, setViewingBulkInvoices] = useState(false);
+  const [auditSearch, setAuditSearch] = useState("");
 
   useEffect(() => {
     setIsClient(true);
@@ -168,6 +170,16 @@ export default function ReportsPage() {
       return (isNaN(aNum) || isNaN(bNum)) ? a.canNumber.localeCompare(b.canNumber) : aNum - bNum;
     });
   }, [farmers, filteredCycleEntries]);
+
+  const filteredAuditEntries = useMemo(() => {
+    return monthlyEntries.filter(e => {
+      const farmer = farmers?.find(f => f.id === e.farmerId);
+      const search = auditSearch.toLowerCase();
+      return (farmer?.name.toLowerCase().includes(search) || 
+              farmer?.canNumber.includes(search) || 
+              e.date.includes(search));
+    }).sort((a, b) => b.date.localeCompare(a.date));
+  }, [monthlyEntries, farmers, auditSearch]);
 
   const renderInvoice = (farmerId: string) => {
     const invFarmer = farmers?.find(f => f.id === farmerId);
@@ -391,13 +403,22 @@ export default function ReportsPage() {
               </TabsContent>
 
               <TabsContent value="management" className="space-y-12 animate-in fade-in duration-500">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
                   <div className="flex items-center gap-3">
-                    <h3 className="text-xl font-black text-primary uppercase tracking-tighter">Audit Log</h3>
+                    <h3 className="text-xl font-black text-primary uppercase tracking-tighter">Detailed Audit</h3>
                     <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                       <SelectTrigger className="w-[200px] rounded-full font-bold"><SelectValue /></SelectTrigger>
                       <SelectContent>{monthOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
                     </Select>
+                  </div>
+                  <div className="relative w-full sm:w-[300px]">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input 
+                      placeholder="Search entries..." 
+                      className="pl-10 rounded-full h-10" 
+                      value={auditSearch}
+                      onChange={(e) => setAuditSearch(e.target.value)}
+                    />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -424,22 +445,28 @@ export default function ReportsPage() {
                       <TableRow>
                         <TableHead className="font-bold">Date</TableHead>
                         <TableHead className="font-bold">Session</TableHead>
-                        <TableHead className="font-bold">Supplier</TableHead>
-                        <TableHead className="font-bold text-right">Litre (Qty)</TableHead>
+                        <TableHead className="font-bold">Supplier (CAN)</TableHead>
+                        <TableHead className="font-bold text-right">Qty (Litre)</TableHead>
                         <TableHead className="font-bold text-right">Total (₹)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {monthlyEntries.length === 0 ? (
-                        <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground italic font-medium">No logs found for this period. Metrics are 0.00.</TableCell></TableRow>
+                      {filteredAuditEntries.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-20 text-muted-foreground italic font-medium">
+                            No logs found for the selected month/search.
+                          </TableCell>
+                        </TableRow>
                       ) : (
-                        monthlyEntries.sort((a,b) => b.date.localeCompare(a.date)).map((entry) => {
+                        filteredAuditEntries.map((entry) => {
                           const farmer = farmers?.find(f => f.id === entry.farmerId);
                           return (
                             <TableRow key={entry.id} className="hover:bg-primary/5">
                               <TableCell className="font-medium">{format(new Date(entry.date), 'dd MMM yyyy')}</TableCell>
                               <TableCell><Badge variant="outline" className="text-[9px] font-black uppercase">{entry.session}</Badge></TableCell>
-                              <TableCell className="font-bold text-primary">{farmer ? `${farmer.canNumber} - ${farmer.name}` : "Unknown"}</TableCell>
+                              <TableCell className="font-bold text-primary">
+                                {farmer ? `${farmer.name} (${farmer.canNumber})` : "Unknown Supplier"}
+                              </TableCell>
                               <TableCell className="text-right font-black text-primary">{entry.quantity.toFixed(2)}</TableCell>
                               <TableCell className="text-right font-black">₹{entry.totalAmount.toFixed(2)}</TableCell>
                             </TableRow>
@@ -448,6 +475,9 @@ export default function ReportsPage() {
                       )}
                     </TableBody>
                   </Table>
+                  <div className="p-4 bg-muted/20 text-center text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] border-t">
+                    Showing {filteredAuditEntries.length} entries for {selectedMonth}
+                  </div>
                 </Card>
               </TabsContent>
 

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -40,7 +41,9 @@ import {
   Upload,
   Trash2,
   CheckSquare,
-  Square
+  Square,
+  MoreVertical,
+  X
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { read, utils, writeFile } from 'xlsx';
@@ -93,18 +96,18 @@ export default function FarmersPage() {
     toast({ title: "Success", description: "Farmer added successfully." });
   };
 
-  const toggleSelect = (id: string) => {
+  const toggleSelect = (id: string, checked: boolean) => {
     setSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+      checked ? [...prev, id] : prev.filter(i => i !== id)
     );
   };
 
-  const toggleSelectAll = () => {
+  const toggleSelectAll = (checked: boolean) => {
     if (!filteredFarmers) return;
-    if (selectedIds.length === filteredFarmers.length) {
-      setSelectedIds([]);
-    } else {
+    if (checked) {
       setSelectedIds(filteredFarmers.map(f => f.id));
+    } else {
+      setSelectedIds([]);
     }
   };
 
@@ -123,6 +126,14 @@ export default function FarmersPage() {
     setSelectedIds([]);
   };
 
+  const handleDeleteRow = (id: string, name: string) => {
+    if (!firestore) return;
+    if (!confirm(`Are you sure you want to delete farmer "${name}"?`)) return;
+
+    deleteDocumentNonBlocking(doc(firestore, 'farmers', id));
+    toast({ title: "Deleted", description: "Farmer removed from directory." });
+  };
+
   const handleDeleteAll = () => {
     if (!farmers || !firestore) return;
     if (!confirm("Are you sure you want to delete ALL farmers? This cannot be undone.")) return;
@@ -130,7 +141,7 @@ export default function FarmersPage() {
     farmers.forEach(farmer => {
       deleteDocumentNonBlocking(doc(firestore, 'farmers', farmer.id));
     });
-    toast({ title: "Deleted", description: "All farmers have been removed from the directory." });
+    toast({ title: "Deleted", description: "All farmers have been removed." });
     setSelectedIds([]);
   };
 
@@ -241,7 +252,7 @@ export default function FarmersPage() {
     utils.book_append_sheet(wb, ws, "Farmers Template");
     writeFile(wb, "Farmers_Import_Template.xlsx");
     
-    toast({ title: "Template Downloaded", description: "Excel (.xlsx) file is ready." });
+    toast({ title: "Template Downloaded", description: "Excel template is ready." });
   };
 
   const seedData = () => {
@@ -249,7 +260,7 @@ export default function FarmersPage() {
     toast({ title: "Seeding...", description: "Adding 50 sample farmers." });
     for (let i = 1; i <= 50; i++) {
       addDocumentNonBlocking(collection(firestore, 'farmers'), {
-        name: `Farmer ${i}`,
+        name: `Sample Farmer ${i}`,
         canNumber: i.toString().padStart(3, '0'),
         bankAccountNumber: `ACC-${i.toString().padStart(6, '0')}`,
         ifscCode: `IFSC${i.toString().padStart(4, '0')}`,
@@ -278,12 +289,12 @@ export default function FarmersPage() {
                   className="rounded-full shadow-lg animate-in zoom-in duration-300"
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
-                  Delete ({selectedIds.length})
+                  Delete Selected ({selectedIds.length})
                 </Button>
               )}
 
               <Button onClick={() => setIsAdding(!isAdding)} variant={isAdding ? "outline" : "default"} className="rounded-full">
-                <UserPlus className="w-4 h-4 mr-2" />
+                {isAdding ? <X className="w-4 h-4 mr-2" /> : <UserPlus className="w-4 h-4 mr-2" />}
                 {isAdding ? "Cancel" : "Add Farmer"}
               </Button>
               
@@ -302,7 +313,7 @@ export default function FarmersPage() {
                         Excel Bulk Import
                       </DialogTitle>
                       <DialogDescription className="text-primary-foreground/80">
-                        Upload your .xlsx file with Name, Can Number, Bank Account Number, IFSC Code, and Milk Type.
+                        Upload your .xlsx file with Name, Can Number, Bank Details, and Milk Type.
                       </DialogDescription>
                     </DialogHeader>
                   </div>
@@ -319,68 +330,56 @@ export default function FarmersPage() {
                           onChange={handleFileUpload}
                           className="rounded-xl h-24 border-dashed border-2 cursor-pointer hover:bg-muted/50 transition-colors file:hidden text-center pt-8 text-muted-foreground font-medium"
                         />
-                        <p className="text-[10px] text-center text-muted-foreground">Drop your Excel file here or click to browse</p>
                       </div>
 
                       <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
-                            <Download className="w-3 h-3" /> Step 2: Download Format
-                          </label>
-                        </div>
+                        <label className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
+                          <Download className="w-3 h-3" /> Step 2: Download Format
+                        </label>
                         <div className="bg-muted/50 rounded-2xl p-4 border border-primary/10 flex flex-col items-center justify-center h-24 gap-2">
-                          <Button variant="outline" size="sm" onClick={downloadExcelTemplate} className="rounded-full w-full bg-background shadow-sm hover:bg-primary hover:text-white transition-all">
+                          <Button variant="outline" size="sm" onClick={downloadExcelTemplate} className="rounded-full w-full bg-background shadow-sm">
                             <Download className="w-3 h-3 mr-2" /> Download Template (.xlsx)
                           </Button>
-                          <p className="text-[10px] text-muted-foreground italic text-center">Includes Bank Account Number & IFSC</p>
                         </div>
                       </div>
                     </div>
 
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <label className="text-sm font-bold text-primary flex items-center gap-2 uppercase tracking-wider">
-                          <ClipboardList className="w-4 h-4" />
-                          Or Paste Data
-                        </label>
-                      </div>
+                      <label className="text-sm font-bold text-primary flex items-center gap-2 uppercase tracking-wider">
+                        <ClipboardList className="w-4 h-4" />
+                        Or Paste Data
+                      </label>
                       <Textarea 
-                        placeholder="Name, Can Number, Bank Account Number, IFSC Code, Milk Type&#10;John Doe, 101, 9123456789, SBIN0001234, COW" 
+                        placeholder="Name, Can Number, Account, IFSC, Milk Type..." 
                         value={importData}
                         onChange={(e) => setImportData(e.target.value)}
-                        className="min-h-[120px] font-mono text-xs rounded-2xl border-primary/20 bg-background/50 focus:bg-background transition-colors"
+                        className="min-h-[120px] font-mono text-xs rounded-2xl border-primary/20 bg-background/50"
                       />
                     </div>
                   </div>
 
-                  <div className="bg-muted/50 p-6 flex flex-col sm:flex-row gap-4 justify-between items-center border-t">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium italic">
-                      <CircleAlert className="w-4 h-4 text-accent" />
-                      Milk Type must be COW or BUFFALO
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" onClick={() => setIsImporting(false)} className="rounded-full">Cancel</Button>
-                      <Button onClick={handleBulkImportText} className="rounded-full px-8 shadow-md" disabled={!importData}>
-                        <CircleCheck className="w-4 h-4 mr-2" />
-                        Process Text
-                      </Button>
-                    </div>
+                  <div className="bg-muted/50 p-6 flex justify-end gap-2 border-t">
+                    <Button variant="ghost" onClick={() => setIsImporting(false)} className="rounded-full">Cancel</Button>
+                    <Button onClick={handleBulkImportText} className="rounded-full px-8 shadow-md" disabled={!importData}>
+                      <CircleCheck className="w-4 h-4 mr-2" />
+                      Process Text
+                    </Button>
                   </div>
                 </DialogContent>
               </Dialog>
 
               <div className="flex gap-1">
-                <Button variant="ghost" onClick={seedData} className="rounded-l-full text-muted-foreground border-y-2 border-l-2 border-dashed hover:bg-muted/50">
-                  <Database className="w-4 h-4 mr-2" />
+                <Button variant="ghost" onClick={seedData} className="rounded-l-full text-muted-foreground border border-dashed hover:bg-muted/50">
+                  <Database className="w-3 h-3 mr-2" />
                   Seed Samples
                 </Button>
                 <Button 
                   variant="ghost" 
                   onClick={handleDeleteAll} 
-                  className="rounded-r-full text-destructive border-y-2 border-r-2 border-dashed hover:bg-destructive/10"
+                  className="rounded-r-full text-destructive border border-dashed hover:bg-destructive/10"
                   disabled={!farmers || farmers.length === 0}
                 >
-                  <Trash2 className="w-4 h-4 mr-2" />
+                  <Trash2 className="w-3 h-3 mr-2" />
                   Clear All
                 </Button>
               </div>
@@ -390,7 +389,7 @@ export default function FarmersPage() {
           {isAdding && (
             <Card className="mb-8 border-primary/20 bg-primary/5 rounded-3xl shadow-sm animate-in fade-in slide-in-from-top-4 duration-300">
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
+                <CardTitle className="text-lg flex items-center gap-2 uppercase tracking-tight font-black">
                   <UserPlus className="w-5 h-5 text-primary" />
                   New Farmer Profile
                 </CardTitle>
@@ -398,7 +397,7 @@ export default function FarmersPage() {
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-muted-foreground uppercase tracking-widest">Full Name</label>
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Full Name</label>
                     <Input 
                       placeholder="e.g. John Doe" 
                       value={newFarmer.name}
@@ -407,7 +406,7 @@ export default function FarmersPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-muted-foreground uppercase tracking-widest">Can Number</label>
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Can Number</label>
                     <Input 
                       placeholder="e.g. 101" 
                       value={newFarmer.canNumber}
@@ -416,7 +415,7 @@ export default function FarmersPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-muted-foreground uppercase tracking-widest">Milk Type</label>
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Milk Type</label>
                     <Select value={newFarmer.milkType} onValueChange={(v) => setNewFarmer({...newFarmer, milkType: v})}>
                       <SelectTrigger className="rounded-xl h-11 border-primary/10">
                         <SelectValue />
@@ -428,7 +427,7 @@ export default function FarmersPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-muted-foreground uppercase tracking-widest">Bank Account Number</label>
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Account Number</label>
                     <Input 
                       placeholder="e.g. 9123456789" 
                       value={newFarmer.bankAccountNumber}
@@ -437,7 +436,7 @@ export default function FarmersPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-muted-foreground uppercase tracking-widest">IFSC Code</label>
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">IFSC Code</label>
                     <Input 
                       placeholder="e.g. SBIN0001234" 
                       value={newFarmer.ifscCode}
@@ -457,7 +456,7 @@ export default function FarmersPage() {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <Input 
               className="pl-12 h-14 bg-card rounded-2xl border-primary/10 shadow-sm focus:ring-primary/20 text-lg" 
-              placeholder="Quick search by Name or Can Number..." 
+              placeholder="Search by Name or Can Number..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -470,15 +469,15 @@ export default function FarmersPage() {
                   <TableHead className="w-[50px] pl-6 py-5">
                     <Checkbox 
                       checked={filteredFarmers?.length ? selectedIds.length === filteredFarmers.length : false} 
-                      onCheckedChange={toggleSelectAll} 
+                      onCheckedChange={(checked) => toggleSelectAll(!!checked)} 
                       aria-label="Select all"
                     />
                   </TableHead>
-                  <TableHead className="w-[100px] font-black text-primary py-5">CAN</TableHead>
-                  <TableHead className="font-black text-primary">Farmer Name</TableHead>
-                  <TableHead className="w-[120px] font-black text-primary">Milk Type</TableHead>
-                  <TableHead className="font-black text-primary">Bank Details</TableHead>
-                  <TableHead className="text-right pr-6 font-black text-primary">Actions</TableHead>
+                  <TableHead className="w-[100px] font-black text-primary py-5 uppercase text-[10px] tracking-widest">CAN</TableHead>
+                  <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Farmer Name</TableHead>
+                  <TableHead className="w-[120px] font-black text-primary uppercase text-[10px] tracking-widest">Milk Type</TableHead>
+                  <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Bank Details</TableHead>
+                  <TableHead className="text-right pr-6 font-black text-primary uppercase text-[10px] tracking-widest">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -488,10 +487,8 @@ export default function FarmersPage() {
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-20">
                       <div className="flex flex-col items-center gap-3">
-                        <div className="p-4 bg-muted rounded-full">
-                          <ClipboardList className="w-10 h-10 text-muted-foreground/30" />
-                        </div>
-                        <p className="text-muted-foreground font-semibold">No farmers found matching your search.</p>
+                        <ClipboardList className="w-10 h-10 text-muted-foreground/30" />
+                        <p className="text-muted-foreground font-semibold">No farmers found.</p>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -501,14 +498,14 @@ export default function FarmersPage() {
                       <TableCell className="pl-6">
                         <Checkbox 
                           checked={selectedIds.includes(farmer.id)} 
-                          onCheckedChange={() => toggleSelect(farmer.id)} 
+                          onCheckedChange={(checked) => toggleSelect(farmer.id, !!checked)} 
                           aria-label={`Select ${farmer.name}`}
                         />
                       </TableCell>
                       <TableCell className="font-black text-primary text-lg">{farmer.canNumber}</TableCell>
                       <TableCell className="font-bold text-base text-foreground/80">{farmer.name}</TableCell>
                       <TableCell>
-                        <Badge variant={farmer.milkType === 'BUFFALO' ? "secondary" : "outline"} className="rounded-full font-bold">
+                        <Badge variant={farmer.milkType === 'BUFFALO' ? "secondary" : "outline"} className="rounded-full font-black text-[10px] uppercase">
                           {farmer.milkType || 'COW'}
                         </Badge>
                       </TableCell>
@@ -519,7 +516,17 @@ export default function FarmersPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right pr-6">
-                        <Button variant="ghost" size="sm" className="rounded-full opacity-0 group-hover:opacity-100 transition-opacity font-bold text-primary">Edit Profile</Button>
+                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button variant="ghost" size="sm" className="rounded-full font-bold text-primary">Edit</Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="rounded-full text-destructive hover:bg-destructive/10"
+                            onClick={() => handleDeleteRow(farmer.id, farmer.name)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -527,7 +534,7 @@ export default function FarmersPage() {
               </TableBody>
             </Table>
             <div className="p-5 bg-muted/20 text-center text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] border-t">
-              Total Active Suppliers: {farmers?.length || 0}
+              Active Directory Suppliers: {farmers?.length || 0}
             </div>
           </Card>
         </div>

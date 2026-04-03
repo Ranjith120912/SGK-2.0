@@ -8,6 +8,9 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn();
     }
+    match /farmers/{farmerId} {
+      allow read, write: if isAdmin();
+    }
     match /entries/{entryId} {
       allow read, write: if isAdmin();
     }

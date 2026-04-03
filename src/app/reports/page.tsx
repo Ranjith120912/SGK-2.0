@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -131,10 +132,11 @@ export default function ReportsPage() {
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
+    // Fiscal year starts in April. If month is Jan(0), Feb(1), Mar(2), fiscal start was previous year.
     const fiscalStartYear = currentMonth < 3 ? currentYear - 1 : currentYear;
     
     return Array.from({ length: 12 }).map((_, i) => {
-      const monthIndex = (3 + i) % 12; 
+      const monthIndex = (3 + i) % 12; // Start from April (3)
       const year = fiscalStartYear + (3 + i >= 12 ? 1 : 0);
       const d = new Date(year, monthIndex, 1);
       const monthStr = format(d, 'yyyy-MM');
@@ -158,6 +160,8 @@ export default function ReportsPage() {
       const fEntries = filteredCycleEntries.filter(e => e.farmerId === farmer.id);
       return {
         ...farmer,
+        morningQty: fEntries.filter(e => e.session === 'Morning').reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0),
+        eveningQty: fEntries.filter(e => e.session === 'Evening').reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0),
         totalQty: fEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0),
         totalAmount: fEntries.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0)
       };
@@ -168,6 +172,8 @@ export default function ReportsPage() {
     });
   }, [farmers, filteredCycleEntries]);
 
+  const grandTotalMorning = masterRoster.reduce((acc, curr) => acc + curr.morningQty, 0);
+  const grandTotalEvening = masterRoster.reduce((acc, curr) => acc + curr.eveningQty, 0);
   const grandTotalQty = masterRoster.reduce((acc, curr) => acc + curr.totalQty, 0);
   const grandTotalAmt = masterRoster.reduce((acc, curr) => acc + curr.totalAmount, 0);
 
@@ -486,7 +492,9 @@ export default function ReportsPage() {
                         <TableHead className="font-black text-[10px] text-primary uppercase tracking-widest py-5 pl-8 border-r border-black">CAN NO</TableHead>
                         <TableHead className="font-black text-[10px] text-primary uppercase tracking-widest py-5 border-r border-black">FARMER NAME</TableHead>
                         <TableHead className="font-black text-[10px] text-primary uppercase tracking-widest py-5 border-r border-black">A/C NUMBER</TableHead>
-                        <TableHead className="text-right font-black text-[10px] text-primary uppercase tracking-widest py-5 border-r border-black">TOTAL LITRES</TableHead>
+                        <TableHead className="text-center font-black text-[10px] text-primary uppercase tracking-widest py-5 border-r border-black">MORNING (L)</TableHead>
+                        <TableHead className="text-center font-black text-[10px] text-primary uppercase tracking-widest py-5 border-r border-black">EVENING (L)</TableHead>
+                        <TableHead className="text-center font-black text-[10px] text-primary uppercase tracking-widest py-5 border-r border-black">TOTAL LITRES</TableHead>
                         <TableHead className="text-right font-black text-[10px] text-primary uppercase tracking-widest py-5 pr-8">AMOUNT (₹)</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -496,7 +504,9 @@ export default function ReportsPage() {
                           <TableCell className="font-black text-primary text-lg pl-8 py-4 border-r border-black">{f.canNumber}</TableCell>
                           <TableCell className="font-bold uppercase text-sm text-foreground/80 border-r border-black">{f.name}</TableCell>
                           <TableCell className="font-mono text-xs text-muted-foreground border-r border-black">{f.bankAccountNumber || "—"}</TableCell>
-                          <TableCell className="text-right font-bold text-base border-r border-black">{f.totalQty.toFixed(2)}</TableCell>
+                          <TableCell className="text-center font-medium text-base border-r border-black">{f.morningQty.toFixed(2)}</TableCell>
+                          <TableCell className="text-center font-medium text-base border-r border-black">{f.eveningQty.toFixed(2)}</TableCell>
+                          <TableCell className="text-center font-bold text-base border-r border-black">{f.totalQty.toFixed(2)}</TableCell>
                           <TableCell className="text-right font-black text-primary text-lg pr-8">₹ {f.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                         </TableRow>
                       ))}
@@ -504,7 +514,9 @@ export default function ReportsPage() {
                     <tfoot className="bg-muted/50 border-t-2 border-black">
                       <TableRow className="hover:bg-transparent">
                         <TableCell colSpan={3} className="pl-8 py-6 font-black text-primary uppercase tracking-widest text-base border-r border-black">Grand Total</TableCell>
-                        <TableCell className="text-right font-black text-xl border-r border-black">{grandTotalQty.toFixed(2)} L</TableCell>
+                        <TableCell className="text-center font-black text-base border-r border-black">{grandTotalMorning.toFixed(2)}</TableCell>
+                        <TableCell className="text-center font-black text-base border-r border-black">{grandTotalEvening.toFixed(2)}</TableCell>
+                        <TableCell className="text-center font-black text-xl border-r border-black">{grandTotalQty.toFixed(2)} L</TableCell>
                         <TableCell className="text-right font-black text-primary text-2xl pr-8">₹ {grandTotalAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                       </TableRow>
                     </tfoot>

@@ -24,7 +24,8 @@ import {
   Scale,
   Trash2,
   AlertTriangle,
-  DatabaseZap
+  DatabaseZap,
+  RefreshCcw
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -37,6 +38,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 export default function SettingsPage() {
@@ -71,9 +73,15 @@ export default function SettingsPage() {
     return collection(firestore, 'sales');
   }, [firestore]);
 
+  const farmersRef = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'farmers');
+  }, [firestore]);
+
   const { data: currentSettings, isLoading } = useDoc(settingsRef);
   const { data: allEntries } = useCollection(entriesRef);
   const { data: allSales } = useCollection(salesRef);
+  const { data: allFarmers } = useCollection(farmersRef);
 
   useEffect(() => {
     if (currentSettings) {
@@ -135,7 +143,7 @@ export default function SettingsPage() {
     allEntries.forEach(entry => {
       deleteDocumentNonBlocking(doc(firestore, 'entries', entry.id));
     });
-    toast({ title: "System Cleaned", description: `Removed ${allEntries.length} collection logs.` });
+    toast({ title: "Logs Cleared", description: `Removed ${allEntries.length} collection records.` });
   };
 
   const wipeSales = () => {
@@ -144,6 +152,23 @@ export default function SettingsPage() {
       deleteDocumentNonBlocking(doc(firestore, 'sales', sale.id));
     });
     toast({ title: "Sales Wiped", description: `Removed ${allSales.length} distribution records.` });
+  };
+
+  const masterReset = () => {
+    if (!firestore) return;
+    
+    // Wipe Entries
+    allEntries?.forEach(e => deleteDocumentNonBlocking(doc(firestore, 'entries', e.id)));
+    // Wipe Sales
+    allSales?.forEach(s => deleteDocumentNonBlocking(doc(firestore, 'sales', s.id)));
+    // Wipe Farmers
+    allFarmers?.forEach(f => deleteDocumentNonBlocking(doc(firestore, 'farmers', f.id)));
+
+    toast({ 
+      title: "Master Reset Complete", 
+      description: "All suppliers, collection logs, and sales records have been permanently removed.",
+      variant: "destructive"
+    });
   };
 
   return (
@@ -160,6 +185,62 @@ export default function SettingsPage() {
           </header>
 
           <div className="space-y-6">
+            {/* Master Wipe Card - High Visibility */}
+            <Card className="rounded-[2rem] shadow-2xl border-2 border-destructive/20 bg-destructive/5 overflow-hidden">
+              <CardHeader className="bg-destructive/10 p-6">
+                <CardTitle className="text-xl font-black flex items-center gap-3 text-destructive uppercase tracking-tighter">
+                  <DatabaseZap className="w-6 h-6" />
+                  Master System Reset
+                </CardTitle>
+                <CardDescription className="text-destructive font-bold text-sm">
+                  DANGER: This will delete ALL farmers, collection entries, and sales data at once.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+                  <div className="flex items-start gap-4">
+                    <AlertTriangle className="w-12 h-12 text-destructive animate-pulse" />
+                    <div>
+                      <p className="text-sm font-semibold text-destructive/80 leading-relaxed">
+                        Use this for a total seasonal reset. Every piece of transaction data and every supplier profile will be wiped. 
+                        This action cannot be undone and will reset your reports to 0.00 immediately.
+                      </p>
+                    </div>
+                  </div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="lg" className="rounded-full px-12 h-14 font-black uppercase tracking-widest shadow-xl">
+                        <RefreshCcw className="w-5 h-5 mr-2" />
+                        Master Clear
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="rounded-3xl">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="font-black text-destructive uppercase flex items-center gap-2">
+                          <AlertTriangle className="w-6 h-6" /> PERMANENT WIPE?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-foreground font-medium">
+                          You are about to initiate a Master Reset. This will permanently delete:
+                          <ul className="list-disc pl-6 mt-2 space-y-1 text-sm">
+                            <li>All {allFarmers?.length || 0} Registered Farmers</li>
+                            <li>All {allEntries?.length || 0} Collection Log Entries</li>
+                            <li>All {allSales?.length || 0} Distribution Sales Records</li>
+                          </ul>
+                          <p className="mt-4 font-black">THIS ACTION IS IRREVERSIBLE.</p>
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="rounded-full">Abort Reset</AlertDialogCancel>
+                        <AlertDialogAction onClick={masterReset} className="rounded-full bg-destructive hover:bg-destructive/90">
+                          YES, WIPE EVERYTHING
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </CardContent>
+            </Card>
+
             <Card className="rounded-[2rem] shadow-xl border-none bg-card/50 backdrop-blur-sm overflow-hidden">
               <CardHeader className="bg-primary/5 border-b border-primary/10 p-6">
                 <CardTitle className="text-xl font-black flex items-center gap-3 text-primary uppercase tracking-tighter">
@@ -319,80 +400,6 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
             </div>
-
-            {/* Maintenance Section */}
-            <Card className="rounded-[2rem] shadow-xl border-none bg-destructive/5 backdrop-blur-sm overflow-hidden">
-              <CardHeader className="bg-destructive/10 border-b border-destructive/10 p-6">
-                <CardTitle className="text-xl font-black flex items-center gap-3 text-destructive uppercase tracking-tighter">
-                  <DatabaseZap className="w-6 h-6" />
-                  System Maintenance
-                </CardTitle>
-                <CardDescription className="text-destructive font-medium text-xs">Irreversible data cleaning operations.</CardDescription>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <h4 className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                      <Trash2 className="w-3 h-3" /> Clean Collection Logs
-                    </h4>
-                    <p className="text-[10px] text-muted-foreground">Delete all daily milk entries. Use this to reset the system for a new season.</p>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="outline" className="w-full rounded-xl border-destructive/20 text-destructive hover:bg-destructive/10">
-                          Wipe All Entries ({allEntries?.length || 0})
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="rounded-3xl">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle className="font-black text-destructive uppercase flex items-center gap-2">
-                            <AlertTriangle className="w-6 h-6" /> Total Wipeout?
-                          </AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will permanently delete every milk entry in your database. Reports will reset to zero. This cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={wipeEntries} className="rounded-full bg-destructive hover:bg-destructive/90">
-                            Yes, Wipe All Entries
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-
-                  <div className="space-y-3">
-                    <h4 className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                      <ShoppingBag className="w-3 h-3" /> Clean Sales Records
-                    </h4>
-                    <p className="text-[10px] text-muted-foreground">Delete all distribution/sales records. Buyer profiles will remain intact.</p>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="outline" className="w-full rounded-xl border-destructive/20 text-destructive hover:bg-destructive/10">
-                          Wipe All Sales ({allSales?.length || 0})
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="rounded-3xl">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle className="font-black text-destructive uppercase flex items-center gap-2">
-                            <AlertTriangle className="w-6 h-6" /> Delete Sales History?
-                          </AlertDialogTitle>
-                          <AlertDialogDescription>
-                            All distribution logs and revenue history will be permanently removed.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={wipeSales} className="rounded-full bg-destructive hover:bg-destructive/90">
-                            Confirm Sales Wipe
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
 
             <div className="flex justify-end pt-4">
               <Button onClick={handleSave} disabled={isSaving || isLoading} className="rounded-full px-10 h-12 shadow-xl hover:scale-105 active:scale-95 transition-all font-black uppercase tracking-widest text-sm">

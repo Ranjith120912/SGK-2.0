@@ -32,7 +32,8 @@ import {
   Activity,
   History,
   Info,
-  Files
+  Files,
+  Scale
 } from "lucide-react";
 import { format, endOfMonth, eachMonthOfInterval, startOfYear, endOfYear } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -129,36 +130,6 @@ export default function ReportsPage() {
     });
   }, [allEntries, selectedMonth, currentCycle]);
 
-  const cycleStats = useMemo(() => {
-    return cycles.map(c => {
-      const cEntries = allEntries?.filter(entry => {
-        if (!selectedMonth || !entry.date.startsWith(selectedMonth)) return false;
-        const day = parseInt(entry.date.split('-')[2]);
-        return day >= c.start && day <= c.end;
-      }) || [];
-      return { 
-        qty: cEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0),
-        amount: cEntries.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0)
-      };
-    });
-  }, [cycles, allEntries, selectedMonth]);
-
-  const activeFarmerCycleBreakdown = useMemo(() => {
-    if (!farmers) return [];
-    return farmers.map(farmer => {
-      const fEntries = filteredCycleEntries.filter(e => e.farmerId === farmer.id);
-      return {
-        ...farmer,
-        totalQty: fEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0),
-        totalAmount: fEntries.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0)
-      };
-    }).filter(f => f.totalQty > 0).sort((a, b) => {
-      const aNum = parseInt(a.canNumber);
-      const bNum = parseInt(b.canNumber);
-      return (isNaN(aNum) || isNaN(bNum)) ? a.canNumber.localeCompare(b.canNumber) : aNum - bNum;
-    });
-  }, [farmers, filteredCycleEntries]);
-
   const dailyEntries = useMemo(() => {
     if (!allEntries || !selectedDate) return [];
     return allEntries.filter(e => e.date === selectedDate).sort((a, b) => {
@@ -181,6 +152,7 @@ export default function ReportsPage() {
   const monthlySales = useMemo(() => allSales?.filter(s => s.date.startsWith(selectedMonth)) || [], [allSales, selectedMonth]);
   
   const totalMonthlyCollection = monthlyEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
+  const totalMonthlyWeight = monthlyEntries.reduce((acc, curr) => acc + (Number(curr.kgWeight) || 0), 0);
   const totalMonthlyProcurementCost = monthlyEntries.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
   const totalMonthlySalesRevenue = monthlySales.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
   const monthlyProfit = totalMonthlySalesRevenue - totalMonthlyProcurementCost;
@@ -190,6 +162,22 @@ export default function ReportsPage() {
   const totalFarmerCostDaily = dailyEntries.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
   const totalSalesRevenueDaily = dailySales.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
   const profitDaily = totalSalesRevenueDaily - totalFarmerCostDaily;
+
+  const activeFarmerCycleBreakdown = useMemo(() => {
+    if (!farmers) return [];
+    return farmers.map(farmer => {
+      const fEntries = filteredCycleEntries.filter(e => e.farmerId === farmer.id);
+      return {
+        ...farmer,
+        totalQty: fEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0),
+        totalAmount: fEntries.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0)
+      };
+    }).filter(f => f.totalQty > 0).sort((a, b) => {
+      const aNum = parseInt(a.canNumber);
+      const bNum = parseInt(b.canNumber);
+      return (isNaN(aNum) || isNaN(bNum)) ? a.canNumber.localeCompare(b.canNumber) : aNum - bNum;
+    });
+  }, [farmers, filteredCycleEntries]);
 
   const renderInvoice = (farmerId: string) => {
     const invFarmer = farmers?.find(f => f.id === farmerId);
@@ -411,9 +399,6 @@ export default function ReportsPage() {
                 <TabsTrigger value="cycle" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
                   <FileText className="w-3.5 h-3.5" /> Cycle Bill
                 </TabsTrigger>
-                <TabsTrigger value="master" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
-                  <ListChecks className="w-3.5 h-3.5" /> Master Summary
-                </TabsTrigger>
                 <TabsTrigger value="management" className="flex-1 md:flex-initial rounded-full font-bold gap-2 uppercase text-[9px] md:text-[10px] tracking-widest px-4 py-2.5">
                   <Activity className="w-3.5 h-3.5" /> Internal logs
                 </TabsTrigger>
@@ -469,7 +454,7 @@ export default function ReportsPage() {
                     <CardHeader className="pb-2">
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Daily Net Profit</p>
                       <CardTitle className={cn("text-4xl font-black", profitDaily >= 0 ? "text-green-600" : "text-destructive")}>
-                        ₹ {profitDaily.toLocaleString()}
+                        ₹ {profitDaily.toFixed(2)}
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -483,7 +468,7 @@ export default function ReportsPage() {
                   <Card className="rounded-3xl border-none shadow-xl bg-card overflow-hidden">
                     <CardHeader className="pb-2">
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Farmer Payables</p>
-                      <CardTitle className="text-3xl font-black text-primary">₹ {totalFarmerCostDaily.toLocaleString()}</CardTitle>
+                      <CardTitle className="text-3xl font-black text-primary">₹ {totalFarmerCostDaily.toFixed(2)}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
@@ -514,20 +499,88 @@ export default function ReportsPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <Card className="rounded-3xl border-none shadow-xl bg-card p-6">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Monthly Procurement</p>
-                    <p className="text-2xl font-black text-primary">{totalMonthlyCollection.toFixed(2)} Litres</p>
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Monthly Collection</p>
+                      <Droplets className="w-4 h-4 text-primary" />
+                    </div>
+                    <p className="text-3xl font-black text-primary">{totalMonthlyCollection.toFixed(2)} Litres</p>
+                    <p className="text-[10px] font-bold text-muted-foreground mt-2 uppercase">Weight: {totalMonthlyWeight.toFixed(2)} Kg</p>
                   </Card>
                   <Card className="rounded-3xl border-none shadow-xl bg-card p-6">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Procurement Cost</p>
-                    <p className="text-2xl font-black text-destructive">₹ {totalMonthlyProcurementCost.toLocaleString()}</p>
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Procurement Cost</p>
+                      <IndianRupee className="w-4 h-4 text-destructive" />
+                    </div>
+                    <p className="text-3xl font-black text-destructive">₹ {totalMonthlyProcurementCost.toFixed(2)}</p>
+                    <p className="text-[10px] font-bold text-muted-foreground mt-2 uppercase">Total Farmer Payables</p>
                   </Card>
                   <Card className="rounded-3xl border-none shadow-xl bg-card p-6">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Sales Revenue</p>
-                    <p className="text-2xl font-black text-green-600">₹ {totalMonthlySalesRevenue.toLocaleString()}</p>
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Sales Revenue</p>
+                      <ShoppingCart className="w-4 h-4 text-green-600" />
+                    </div>
+                    <p className="text-3xl font-black text-green-600">₹ {totalMonthlySalesRevenue.toFixed(2)}</p>
+                    <p className="text-[10px] font-bold text-muted-foreground mt-2 uppercase">Total Buyer Receivables</p>
                   </Card>
                   <Card className="rounded-3xl border-none shadow-xl bg-primary text-primary-foreground p-6">
-                    <p className="text-[10px] font-black uppercase tracking-widest mb-1 opacity-80">Net Monthly Profit</p>
-                    <p className="text-2xl font-black">₹ {monthlyProfit.toLocaleString()}</p>
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Net Profit</p>
+                      <TrendingUp className="w-4 h-4 opacity-80" />
+                    </div>
+                    <p className="text-3xl font-black">₹ {monthlyProfit.toFixed(2)}</p>
+                    <p className="text-[10px] font-bold opacity-80 mt-2 uppercase">Revenue - Cost</p>
+                  </Card>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <History className="w-5 h-5 text-primary" />
+                    <h4 className="text-lg font-black text-primary uppercase tracking-tight">Monthly Transaction Audit Log</h4>
+                  </div>
+                  <Card className="rounded-2xl overflow-hidden border-none shadow-lg">
+                    <Table>
+                      <TableHeader className="bg-muted">
+                        <TableRow>
+                          <TableHead className="font-bold">Date</TableHead>
+                          <TableHead className="font-bold">Session</TableHead>
+                          <TableHead className="font-bold">Supplier</TableHead>
+                          <TableHead className="font-bold text-right">Kg Weight</TableHead>
+                          <TableHead className="font-bold text-right">Litre (Qty)</TableHead>
+                          <TableHead className="font-bold text-right">Rate</TableHead>
+                          <TableHead className="font-bold text-right">Total (₹)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {monthlyEntries.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center py-10 text-muted-foreground italic">
+                              No collection logs found for this period. All reports are 0.00.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          monthlyEntries.sort((a,b) => b.date.localeCompare(a.date)).map((entry) => {
+                            const farmer = farmers?.find(f => f.id === entry.farmerId);
+                            return (
+                              <TableRow key={entry.id} className="hover:bg-primary/5">
+                                <TableCell className="font-medium">{format(new Date(entry.date), 'dd MMM yyyy')}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="rounded-full px-2 text-[9px] font-black">
+                                    {entry.session}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="font-bold text-primary">
+                                  {farmer ? `${farmer.canNumber} - ${farmer.name}` : "Unknown Supplier"}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-xs">{entry.kgWeight.toFixed(2)}</TableCell>
+                                <TableCell className="text-right font-black text-primary">{entry.quantity.toFixed(2)}</TableCell>
+                                <TableCell className="text-right text-xs">₹{entry.rate.toFixed(2)}</TableCell>
+                                <TableCell className="text-right font-black">₹{entry.totalAmount.toFixed(2)}</TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
                   </Card>
                 </div>
               </TabsContent>
@@ -581,7 +634,7 @@ export default function ReportsPage() {
                     </TableHeader>
                     <TableBody>
                       {activeFarmerCycleBreakdown.length === 0 ? (
-                        <TableRow><TableCell colSpan={4} className="text-center py-20 text-muted-foreground">No records found.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={4} className="text-center py-20 text-muted-foreground">No records found for {currentCycle?.label}.</TableCell></TableRow>
                       ) : (
                         activeFarmerCycleBreakdown.map((f) => (
                           <TableRow key={f.id} className="hover:bg-primary/5 transition-colors border-b last:border-0">
@@ -597,6 +650,21 @@ export default function ReportsPage() {
                     </TableBody>
                   </Table>
                 </Card>
+              </TabsContent>
+
+              {/* Added placeholders for the remaining tabs to ensure layout completeness */}
+              <TabsContent value="daily" className="animate-in fade-in duration-500">
+                 <Card className="p-20 text-center rounded-[2rem]">
+                   <ClipboardList className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+                   <p className="text-muted-foreground font-medium uppercase tracking-widest text-xs">Detailed collection breakdown available in Audit Log.</p>
+                 </Card>
+              </TabsContent>
+
+              <TabsContent value="sales" className="animate-in fade-in duration-500">
+                 <Card className="p-20 text-center rounded-[2rem]">
+                   <ShoppingCart className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+                   <p className="text-muted-foreground font-medium uppercase tracking-widest text-xs">Individual distribution records tracked via dashboard metrics.</p>
+                 </Card>
               </TabsContent>
             </Tabs>
           </div>

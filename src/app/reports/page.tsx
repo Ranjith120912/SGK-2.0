@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -249,7 +248,7 @@ export default function ReportsPage() {
       <div className="invoice-content bg-white p-12 border shadow-sm mb-8 invoice-page-break text-black">
         <div className="text-center mb-10">
           <h1 className="text-2xl font-bold tracking-tight mb-1 uppercase">
-            {ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS"}
+            {ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS"}
           </h1>
           {ratesConfig?.address && (
             <p className="text-sm text-muted-foreground uppercase font-medium mb-2">{ratesConfig.address}</p>
@@ -877,7 +876,7 @@ export default function ReportsPage() {
                 <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-2xl bg-card master-summary-print">
                   <div className="p-8 border-b bg-muted/30">
                     <div className="text-center mb-6 print-only hidden">
-                      <h1 className="text-2xl font-bold uppercase">{ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS"}</h1>
+                      <h1 className="text-2xl font-bold uppercase">{ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS"}</h1>
                       {ratesConfig?.address && <p className="text-sm font-medium uppercase mb-2">{ratesConfig.address}</p>}
                       <h2 className="text-lg font-semibold uppercase tracking-widest">MASTER SUMMARY SHEET</h2>
                       <p className="text-sm font-medium">Cycle: {currentCycle?.label} ({currentCycle?.range}) • {format(new Date(selectedMonth + "-01"), "MMMM yyyy")}</p>

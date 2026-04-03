@@ -1,6 +1,5 @@
-
 import Link from "next/link";
-import { Droplets, Users, ClipboardList, BarChart3, Settings, ShoppingCart, UserCheck, Calculator } from "lucide-react";
+import { Droplets, Users, ClipboardList, BarChart3, Settings, ShoppingCart, Calculator } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export function Navbar() {

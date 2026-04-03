@@ -18,15 +18,21 @@ import {
   ShieldCheck,
   TrendingUp,
   IndianRupee,
-  FileSpreadsheet,
   ChevronRight,
-  Printer
+  FileDown
 } from "lucide-react";
-import { format, endOfMonth, subMonths } from "date-fns";
+import { format, endOfMonth, subMonths, startOfMonth } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { utils, writeFile } from 'xlsx';
+import jsPDF from "jspdf";
+import "jspdf-autotable";
+
+declare module "jspdf" {
+  interface jsPDF {
+    autoTable: any;
+  }
+}
 
 export default function ReportsPage() {
   const firestore = useFirestore();
@@ -180,64 +186,121 @@ export default function ReportsPage() {
   const grandTotalQty = masterRoster.reduce((acc, curr) => acc + curr.totalQty, 0);
   const grandTotalAmt = masterRoster.reduce((acc, curr) => acc + curr.totalAmount, 0);
 
-  // Download Handlers
-  const handleDownloadRoster = () => {
-    const data = masterRoster.map(f => ({
-      "CAN No": f.canNumber,
-      "Farmer Name": f.name,
-      "Bank Account": f.bankAccountNumber || "—",
-      "Milk Type": f.milkType || "COW",
-      "Morning (L)": f.morningQty.toFixed(2),
-      "Evening (L)": f.eveningQty.toFixed(2),
-      "Total Litres": f.totalQty.toFixed(2),
-      "Payout (₹)": f.totalAmount.toFixed(2)
-    }));
+  // PDF Download Handlers
+  const handleDownloadRosterPDF = () => {
+    const doc = new jsPDF('l', 'mm', 'a4');
+    const companyName = ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS";
+    const cycleLabel = currentCycle?.label || "";
+    const monthLabel = monthOptions.find(o => o.value === selectedMonth)?.label || "";
 
-    const ws = utils.json_to_sheet(data);
-    const wb = utils.book_new();
-    utils.book_append_sheet(wb, ws, "Master Roster");
-    writeFile(wb, `Master_Roster_${selectedMonth}_${currentCycle?.label}.xlsx`);
-  };
+    doc.setFontSize(18);
+    doc.text(companyName, 14, 20);
+    doc.setFontSize(14);
+    doc.text(`Master Roster: ${cycleLabel} - ${monthLabel}`, 14, 28);
 
-  const handleDownloadFarmerBill = (farmerId: string) => {
-    const invFarmer = farmers?.find(f => f.id === farmerId);
-    const invEntries = filteredCycleEntries.filter(e => e.farmerId === farmerId).sort((a, b) => a.date.localeCompare(b.date));
-    
-    if (!invFarmer || invEntries.length === 0) return;
+    const tableData = masterRoster.map(f => [
+      f.canNumber,
+      f.name,
+      f.bankAccountNumber || "—",
+      f.morningQty.toFixed(2),
+      f.eveningQty.toFixed(2),
+      f.totalQty.toFixed(2),
+      `Rs. ${f.totalAmount.toFixed(2)}`
+    ]);
 
-    const data = invEntries.map(e => ({
-      "Date": e.date,
-      "Session": e.session,
-      "Quantity (L)": e.quantity.toFixed(2),
-      "Rate (₹/L)": e.rate.toFixed(2),
-      "Total Amount (₹)": e.totalAmount.toFixed(2)
-    }));
-
-    const ws = utils.json_to_sheet(data);
-    const wb = utils.book_new();
-    utils.book_append_sheet(wb, ws, "Invoice");
-    writeFile(wb, `Bill_${invFarmer.canNumber}_${invFarmer.name}_${selectedMonth}.xlsx`);
-  };
-
-  const handleDownloadBulkInvoices = () => {
-    if (activeInvoices.length === 0) return;
-
-    const wb = utils.book_new();
-    
-    activeInvoices.forEach(f => {
-      const fEntries = filteredCycleEntries.filter(e => e.farmerId === f.id).sort((a, b) => a.date.localeCompare(b.date));
-      const data = fEntries.map(e => ({
-        "Date": e.date,
-        "Session": e.session,
-        "Quantity (L)": e.quantity.toFixed(2),
-        "Rate (₹/L)": e.rate.toFixed(2),
-        "Total (₹)": e.totalAmount.toFixed(2)
-      }));
-      const ws = utils.json_to_sheet(data);
-      utils.book_append_sheet(wb, ws, `CAN_${f.canNumber}`);
+    doc.autoTable({
+      startY: 35,
+      head: [['CAN', 'FARMER NAME', 'BANK A/C', 'MORNING (L)', 'EVENING (L)', 'TOTAL L', 'PAYOUT (Rs.)']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [37, 99, 235], textColor: 255 },
+      foot: [['', 'Grand Totals', '', grandTotalMorning.toFixed(2), grandTotalEvening.toFixed(2), grandTotalQty.toFixed(2), `Rs. ${grandTotalAmt.toFixed(2)}`]],
+      footStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' }
     });
 
-    writeFile(wb, `Bulk_Invoices_${selectedMonth}_${currentCycle?.label}.xlsx`);
+    doc.save(`Master_Roster_${selectedMonth}_${cycleLabel}.pdf`);
+  };
+
+  const handleDownloadFarmerBillPDF = (farmerId: string) => {
+    const f = farmers?.find(f => f.id === farmerId);
+    if (!f) return;
+
+    const doc = new jsPDF();
+    const companyName = ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS";
+    const invEntries = filteredCycleEntries.filter(e => e.farmerId === farmerId).sort((a, b) => a.date.localeCompare(b.date));
+    
+    doc.setFontSize(20);
+    doc.text(companyName, 14, 20);
+    doc.setFontSize(10);
+    doc.text(ratesConfig?.address || "", 14, 26);
+    
+    doc.setFontSize(14);
+    doc.text(`Milk Bill: ${f.name} (CAN: ${f.canNumber})`, 14, 40);
+    doc.setFontSize(10);
+    doc.text(`Period: ${currentCycle?.label} - ${monthOptions.find(o => o.value === selectedMonth)?.label}`, 14, 46);
+
+    const tableData = invEntries.map(e => [
+      e.date,
+      e.session,
+      e.quantity.toFixed(2),
+      e.rate.toFixed(2),
+      e.totalAmount.toFixed(2)
+    ]);
+
+    const totalQty = invEntries.reduce((acc, curr) => acc + curr.quantity, 0);
+    const totalAmt = invEntries.reduce((acc, curr) => acc + curr.totalAmount, 0);
+
+    doc.autoTable({
+      startY: 55,
+      head: [['Date', 'Session', 'Qty (L)', 'Rate (Rs/L)', 'Total (Rs)']],
+      body: tableData,
+      theme: 'striped',
+      foot: [['Total', '', totalQty.toFixed(2), '', `Rs. ${totalAmt.toFixed(2)}`]],
+      footStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' }
+    });
+
+    doc.save(`Bill_${f.canNumber}_${f.name}_${selectedMonth}.pdf`);
+  };
+
+  const handleDownloadBulkInvoicesPDF = () => {
+    if (activeInvoices.length === 0) return;
+
+    const doc = new jsPDF();
+    const companyName = ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS";
+
+    activeInvoices.forEach((f, idx) => {
+      if (idx > 0) doc.addPage();
+      
+      const invEntries = filteredCycleEntries.filter(e => e.farmerId === f.id).sort((a, b) => a.date.localeCompare(b.date));
+      const totalQty = invEntries.reduce((acc, curr) => acc + curr.quantity, 0);
+      const totalAmt = invEntries.reduce((acc, curr) => acc + curr.totalAmount, 0);
+
+      doc.setFontSize(20);
+      doc.text(companyName, 14, 20);
+      doc.setFontSize(14);
+      doc.text(`Farmer Bill: ${f.name} (CAN: ${f.canNumber})`, 14, 35);
+      doc.setFontSize(10);
+      doc.text(`Cycle: ${currentCycle?.label} | ${monthOptions.find(o => o.value === selectedMonth)?.label}`, 14, 42);
+
+      const tableData = invEntries.map(e => [
+        e.date,
+        e.session,
+        e.quantity.toFixed(2),
+        e.rate.toFixed(2),
+        e.totalAmount.toFixed(2)
+      ]);
+
+      doc.autoTable({
+        startY: 50,
+        head: [['Date', 'Session', 'Qty (L)', 'Rate (Rs/L)', 'Total (Rs)']],
+        body: tableData,
+        theme: 'grid',
+        foot: [['Grand Total', '', totalQty.toFixed(2), '', `Rs. ${totalAmt.toFixed(2)}`]],
+        footStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' }
+      });
+    });
+
+    doc.save(`Bulk_Invoices_${selectedMonth}_${currentCycle?.label}.pdf`);
   };
 
   if (!isClient || !selectedMonth) {
@@ -257,12 +320,12 @@ export default function ReportsPage() {
       <Navbar />
       <main className="flex-grow pt-24 pb-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <header className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 no-print">
+          <header className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">
                 {ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS"} Reports
               </h1>
-              <p className="text-muted-foreground font-medium">Fiscal Analytics & Cycle Rosters.</p>
+              <p className="text-muted-foreground font-medium">Fiscal Year: April - March</p>
             </div>
             <div className="flex items-center gap-3">
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
@@ -272,7 +335,7 @@ export default function ReportsPage() {
             </div>
           </header>
 
-          <Tabs defaultValue="overview" className="space-y-8 no-print">
+          <Tabs defaultValue="overview" className="space-y-8">
             <TabsList className="flex flex-wrap h-auto gap-2 p-1.5 bg-muted rounded-[1.5rem] w-full border border-primary/5 max-w-2xl">
               <TabsTrigger value="overview" className="flex-1 rounded-full font-black gap-2 uppercase text-[10px] tracking-widest px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-white">
                 <BarChart4 className="w-3.5 h-3.5" /> Overview
@@ -308,7 +371,7 @@ export default function ReportsPage() {
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Net Profit</p>
                   <div className="mt-4">
                     <p className={cn("text-4xl font-black", monthStats.profit >= 0 ? "text-green-600" : "text-destructive")}>
-                      ₹ {monthStats.profit.toFixed(2)}
+                      Rs. {monthStats.profit.toFixed(2)}
                     </p>
                     <Badge variant={monthStats.profit >= 0 ? "default" : "destructive"} className="mt-2 rounded-full font-black text-[9px] uppercase">
                       {monthStats.profit >= 0 ? "+ Profit" : "- Loss"}
@@ -318,8 +381,8 @@ export default function ReportsPage() {
                 <Card className="rounded-[2rem] border-none shadow-xl bg-card p-8 flex flex-col justify-between border-2 border-primary/5">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Farmer Payouts</p>
                   <div className="mt-4">
-                    <p className="text-3xl font-black text-primary">₹ {monthStats.totalEntryAmt.toFixed(2)}</p>
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Pending Settlement</p>
+                    <p className="text-3xl font-black text-primary">Rs. {monthStats.totalEntryAmt.toFixed(2)}</p>
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Monthly Procurement</p>
                   </div>
                 </Card>
               </div>
@@ -342,11 +405,11 @@ export default function ReportsPage() {
                   ))}
                 </div>
                 <Button 
-                  onClick={handleDownloadBulkInvoices} 
+                  onClick={handleDownloadBulkInvoicesPDF} 
                   disabled={activeInvoices.length === 0}
-                  className="rounded-full shadow-lg h-11 px-8 font-black uppercase text-[10px] tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white"
+                  className="rounded-full shadow-lg h-11 px-8 font-black uppercase text-[10px] tracking-widest bg-red-600 hover:bg-red-700 text-white"
                 >
-                  <Download className="w-4 h-4 mr-2" /> Bulk Download Excel ({activeInvoices.length})
+                  <FileDown className="w-4 h-4 mr-2" /> Download Bulk PDFs ({activeInvoices.length})
                 </Button>
               </div>
 
@@ -357,7 +420,7 @@ export default function ReportsPage() {
                       <TableHead className="w-[120px] font-black text-primary pl-10 py-8 uppercase text-[10px] tracking-widest">CAN</TableHead>
                       <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Farmer Name</TableHead>
                       <TableHead className="text-right font-black text-primary uppercase text-[10px] tracking-widest">Qty (L)</TableHead>
-                      <TableHead className="text-right font-black text-primary uppercase text-[10px] tracking-widest">Amount (₹)</TableHead>
+                      <TableHead className="text-right font-black text-primary uppercase text-[10px] tracking-widest">Amount (Rs)</TableHead>
                       <TableHead className="text-right pr-10 font-black text-primary uppercase text-[10px] tracking-widest">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -370,14 +433,14 @@ export default function ReportsPage() {
                           <TableCell className="font-black text-primary pl-10 text-2xl tracking-tighter">{f.canNumber}</TableCell>
                           <TableCell className="font-bold text-lg">{f.name}</TableCell>
                           <TableCell className="text-right font-black text-primary text-2xl">{f.totalQty.toFixed(2)}</TableCell>
-                          <TableCell className="text-right font-mono font-bold text-lg">₹ {f.totalAmount.toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-mono font-bold text-lg">Rs. {f.totalAmount.toFixed(2)}</TableCell>
                           <TableCell className="text-right pr-10">
                             <Button 
                               variant="ghost" 
-                              onClick={() => handleDownloadFarmerBill(f.id)} 
-                              className="rounded-full h-10 px-6 font-bold text-emerald-600 hover:bg-emerald-50 transition-all flex items-center gap-2"
+                              onClick={() => handleDownloadFarmerBillPDF(f.id)} 
+                              className="rounded-full h-10 px-6 font-bold text-red-600 hover:bg-red-50 transition-all flex items-center gap-2"
                             >
-                              Download Excel <ChevronRight className="w-4 h-4" />
+                              Download PDF <ChevronRight className="w-4 h-4" />
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -404,17 +467,12 @@ export default function ReportsPage() {
                     </button>
                   ))}
                 </div>
-                <div className="flex gap-2">
-                  <Button onClick={() => window.print()} variant="outline" className="rounded-full h-11 px-8 font-black uppercase text-[10px] tracking-widest no-print">
-                    <Printer className="w-4 h-4 mr-2" /> Print PDF
-                  </Button>
-                  <Button onClick={handleDownloadRoster} className="rounded-full shadow-xl h-11 px-8 font-black uppercase text-[10px] tracking-widest bg-primary text-white">
-                    <Download className="w-4 h-4 mr-2" /> Download Excel Roster
-                  </Button>
-                </div>
+                <Button onClick={handleDownloadRosterPDF} className="rounded-full shadow-xl h-11 px-8 font-black uppercase text-[10px] tracking-widest bg-primary text-white">
+                  <Download className="w-4 h-4 mr-2" /> Download PDF Roster
+                </Button>
               </div>
 
-              <div className="bg-white p-8 sm:p-12 border shadow-none rounded-[2rem] text-black print-container">
+              <div className="bg-white p-8 sm:p-12 border shadow-none rounded-[2rem] text-black">
                 <div className="flex justify-between items-start mb-12">
                   <div>
                     <h1 className="text-3xl font-black text-primary tracking-tighter uppercase leading-none mb-1">Master Summary Roster</h1>
@@ -428,7 +486,7 @@ export default function ReportsPage() {
                     </div>
                     <div className="text-white">
                       <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Cycle Payout</p>
-                      <p className="text-3xl font-black leading-none mt-1">₹ {grandTotalAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                      <p className="text-3xl font-black leading-none mt-1">Rs. {grandTotalAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                     </div>
                   </div>
                 </div>
@@ -443,7 +501,7 @@ export default function ReportsPage() {
                         <TableHead className="text-center font-black text-[10px] text-primary uppercase tracking-widest py-5 border-r border-black">MORNING (L)</TableHead>
                         <TableHead className="text-center font-black text-[10px] text-primary uppercase tracking-widest py-5 border-r border-black">EVENING (L)</TableHead>
                         <TableHead className="text-center font-black text-[10px] text-primary uppercase tracking-widest py-5 border-r border-black">TOTAL L</TableHead>
-                        <TableHead className="text-right font-black text-[10px] text-primary uppercase tracking-widest py-5 pr-8">PAYOUT (₹)</TableHead>
+                        <TableHead className="text-right font-black text-[10px] text-primary uppercase tracking-widest py-5 pr-8">PAYOUT (Rs)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -455,7 +513,7 @@ export default function ReportsPage() {
                           <TableCell className="text-center font-medium text-base border-r border-black">{f.morningQty.toFixed(2)}</TableCell>
                           <TableCell className="text-center font-medium text-base border-r border-black">{f.eveningQty.toFixed(2)}</TableCell>
                           <TableCell className="text-center font-bold text-base border-r border-black">{f.totalQty.toFixed(2)}</TableCell>
-                          <TableCell className="text-right font-black text-primary text-lg pr-8">₹ {f.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                          <TableCell className="text-right font-black text-primary text-lg pr-8">Rs. {f.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -465,15 +523,10 @@ export default function ReportsPage() {
                         <TableCell className="text-center font-black text-base border-r border-black">{grandTotalMorning.toFixed(2)}</TableCell>
                         <TableCell className="text-center font-black text-base border-r border-black">{grandTotalEvening.toFixed(2)}</TableCell>
                         <TableCell className="text-center font-black text-xl border-r border-black">{grandTotalQty.toFixed(2)} L</TableCell>
-                        <TableCell className="text-right font-black text-primary text-2xl pr-8">₹ {grandTotalAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="text-right font-black text-primary text-2xl pr-8">Rs. {grandTotalAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                       </TableRow>
                     </tfoot>
                   </Table>
-                </div>
-
-                <div className="mt-16 flex justify-between items-end border-t border-black pt-8 text-[10px] text-muted-foreground font-black uppercase tracking-widest italic">
-                  <div>Generated on {format(new Date(), 'PPP p')}</div>
-                  <div className="text-right">Authorized Financial Roster</div>
                 </div>
               </div>
             </TabsContent>
@@ -483,11 +536,11 @@ export default function ReportsPage() {
                 <Table>
                   <TableHeader className="bg-muted/50 border-b">
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest pl-10 py-6">Month (Fiscal Year)</TableHead>
+                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest pl-10 py-6">Month (Fiscal Year: April-March)</TableHead>
                       <TableHead className="text-center font-black text-primary uppercase text-[10px] tracking-widest py-6">Collection (L)</TableHead>
-                      <TableHead className="text-center font-black text-primary uppercase text-[10px] tracking-widest py-6">Farmer Cost (₹)</TableHead>
-                      <TableHead className="text-center font-black text-primary uppercase text-[10px] tracking-widest py-6">Sales Revenue (₹)</TableHead>
-                      <TableHead className="text-right font-black text-primary uppercase text-[10px] tracking-widest pr-10 py-6">Net Profit (₹)</TableHead>
+                      <TableHead className="text-center font-black text-primary uppercase text-[10px] tracking-widest py-6">Farmer Cost (Rs)</TableHead>
+                      <TableHead className="text-center font-black text-primary uppercase text-[10px] tracking-widest py-6">Sales Revenue (Rs)</TableHead>
+                      <TableHead className="text-right font-black text-primary uppercase text-[10px] tracking-widest pr-10 py-6">Net Profit (Rs)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -497,18 +550,18 @@ export default function ReportsPage() {
                           <span className="text-xl font-black text-primary tracking-tight">{m.monthName}</span>
                         </TableCell>
                         <TableCell className="text-center font-bold text-lg">{m.collectionL.toFixed(2)} L</TableCell>
-                        <TableCell className="text-center font-mono font-medium text-destructive">₹ {m.cost.toFixed(2)}</TableCell>
-                        <TableCell className="text-center font-mono font-medium text-green-600">₹ {m.revenue.toFixed(2)}</TableCell>
+                        <TableCell className="text-center font-mono font-medium text-destructive">Rs. {m.cost.toFixed(2)}</TableCell>
+                        <TableCell className="text-center font-mono font-medium text-green-600">Rs. {m.revenue.toFixed(2)}</TableCell>
                         <TableCell className="text-right pr-10">
                           <span className={cn("text-2xl font-black tracking-tighter", m.profit >= 0 ? "text-primary" : "text-destructive")}>
-                            {m.profit >= 0 ? "+" : ""} ₹ {m.profit.toFixed(2)}
+                            {m.profit >= 0 ? "+" : ""} Rs. {m.profit.toFixed(2)}
                           </span>
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-                <div className="p-6 bg-muted/20 border-t no-print">
+                <div className="p-6 bg-muted/20 border-t">
                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest text-center">
                     Fiscal Summary based on April - March Year Cycle
                   </p>
@@ -522,4 +575,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-

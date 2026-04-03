@@ -1,12 +1,12 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { useCollection, useMemoFirebase, useFirestore } from "@/firebase";
-import { collection, serverTimestamp } from "firebase/firestore";
-import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { collection, serverTimestamp, doc } from "firebase/firestore";
+import { addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -18,7 +18,6 @@ import {
   DialogTitle, 
   DialogTrigger,
   DialogDescription,
-  DialogFooter
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { 
@@ -39,7 +38,7 @@ import {
   Download, 
   FileSpreadsheet,
   Upload,
-  Milk
+  Trash2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { read, utils, writeFile } from 'xlsx';
@@ -89,6 +88,16 @@ export default function FarmersPage() {
     setNewFarmer({ name: "", canNumber: "", bankAccountNumber: "", ifscCode: "", milkType: "COW" });
     setIsAdding(false);
     toast({ title: "Success", description: "Farmer added successfully." });
+  };
+
+  const handleDeleteAll = () => {
+    if (!farmers || !firestore) return;
+    if (!confirm("Are you sure you want to delete ALL farmers? This cannot be undone.")) return;
+    
+    farmers.forEach(farmer => {
+      deleteDocumentNonBlocking(doc(firestore, 'farmers', farmer.id));
+    });
+    toast({ title: "Deleted", description: "All farmers have been removed from the directory." });
   };
 
   const processImportArray = (data: any[]) => {
@@ -315,10 +324,21 @@ export default function FarmersPage() {
                 </DialogContent>
               </Dialog>
 
-              <Button variant="ghost" onClick={seedData} className="rounded-full text-muted-foreground border-dashed border-2 hover:bg-muted/50">
-                <Database className="w-4 h-4 mr-2" />
-                Seed Samples
-              </Button>
+              <div className="flex gap-1">
+                <Button variant="ghost" onClick={seedData} className="rounded-l-full text-muted-foreground border-y-2 border-l-2 border-dashed hover:bg-muted/50">
+                  <Database className="w-4 h-4 mr-2" />
+                  Seed Samples
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  onClick={handleDeleteAll} 
+                  className="rounded-r-full text-destructive border-y-2 border-r-2 border-dashed hover:bg-destructive/10"
+                  disabled={!farmers || farmers.length === 0}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Clear All
+                </Button>
+              </div>
             </div>
           </div>
 

@@ -6,34 +6,33 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { useCollection, useDoc, useMemoFirebase, useFirestore } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   FileText, 
   Loader2, 
-  ArrowLeft,
   BarChart4,
-  Printer,
+  Download,
   ShieldCheck,
   TrendingUp,
   IndianRupee,
-  FileStack,
-  ChevronRight
+  FileSpreadsheet,
+  ChevronRight,
+  Printer
 } from "lucide-react";
 import { format, endOfMonth, subMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { utils, writeFile } from 'xlsx';
 
 export default function ReportsPage() {
   const firestore = useFirestore();
   const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [activeCycle, setActiveCycle] = useState<number>(0);
   const [isClient, setIsClient] = useState(false);
-  const [viewingInvoiceFarmerId, setViewingInvoiceFarmerId] = useState<string | null>(null);
-  const [isPrintingBulk, setIsPrintingBulk] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
@@ -154,10 +153,11 @@ export default function ReportsPage() {
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
+    // Fiscal Year starts in April. If current month is Jan/Feb/Mar (0,1,2), we are in fiscal year starting last year.
     const fiscalStartYear = currentMonth < 3 ? currentYear - 1 : currentYear;
     
     return Array.from({ length: 12 }).map((_, i) => {
-      const monthIndex = (3 + i) % 12; 
+      const monthIndex = (3 + i) % 12; // Start from April (index 3)
       const year = fiscalStartYear + (3 + i >= 12 ? 1 : 0);
       const d = new Date(year, monthIndex, 1);
       const monthStr = format(d, 'yyyy-MM');
@@ -180,114 +180,64 @@ export default function ReportsPage() {
   const grandTotalQty = masterRoster.reduce((acc, curr) => acc + curr.totalQty, 0);
   const grandTotalAmt = masterRoster.reduce((acc, curr) => acc + curr.totalAmount, 0);
 
-  const renderInvoice = (farmerId: string) => {
+  // Download Handlers
+  const handleDownloadRoster = () => {
+    const data = masterRoster.map(f => ({
+      "CAN No": f.canNumber,
+      "Farmer Name": f.name,
+      "Bank Account": f.bankAccountNumber || "—",
+      "Milk Type": f.milkType || "COW",
+      "Morning (L)": f.morningQty.toFixed(2),
+      "Evening (L)": f.eveningQty.toFixed(2),
+      "Total Litres": f.totalQty.toFixed(2),
+      "Payout (₹)": f.totalAmount.toFixed(2)
+    }));
+
+    const ws = utils.json_to_sheet(data);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, "Master Roster");
+    writeFile(wb, `Master_Roster_${selectedMonth}_${currentCycle?.label}.xlsx`);
+  };
+
+  const handleDownloadFarmerBill = (farmerId: string) => {
     const invFarmer = farmers?.find(f => f.id === farmerId);
     const invEntries = filteredCycleEntries.filter(e => e.farmerId === farmerId).sort((a, b) => a.date.localeCompare(b.date));
     
-    if (!invFarmer || invEntries.length === 0) return null;
+    if (!invFarmer || invEntries.length === 0) return;
 
-    const grouped: Record<string, { date: string, morning: number, evening: number, total: number }> = {};
-    invEntries.forEach(entry => {
-      if (!grouped[entry.date]) {
-        grouped[entry.date] = { date: entry.date, morning: 0, evening: 0, total: 0 };
-      }
-      if (entry.session === 'Morning') grouped[entry.date].morning += Number(entry.quantity) || 0;
-      if (entry.session === 'Evening') grouped[entry.date].evening += Number(entry.quantity) || 0;
-      grouped[entry.date].total = grouped[entry.date].morning + grouped[entry.date].evening;
+    const data = invEntries.map(e => ({
+      "Date": e.date,
+      "Session": e.session,
+      "Quantity (L)": e.quantity.toFixed(2),
+      "Rate (₹/L)": e.rate.toFixed(2),
+      "Total Amount (₹)": e.totalAmount.toFixed(2)
+    }));
+
+    const ws = utils.json_to_sheet(data);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, "Invoice");
+    writeFile(wb, `Bill_${invFarmer.canNumber}_${invFarmer.name}_${selectedMonth}.xlsx`);
+  };
+
+  const handleDownloadBulkInvoices = () => {
+    if (activeInvoices.length === 0) return;
+
+    const wb = utils.book_new();
+    
+    activeInvoices.forEach(f => {
+      const fEntries = filteredCycleEntries.filter(e => e.farmerId === f.id).sort((a, b) => a.date.localeCompare(b.date));
+      const data = fEntries.map(e => ({
+        "Date": e.date,
+        "Session": e.session,
+        "Quantity (L)": e.quantity.toFixed(2),
+        "Rate (₹/L)": e.rate.toFixed(2),
+        "Total (₹)": e.totalAmount.toFixed(2)
+      }));
+      const ws = utils.json_to_sheet(data);
+      utils.book_append_sheet(wb, ws, `CAN_${f.canNumber}`);
     });
 
-    const consolidated = Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date));
-    const invRate = invFarmer.milkType === 'BUFFALO' ? (Number(ratesConfig?.buffaloRate) || 0) : (Number(ratesConfig?.cowRate) || 0);
-    const totalL = consolidated.reduce((acc, curr) => acc + curr.total, 0);
-    const totalA = totalL * invRate;
-
-    return (
-      <div key={farmerId} className="invoice-content bg-white p-12 border shadow-none mb-8 invoice-page-break text-black print-container">
-        <div className="text-center mb-10">
-          <h1 className="text-2xl font-bold tracking-tight mb-1 uppercase">
-            {ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS"}
-          </h1>
-          {ratesConfig?.address && (
-            <p className="text-sm text-muted-foreground uppercase font-medium mb-2">{ratesConfig.address}</p>
-          )}
-          <h2 className="text-xl font-semibold uppercase tracking-widest border-t border-b border-black/10 py-1 inline-block px-4">MILK INVOICE</h2>
-        </div>
-
-        <div className="grid grid-cols-2 gap-x-12 gap-y-4 mb-8 text-sm font-medium">
-          <div className="flex gap-4">
-            <span className="w-24 text-muted-foreground uppercase">Name:</span>
-            <span className="font-bold border-b border-black flex-grow uppercase">{invFarmer.name}</span>
-          </div>
-          <div className="flex gap-4">
-            <span className="w-24 text-muted-foreground uppercase">Date:</span>
-            <span className="font-bold border-b border-black flex-grow">{format(new Date(), 'dd/MM/yyyy')}</span>
-          </div>
-          <div className="flex gap-4">
-            <span className="w-24 text-muted-foreground uppercase">A/C No:</span>
-            <span className="font-bold border-b border-black flex-grow font-mono">{invFarmer.bankAccountNumber || "—"}</span>
-          </div>
-          <div className="flex gap-4">
-            <span className="w-24 text-muted-foreground uppercase">Period:</span>
-            <span className="font-bold border-b border-black flex-grow">
-              {currentCycle ? `${currentCycle.start}/${selectedMonth.split('-')[1]}/${selectedMonth.split('-')[0].slice(2)} to ${currentCycle.end}/${selectedMonth.split('-')[1]}/${selectedMonth.split('-')[0].slice(2)}` : "—"}
-            </span>
-          </div>
-          <div className="flex gap-4">
-            <span className="w-24 text-muted-foreground uppercase">Can No:</span>
-            <span className="font-bold border-b border-black flex-grow">{invFarmer.canNumber}</span>
-          </div>
-          <div className="flex gap-4">
-            <span className="w-24 text-muted-foreground uppercase">Rate (₹):</span>
-            <span className="font-bold border-b border-black flex-grow">{invRate.toFixed(2)}</span>
-          </div>
-        </div>
-
-        <div className="border border-black">
-          <Table className="border-collapse">
-            <TableHeader className="bg-white">
-              <TableRow className="hover:bg-transparent border-b border-black">
-                <TableHead className="text-center border-r border-black font-bold text-black uppercase h-10 px-2">Date</TableHead>
-                <TableHead className="text-center border-r border-black font-bold text-black uppercase h-10 px-2">Morning (L)</TableHead>
-                <TableHead className="text-center border-r border-black font-bold text-black uppercase h-10 px-2">Evening (L)</TableHead>
-                <TableHead className="text-center border-r border-black font-bold text-black uppercase h-10 px-2">Total (L)</TableHead>
-                <TableHead className="text-right font-bold text-black uppercase h-10 px-4">Amount (₹)</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {consolidated.map((row) => (
-                <TableRow key={row.date} className="hover:bg-transparent border-b border-black last:border-b-0">
-                  <TableCell className="text-center border-r border-black py-1.5 font-medium">{format(new Date(row.date), 'dd/MM/yy')}</TableCell>
-                  <TableCell className="text-center border-r border-black py-1.5">{row.morning.toFixed(2)}</TableCell>
-                  <TableCell className="text-center border-r border-black py-1.5">{row.evening.toFixed(2)}</TableCell>
-                  <TableCell className="text-center border-r border-black py-1.5 font-bold">{row.total.toFixed(2)}</TableCell>
-                  <TableCell className="text-right py-1.5 pr-4 font-mono">{ (row.total * invRate).toFixed(2) }</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-
-        <div className="mt-8">
-          <div className="flex justify-between items-center text-lg font-bold border-t-2 border-black pt-4">
-            <span className="uppercase tracking-widest">Total Payout</span>
-            <div className="flex gap-12">
-              <span className="w-32 text-center">{totalL.toFixed(2)} L</span>
-              <span className="w-40 text-right font-mono">₹ {totalA.toFixed(2)}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-16 flex justify-between items-end italic text-xs text-muted-foreground">
-          <p>Generated by {ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS"} System</p>
-          <div className="flex flex-col items-center gap-2">
-            {ratesConfig?.stampUrl && (
-              <img src={ratesConfig.stampUrl} alt="Stamp" className="max-w-[120px] mix-blend-multiply opacity-80" />
-            )}
-            <p className="border-t border-black w-48 text-center pt-2 font-bold text-black uppercase">Authorized Signature</p>
-          </div>
-        </div>
-      </div>
-    );
+    writeFile(wb, `Bulk_Invoices_${selectedMonth}_${currentCycle?.label}.xlsx`);
   };
 
   if (!isClient || !selectedMonth) {
@@ -296,37 +246,6 @@ export default function ReportsPage() {
         <Navbar />
         <main className="flex-grow pt-24 pb-20 flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </main>
-        <Footer />
-      </div>
-    );
-  }
-
-  // Handle Printing Views (Single and Bulk)
-  if (viewingInvoiceFarmerId || isPrintingBulk) {
-    return (
-      <div className="min-h-screen flex flex-col bg-white">
-        <Navbar />
-        <main className="flex-grow pt-24 pb-20 px-4">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex justify-between items-center mb-8 no-print">
-              <Button variant="outline" onClick={() => { setViewingInvoiceFarmerId(null); setIsPrintingBulk(false); }} className="rounded-full">
-                <ArrowLeft className="w-4 h-4 mr-2" /> Back to Bill
-              </Button>
-              <Button onClick={() => window.print()} className="rounded-full shadow-lg">
-                <Printer className="w-4 h-4 mr-2" /> {isPrintingBulk ? "Print All" : "Print Invoice"}
-              </Button>
-            </div>
-            {isPrintingBulk ? (
-              activeInvoices.map(f => (
-                <div key={f.id} className="invoice-page-break">
-                  {renderInvoice(f.id)}
-                </div>
-              ))
-            ) : (
-              viewingInvoiceFarmerId && renderInvoice(viewingInvoiceFarmerId)
-            )}
-          </div>
         </main>
         <Footer />
       </div>
@@ -354,7 +273,7 @@ export default function ReportsPage() {
           </header>
 
           <Tabs defaultValue="overview" className="space-y-8 no-print">
-            <TabsList className="flex flex-wrap h-auto gap-2 p-1.5 bg-muted rounded-[1.5rem] w-full border border-primary/5 max-w-2xl no-print">
+            <TabsList className="flex flex-wrap h-auto gap-2 p-1.5 bg-muted rounded-[1.5rem] w-full border border-primary/5 max-w-2xl">
               <TabsTrigger value="overview" className="flex-1 rounded-full font-black gap-2 uppercase text-[10px] tracking-widest px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-white">
                 <BarChart4 className="w-3.5 h-3.5" /> Overview
               </TabsTrigger>
@@ -407,7 +326,7 @@ export default function ReportsPage() {
             </TabsContent>
 
             <TabsContent value="cycle" className="space-y-8 animate-in fade-in duration-500">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 no-print">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
                 <div className="flex gap-2 bg-muted p-1.5 rounded-full border">
                   {cycles.map((cycle, idx) => (
                     <button 
@@ -423,11 +342,11 @@ export default function ReportsPage() {
                   ))}
                 </div>
                 <Button 
-                  onClick={() => setIsPrintingBulk(true)} 
+                  onClick={handleDownloadBulkInvoices} 
                   disabled={activeInvoices.length === 0}
-                  className="rounded-full shadow-lg h-11 px-8 font-black uppercase text-[10px] tracking-widest"
+                  className="rounded-full shadow-lg h-11 px-8 font-black uppercase text-[10px] tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white"
                 >
-                  <FileStack className="w-4 h-4 mr-2" /> Bulk Invoices ({activeInvoices.length})
+                  <Download className="w-4 h-4 mr-2" /> Bulk Download Excel ({activeInvoices.length})
                 </Button>
               </div>
 
@@ -439,7 +358,7 @@ export default function ReportsPage() {
                       <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Farmer Name</TableHead>
                       <TableHead className="text-right font-black text-primary uppercase text-[10px] tracking-widest">Qty (L)</TableHead>
                       <TableHead className="text-right font-black text-primary uppercase text-[10px] tracking-widest">Amount (₹)</TableHead>
-                      <TableHead className="text-right pr-10 font-black text-primary uppercase text-[10px] tracking-widest no-print">Actions</TableHead>
+                      <TableHead className="text-right pr-10 font-black text-primary uppercase text-[10px] tracking-widest">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -452,13 +371,13 @@ export default function ReportsPage() {
                           <TableCell className="font-bold text-lg">{f.name}</TableCell>
                           <TableCell className="text-right font-black text-primary text-2xl">{f.totalQty.toFixed(2)}</TableCell>
                           <TableCell className="text-right font-mono font-bold text-lg">₹ {f.totalAmount.toFixed(2)}</TableCell>
-                          <TableCell className="text-right pr-10 no-print">
+                          <TableCell className="text-right pr-10">
                             <Button 
                               variant="ghost" 
-                              onClick={() => setViewingInvoiceFarmerId(f.id)} 
-                              className="rounded-full h-10 px-6 font-bold text-primary hover:bg-primary/10 transition-all flex items-center gap-2"
+                              onClick={() => handleDownloadFarmerBill(f.id)} 
+                              className="rounded-full h-10 px-6 font-bold text-emerald-600 hover:bg-emerald-50 transition-all flex items-center gap-2"
                             >
-                              Print Bill <ChevronRight className="w-4 h-4" />
+                              Download Excel <ChevronRight className="w-4 h-4" />
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -470,7 +389,7 @@ export default function ReportsPage() {
             </TabsContent>
 
             <TabsContent value="master" className="space-y-8 animate-in fade-in duration-500">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 no-print">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
                 <div className="flex gap-2 bg-muted p-1.5 rounded-full border">
                   {cycles.map((cycle, idx) => (
                     <button 
@@ -485,12 +404,17 @@ export default function ReportsPage() {
                     </button>
                   ))}
                 </div>
-                <Button onClick={() => window.print()} className="rounded-full shadow-xl h-11 px-8 font-black uppercase text-[10px] tracking-widest">
-                  <Printer className="w-4 h-4 mr-2" /> Print Roster
-                </Button>
+                <div className="flex gap-2">
+                  <Button onClick={() => window.print()} variant="outline" className="rounded-full h-11 px-8 font-black uppercase text-[10px] tracking-widest no-print">
+                    <Printer className="w-4 h-4 mr-2" /> Print PDF
+                  </Button>
+                  <Button onClick={handleDownloadRoster} className="rounded-full shadow-xl h-11 px-8 font-black uppercase text-[10px] tracking-widest bg-primary text-white">
+                    <Download className="w-4 h-4 mr-2" /> Download Excel Roster
+                  </Button>
+                </div>
               </div>
 
-              <div className="master-summary-print bg-white p-8 sm:p-12 border shadow-none rounded-[2rem] text-black print-container">
+              <div className="bg-white p-8 sm:p-12 border shadow-none rounded-[2rem] text-black print-container">
                 <div className="flex justify-between items-start mb-12">
                   <div>
                     <h1 className="text-3xl font-black text-primary tracking-tighter uppercase leading-none mb-1">Master Summary Roster</h1>
@@ -498,7 +422,7 @@ export default function ReportsPage() {
                       Cycle Breakdown • {currentCycle?.label} • {monthOptions.find(o => o.value === selectedMonth)?.label}
                     </p>
                   </div>
-                  <div className="bg-primary p-6 rounded-2xl flex items-center gap-6 shadow-xl shadow-primary/20 no-print-background">
+                  <div className="bg-primary p-6 rounded-2xl flex items-center gap-6 shadow-xl shadow-primary/20">
                     <div className="p-3 bg-white/20 rounded-xl">
                       <IndianRupee className="w-8 h-8 text-white" />
                     </div>
@@ -598,3 +522,4 @@ export default function ReportsPage() {
     </div>
   );
 }
+

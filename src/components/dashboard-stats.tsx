@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { useCollection, useMemoFirebase, useFirestore } from "@/firebase";
 import { collection, query, where } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
-import { Droplets, Users, Calendar, TrendingUp } from "lucide-react";
+import { Droplets, Calendar, TrendingUp, UserCheck } from "lucide-react";
 import { format } from "date-fns";
 
 export function DashboardStats() {
@@ -18,18 +18,18 @@ export function DashboardStats() {
 
   const today = currentDate ? format(currentDate, 'yyyy-MM-dd') : null;
 
-  const farmersQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'farmers');
-  }, [firestore]);
-
   const entriesQuery = useMemoFirebase(() => {
     if (!firestore || !today) return null;
     return query(collection(firestore, 'entries'), where('date', '==', today));
   }, [firestore, today]);
 
-  const { data: farmers } = useCollection(farmersQuery);
+  const buyersQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'buyers');
+  }, [firestore]);
+
   const { data: todayEntries } = useCollection(entriesQuery);
+  const { data: buyers } = useCollection(buyersQuery);
 
   const totalCollection = todayEntries?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
   const morningEntries = todayEntries?.filter(e => e.session === 'Morning').length || 0;
@@ -56,14 +56,14 @@ export function DashboardStats() {
         <CardContent className="p-6">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs font-bold text-accent/60 uppercase tracking-widest mb-1">Suppliers Active</p>
-              <h3 className="text-3xl font-black text-primary">{farmers?.length || 0}</h3>
+              <p className="text-xs font-bold text-accent/60 uppercase tracking-widest mb-1">Total Buyers</p>
+              <h3 className="text-3xl font-black text-primary">{buyers?.length || 0}</h3>
             </div>
             <div className="p-2 bg-accent/10 rounded-xl">
-              <Users className="w-5 h-5 text-accent" />
+              <UserCheck className="w-5 h-5 text-accent" />
             </div>
           </div>
-          <p className="mt-4 text-xs font-medium text-muted-foreground italic">Total registered farmers</p>
+          <p className="mt-4 text-xs font-medium text-muted-foreground italic">Active distribution accounts</p>
         </CardContent>
       </Card>
 
@@ -78,7 +78,7 @@ export function DashboardStats() {
               <Calendar className="w-5 h-5 text-secondary" />
             </div>
           </div>
-          <p className="mt-4 text-xs font-medium text-muted-foreground italic">Entries recorded</p>
+          <p className="mt-4 text-xs font-medium text-muted-foreground italic">Collection records</p>
         </CardContent>
       </Card>
 

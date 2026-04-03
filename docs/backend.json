@@ -1,46 +1,9 @@
 
 {
   "entities": {
-    "Farmer": {
-      "title": "Farmer",
-      "description": "A milk distribution supplier/farmer",
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "description": "Full name of the farmer"
-        },
-        "canNumber": {
-          "type": "string",
-          "description": "Unique CAN number assigned to the farmer"
-        },
-        "bankAccountNumber": {
-          "type": "string",
-          "description": "Bank account number for payments"
-        },
-        "ifscCode": {
-          "type": "string",
-          "description": "Bank IFSC code"
-        },
-        "milkType": {
-          "type": "string",
-          "enum": ["COW", "BUFFALO"],
-          "description": "Type of milk provided by the farmer"
-        },
-        "active": {
-          "type": "boolean",
-          "description": "Whether the farmer is currently active"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      },
-      "required": ["name", "canNumber", "milkType"]
-    },
     "MilkEntry": {
       "title": "Milk Entry",
-      "description": "A daily milk collection record from a farmer",
+      "description": "A daily milk collection record",
       "type": "object",
       "properties": {
         "farmerId": {
@@ -167,10 +130,6 @@
     "providers": ["password"]
   },
   "firestore": {
-    "/farmers/{farmerId}": {
-      "schema": "Farmer",
-      "description": "Collection of milk suppliers"
-    },
     "/entries/{entryId}": {
       "schema": "MilkEntry",
       "description": "Daily collection records"

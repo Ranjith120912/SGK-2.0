@@ -3,16 +3,16 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { DashboardStats } from "@/components/dashboard-stats";
 import Link from "next/link";
-import { PlusCircle, Users, Settings, ShoppingCart, BarChart3, UserCheck, Calculator } from "lucide-react";
+import { PlusCircle, Settings, ShoppingCart, BarChart3, Calculator, UserCheck } from "lucide-react";
 
 export default function Home() {
   const quickActions = [
     { href: "/entries", label: "Collection", icon: PlusCircle, color: "text-primary", bg: "bg-primary/10" },
     { href: "/sales", label: "Sales", icon: ShoppingCart, color: "text-secondary", bg: "bg-secondary/10" },
     { href: "/converter", label: "Converter", icon: Calculator, color: "text-amber-600", bg: "bg-amber-600/10" },
-    { href: "/farmers", label: "Farmers", icon: Users, color: "text-blue-600", bg: "bg-blue-600/10" },
     { href: "/buyers", label: "Buyers", icon: UserCheck, color: "text-indigo-600", bg: "bg-indigo-600/10" },
     { href: "/reports", label: "Reports", icon: BarChart3, color: "text-emerald-600", bg: "bg-emerald-600/10" },
+    { href: "/settings", label: "Settings", icon: Settings, color: "text-slate-600", bg: "bg-slate-600/10" },
   ];
 
   return (
@@ -30,7 +30,6 @@ export default function Home() {
             </p>
           </header>
 
-          {/* Compact Top Navigation / Quick Actions */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-12">
             {quickActions.map((action) => (
               <Link key={action.href} href={action.href}>

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -15,15 +16,19 @@ import {
   Files,
   ArrowLeft,
   BarChart4,
-  Printer
+  Printer,
+  ShieldCheck,
+  ClipboardList,
+  Search,
+  TrendingUp,
+  Droplets,
+  IndianRupee
 } from "lucide-react";
-import { format, endOfMonth } from "date-fns";
+import { format, endOfMonth, startOfMonth } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  TooltipProvider,
-} from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 
 export default function ReportsPage() {
   const firestore = useFirestore();
@@ -33,6 +38,7 @@ export default function ReportsPage() {
   const [isClient, setIsClient] = useState(false);
   const [viewingInvoiceFarmerId, setViewingInvoiceFarmerId] = useState<string | null>(null);
   const [viewingBulkInvoices, setViewingBulkInvoices] = useState(false);
+  const [auditSearch, setAuditSearch] = useState("");
 
   useEffect(() => {
     setIsClient(true);
@@ -108,29 +114,40 @@ export default function ReportsPage() {
     });
   }, [allEntries, selectedMonth, currentCycle]);
 
-  const dailyEntries = useMemo(() => {
-    if (!allEntries || !selectedDate) return [];
-    return allEntries.filter(e => e.date === selectedDate).sort((a, b) => {
-      const fA = farmers?.find(f => f.id === a.farmerId);
-      const fB = farmers?.find(f => f.id === b.farmerId);
-      return (fA?.canNumber || "").localeCompare(fB?.canNumber || "");
-    });
-  }, [allEntries, selectedDate, farmers]);
+  // Calculations for Month Summary
+  const monthStats = useMemo(() => {
+    if (!allEntries || !allSales || !selectedMonth) return null;
+    const mEntries = allEntries.filter(e => e.date.startsWith(selectedMonth));
+    const mSales = allSales.filter(s => s.date.startsWith(selectedMonth));
 
-  const dailySales = useMemo(() => {
-    if (!allSales || !selectedDate) return [];
-    return allSales.filter(s => s.date === selectedDate).sort((a, b) => {
-      const bA = buyers?.find(buy => buy.id === a.buyerId);
-      const bB = buyers?.find(buy => buy.id === b.buyerId);
-      return (bA?.buyerCode || "").localeCompare(bB?.buyerCode || "");
-    });
-  }, [allSales, selectedDate, buyers]);
+    const cowEntryQty = mEntries.reduce((acc, curr) => {
+      const f = farmers?.find(farmer => farmer.id === curr.farmerId);
+      return f?.milkType === 'COW' ? acc + (curr.quantity || 0) : acc;
+    }, 0);
 
-  const totalCollectionDailyVolume = dailyEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
-  const totalSalesDailyVolume = dailySales.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
-  const totalFarmerCostDaily = dailyEntries.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
-  const totalSalesRevenueDaily = dailySales.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
-  const profitDaily = totalSalesRevenueDaily - totalFarmerCostDaily;
+    const buffaloEntryQty = mEntries.reduce((acc, curr) => {
+      const f = farmers?.find(farmer => farmer.id === curr.farmerId);
+      return f?.milkType === 'BUFFALO' ? acc + (curr.quantity || 0) : acc;
+    }, 0);
+
+    const cowSaleQty = mSales.filter(s => s.milkType === 'COW').reduce((acc, curr) => acc + (curr.quantity || 0), 0);
+    const buffaloSaleQty = mSales.filter(s => s.milkType === 'BUFFALO').reduce((acc, curr) => acc + (curr.quantity || 0), 0);
+
+    const totalEntryAmt = mEntries.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0);
+    const totalSaleAmt = mSales.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0);
+
+    return {
+      cowEntryQty,
+      buffaloEntryQty,
+      cowSaleQty,
+      buffaloSaleQty,
+      totalEntryQty: cowEntryQty + buffaloEntryQty,
+      totalSaleQty: cowSaleQty + buffaloSaleQty,
+      totalEntryAmt,
+      totalSaleAmt,
+      profit: totalSaleAmt - totalEntryAmt
+    };
+  }, [allEntries, allSales, selectedMonth, farmers]);
 
   const activeFarmerCycleBreakdown = useMemo(() => {
     if (!farmers) return [];
@@ -294,126 +311,261 @@ export default function ReportsPage() {
     );
   }
 
-  if (viewingBulkInvoices) {
-    return (
-      <div className="min-h-screen flex flex-col bg-white">
-        <Navbar />
-        <main className="flex-grow pt-24 pb-20 px-4">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex justify-between items-center mb-8 no-print">
-              <Button variant="outline" onClick={() => setViewingBulkInvoices(false)} className="rounded-full">
-                <ArrowLeft className="w-4 h-4 mr-2" /> Back to Bill
-              </Button>
-              <Button onClick={() => window.print()} className="rounded-full shadow-lg">
-                <Printer className="w-4 h-4 mr-2" /> Print All
-              </Button>
-            </div>
-            <div className="bulk-invoices-container">
-              {activeFarmerCycleBreakdown.map(f => <div key={f.id}>{renderInvoice(f.id)}</div>)}
-            </div>
-          </div>
-        </main>
-        <Footer />
-      </div>
-    );
-  }
-
   return (
-    <TooltipProvider>
-      <div className="min-h-screen flex flex-col bg-background">
-        <Navbar />
-        <main className="flex-grow pt-24 pb-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <header className="mb-8">
+    <div className="min-h-screen flex flex-col bg-background">
+      <Navbar />
+      <main className="flex-grow pt-24 pb-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <header className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 no-print">
+            <div>
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">
                 {ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS"} Intelligence
               </h1>
               <p className="text-muted-foreground font-medium">Enterprise collection logs, sales analytics and billing.</p>
-            </header>
+            </div>
+            <div className="flex items-center gap-3">
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="w-[200px] rounded-full font-bold h-11"><SelectValue /></SelectTrigger>
+                <SelectContent>{monthOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </header>
 
-            <Tabs defaultValue="overview" className="space-y-8">
-              <TabsList className="flex flex-wrap h-auto gap-2 p-1.5 bg-muted rounded-2xl w-full border border-primary/5 max-w-md">
-                <TabsTrigger value="overview" className="flex-1 rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest px-4 py-2.5">
-                  <BarChart4 className="w-3.5 h-3.5" /> Overview
-                </TabsTrigger>
-                <TabsTrigger value="cycle" className="flex-1 rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest px-4 py-2.5">
-                  <FileText className="w-3.5 h-3.5" /> Cycle Bill
-                </TabsTrigger>
-              </TabsList>
+          <Tabs defaultValue="overview" className="space-y-8 no-print">
+            <TabsList className="flex flex-wrap h-auto gap-2 p-1.5 bg-muted rounded-2xl w-full border border-primary/5 max-w-2xl">
+              <TabsTrigger value="overview" className="flex-1 rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest px-4 py-2.5">
+                <BarChart4 className="w-3.5 h-3.5" /> Overview
+              </TabsTrigger>
+              <TabsTrigger value="cycle" className="flex-1 rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest px-4 py-2.5">
+                <FileText className="w-3.5 h-3.5" /> Cycle Bill
+              </TabsTrigger>
+              <TabsTrigger value="summary" className="flex-1 rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest px-4 py-2.5">
+                <TrendingUp className="w-3.5 h-3.5" /> Master Summary
+              </TabsTrigger>
+              <TabsTrigger value="audit" className="flex-1 rounded-full font-bold gap-2 uppercase text-[10px] tracking-widest px-4 py-2.5">
+                <ShieldCheck className="w-3.5 h-3.5" /> Internal Audit
+              </TabsTrigger>
+            </TabsList>
 
-              <TabsContent value="overview" className="space-y-8 animate-in fade-in duration-500">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-xl font-black text-primary uppercase tracking-tighter">Daily Stats</h3>
-                  <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-[200px] rounded-full font-bold" />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <Card className="rounded-3xl border-none shadow-xl bg-primary text-primary-foreground p-6">
-                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Collection Volume</p>
-                    <p className="text-4xl font-black mt-2">{totalCollectionDailyVolume.toFixed(2)} L</p>
-                  </Card>
-                  <Card className="rounded-3xl border-none shadow-xl bg-accent text-accent-foreground p-6">
-                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Dist. Volume</p>
-                    <p className="text-4xl font-black mt-2">{totalSalesDailyVolume.toFixed(2)} L</p>
-                  </Card>
-                  <Card className="rounded-3xl border-none shadow-xl bg-card p-6">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Net Profit</p>
-                    <p className={cn("text-4xl font-black mt-2", profitDaily >= 0 ? "text-green-600" : "text-destructive")}>₹ {profitDaily.toFixed(2)}</p>
-                  </Card>
-                  <Card className="rounded-3xl border-none shadow-xl bg-card p-6">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Farmer Payables</p>
-                    <p className="text-3xl font-black text-primary mt-2">₹ {totalFarmerCostDaily.toFixed(2)}</p>
-                  </Card>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="cycle" className="space-y-8 animate-in fade-in duration-500">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-                  <div className="flex items-center gap-3">
-                    <h3 className="text-xl font-black text-primary uppercase tracking-tighter">Cycle Bill</h3>
-                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                      <SelectTrigger className="w-[200px] rounded-full font-bold"><SelectValue /></SelectTrigger>
-                      <SelectContent>{monthOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex gap-2">
-                    {cycles.map((cycle, idx) => (
-                      <Button key={idx} variant={activeCycle === idx ? "default" : "outline"} onClick={() => setActiveCycle(idx)} className="rounded-full text-[10px] font-black uppercase h-8">{cycle.label}</Button>
-                    ))}
-                    <Button onClick={() => setViewingBulkInvoices(true)} variant="secondary" className="rounded-full text-[10px] font-black uppercase h-8" disabled={activeFarmerCycleBreakdown.length === 0}><Files className="w-3 h-3 mr-2" /> Print Bulk</Button>
-                  </div>
-                </div>
-                <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-xl bg-card">
-                  <Table>
-                    <TableHeader className="bg-muted/50 border-b">
-                      <TableRow>
-                        <TableHead className="w-[120px] font-black text-primary pl-8 py-6 uppercase text-[10px] tracking-widest">CAN</TableHead>
-                        <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Name</TableHead>
-                        <TableHead className="text-right font-black text-primary uppercase text-[10px] tracking-widest">Qty (L)</TableHead>
-                        <TableHead className="text-right pr-8 font-black text-primary uppercase text-[10px] tracking-widest">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {activeFarmerCycleBreakdown.length === 0 ? (
-                        <TableRow><TableCell colSpan={4} className="text-center py-20 text-muted-foreground font-medium">No records for {currentCycle?.label}.</TableCell></TableRow>
-                      ) : (
-                        activeFarmerCycleBreakdown.map((f) => (
-                          <TableRow key={f.id} className="hover:bg-primary/5 transition-colors border-b last:border-0">
-                            <TableCell className="font-black text-primary pl-8 text-xl">{f.canNumber}</TableCell>
-                            <TableCell className="font-bold">{f.name}</TableCell>
-                            <TableCell className="text-right font-black text-primary text-2xl">{f.totalQty.toFixed(2)} L</TableCell>
-                            <TableCell className="text-right pr-8"><Button size="sm" onClick={() => setViewingInvoiceFarmerId(f.id)} className="rounded-full">Invoice</Button></TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
+            <TabsContent value="overview" className="space-y-8 animate-in fade-in duration-500">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-black text-primary uppercase tracking-tighter">Monthly Aggregates</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Card className="rounded-3xl border-none shadow-xl bg-primary text-primary-foreground p-6">
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Monthly Collection</p>
+                  <p className="text-4xl font-black mt-2">{monthStats?.totalEntryQty.toFixed(2) || "0.00"} L</p>
                 </Card>
-              </TabsContent>
-            </Tabs>
-          </div>
-        </main>
-        <Footer />
-      </div>
-    </TooltipProvider>
+                <Card className="rounded-3xl border-none shadow-xl bg-accent text-accent-foreground p-6">
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Monthly Sales</p>
+                  <p className="text-4xl font-black mt-2">{monthStats?.totalSaleQty.toFixed(2) || "0.00"} L</p>
+                </Card>
+                <Card className="rounded-3xl border-none shadow-xl bg-card p-6">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Monthly Profit</p>
+                  <p className={cn("text-4xl font-black mt-2", (monthStats?.profit || 0) >= 0 ? "text-green-600" : "text-destructive")}>₹ {monthStats?.profit.toFixed(2) || "0.00"}</p>
+                </Card>
+                <Card className="rounded-3xl border-none shadow-xl bg-card p-6">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Total Payouts</p>
+                  <p className="text-3xl font-black text-primary mt-2">₹ {monthStats?.totalEntryAmt.toFixed(2) || "0.00"}</p>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="cycle" className="space-y-8 animate-in fade-in duration-500">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+                <div className="flex gap-2">
+                  {cycles.map((cycle, idx) => (
+                    <Button key={idx} variant={activeCycle === idx ? "default" : "outline"} onClick={() => setActiveCycle(idx)} className="rounded-full text-[10px] font-black uppercase h-8">{cycle.label}</Button>
+                  ))}
+                </div>
+                <Button onClick={() => setViewingBulkInvoices(true)} variant="secondary" className="rounded-full text-[10px] font-black uppercase h-8" disabled={activeFarmerCycleBreakdown.length === 0}><Files className="w-3 h-3 mr-2" /> Print Bulk Invoices</Button>
+              </div>
+              <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-xl bg-card">
+                <Table>
+                  <TableHeader className="bg-muted/50 border-b">
+                    <TableRow>
+                      <TableHead className="w-[120px] font-black text-primary pl-8 py-6 uppercase text-[10px] tracking-widest">CAN</TableHead>
+                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Farmer Name</TableHead>
+                      <TableHead className="text-right font-black text-primary uppercase text-[10px] tracking-widest">Qty (L)</TableHead>
+                      <TableHead className="text-right pr-8 font-black text-primary uppercase text-[10px] tracking-widest">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {activeFarmerCycleBreakdown.length === 0 ? (
+                      <TableRow><TableCell colSpan={4} className="text-center py-20 text-muted-foreground font-medium">No records for {currentCycle?.label}.</TableCell></TableRow>
+                    ) : (
+                      activeFarmerCycleBreakdown.map((f) => (
+                        <TableRow key={f.id} className="hover:bg-primary/5 transition-colors border-b last:border-0">
+                          <TableCell className="font-black text-primary pl-8 text-xl">{f.canNumber}</TableCell>
+                          <TableCell className="font-bold">{f.name}</TableCell>
+                          <TableCell className="text-right font-black text-primary text-2xl">{f.totalQty.toFixed(2)} L</TableCell>
+                          <TableCell className="text-right pr-8"><Button size="sm" onClick={() => setViewingInvoiceFarmerId(f.id)} className="rounded-full">Invoice</Button></TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="summary" className="space-y-8 animate-in fade-in duration-500">
+              <div className="flex justify-end">
+                <Button onClick={() => window.print()} className="rounded-full shadow-lg"><Printer className="w-4 h-4 mr-2" /> Print Master Summary</Button>
+              </div>
+              <div className="master-summary-print bg-white p-12 border shadow-xl rounded-[2.5rem] text-black">
+                <div className="text-center mb-12">
+                  <h1 className="text-3xl font-black tracking-tighter uppercase mb-1">{ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS"}</h1>
+                  <h2 className="text-xl font-bold uppercase tracking-[0.3em] text-muted-foreground">Master Summary Sheet</h2>
+                  <p className="mt-2 font-bold uppercase">Period: {monthOptions.find(o => o.value === selectedMonth)?.label}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-12 mb-12">
+                  <div className="space-y-6">
+                    <h3 className="text-sm font-black uppercase tracking-widest border-b pb-2 flex items-center gap-2"><Droplets className="w-4 h-4" /> Procurement (Collection)</h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between text-sm"><span>Cow Milk Total</span><span className="font-bold">{monthStats?.cowEntryQty.toFixed(2)} L</span></div>
+                      <div className="flex justify-between text-sm"><span>Buffalo Milk Total</span><span className="font-bold">{monthStats?.buffaloEntryQty.toFixed(2)} L</span></div>
+                      <div className="flex justify-between text-lg font-black border-t pt-2 mt-4 uppercase"><span>Total Qty</span><span>{monthStats?.totalEntryQty.toFixed(2)} L</span></div>
+                      <div className="flex justify-between text-lg font-black text-primary uppercase"><span>Total Cost</span><span>₹ {monthStats?.totalEntryAmt.toFixed(2)}</span></div>
+                    </div>
+                  </div>
+                  <div className="space-y-6">
+                    <h3 className="text-sm font-black uppercase tracking-widest border-b pb-2 flex items-center gap-2"><IndianRupee className="w-4 h-4" /> Distribution (Sales)</h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between text-sm"><span>Cow Milk Sold</span><span className="font-bold">{monthStats?.cowSaleQty.toFixed(2)} L</span></div>
+                      <div className="flex justify-between text-sm"><span>Buffalo Milk Sold</span><span className="font-bold">{monthStats?.buffaloSaleQty.toFixed(2)} L</span></div>
+                      <div className="flex justify-between text-lg font-black border-t pt-2 mt-4 uppercase"><span>Total Sold</span><span>{monthStats?.totalSaleQty.toFixed(2)} L</span></div>
+                      <div className="flex justify-between text-lg font-black text-accent uppercase"><span>Total Revenue</span><span>₹ {monthStats?.totalSaleAmt.toFixed(2)}</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-primary/5 rounded-3xl p-8 border-2 border-primary/10 mb-12">
+                  <div className="flex justify-between items-center">
+                    <div className="space-y-1">
+                      <p className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Monthly Operating Performance</p>
+                      <h4 className="text-3xl font-black uppercase tracking-tighter">Net Profit / Loss</h4>
+                    </div>
+                    <div className={cn("text-5xl font-black", (monthStats?.profit || 0) >= 0 ? "text-green-600" : "text-destructive")}>
+                      ₹ {monthStats?.profit.toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-20 flex justify-between items-end border-t pt-10">
+                  <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
+                    Computer Generated Summary Sheet <br /> Date: {format(new Date(), 'PPP p')}
+                  </div>
+                  <div className="text-center">
+                    <div className="h-20 flex items-center justify-center">
+                       {ratesConfig?.stampUrl && <img src={ratesConfig.stampUrl} className="max-w-[120px] mix-blend-multiply" />}
+                    </div>
+                    <p className="border-t-2 border-black w-64 pt-2 font-black uppercase text-sm tracking-widest">Authorized Signature</p>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="audit" className="space-y-8 animate-in fade-in duration-500">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="flex items-center gap-3">
+                   <ShieldCheck className="w-6 h-6 text-primary" />
+                   <h3 className="text-xl font-black text-primary uppercase tracking-tighter">Internal Data Audit</h3>
+                </div>
+                <div className="relative w-full md:w-[300px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input placeholder="Search Audit Logs..." value={auditSearch} onChange={(e) => setAuditSearch(e.target.value)} className="pl-10 rounded-full" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <Card className="rounded-[2rem] border-none shadow-xl overflow-hidden bg-card">
+                   <CardHeader className="bg-primary/5 border-b py-4">
+                     <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2"><ClipboardList className="w-4 h-4" /> Collection Entries</CardTitle>
+                   </CardHeader>
+                   <div className="max-h-[500px] overflow-auto">
+                    <Table>
+                      <TableHeader className="bg-muted/30 sticky top-0 z-10">
+                        <TableRow>
+                          <TableHead className="text-[9px] uppercase font-black">Date</TableHead>
+                          <TableHead className="text-[9px] uppercase font-black">CAN</TableHead>
+                          <TableHead className="text-[9px] uppercase font-black">Session</TableHead>
+                          <TableHead className="text-[9px] uppercase font-black text-right">Qty (L)</TableHead>
+                          <TableHead className="text-[9px] uppercase font-black text-right">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {allEntries?.filter(e => {
+                          const f = farmers?.find(f => f.id === e.farmerId);
+                          return f?.canNumber.includes(auditSearch) || f?.name.toLowerCase().includes(auditSearch.toLowerCase()) || e.date.includes(auditSearch);
+                        }).sort((a,b) => b.date.localeCompare(a.date)).map(entry => {
+                          const f = farmers?.find(f => f.id === entry.farmerId);
+                          return (
+                            <TableRow key={entry.id} className="text-xs">
+                              <TableCell className="font-medium">{format(new Date(entry.date), 'dd/MM/yy')}</TableCell>
+                              <TableCell className="font-black text-primary">{f?.canNumber || "ERR"}</TableCell>
+                              <TableCell><Badge variant="outline" className="text-[8px] h-4">{entry.session}</Badge></TableCell>
+                              <TableCell className="text-right font-bold">{(entry.quantity || 0).toFixed(2)}</TableCell>
+                              <TableCell className="text-right">₹{(entry.totalAmount || 0).toFixed(2)}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                        {(!allEntries || allEntries.length === 0) && <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground uppercase text-[10px] font-bold">No Records Found</TableCell></TableRow>}
+                      </TableBody>
+                    </Table>
+                   </div>
+                </Card>
+
+                <Card className="rounded-[2rem] border-none shadow-xl overflow-hidden bg-card">
+                   <CardHeader className="bg-accent/5 border-b py-4">
+                     <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2"><TrendingUp className="w-4 h-4" /> Sales Records</CardTitle>
+                   </CardHeader>
+                   <div className="max-h-[500px] overflow-auto">
+                    <Table>
+                      <TableHeader className="bg-muted/30 sticky top-0 z-10">
+                        <TableRow>
+                          <TableHead className="text-[9px] uppercase font-black">Date</TableHead>
+                          <TableHead className="text-[9px] uppercase font-black">Buyer</TableHead>
+                          <TableHead className="text-[9px] uppercase font-black">Type</TableHead>
+                          <TableHead className="text-[9px] uppercase font-black text-right">Qty (L)</TableHead>
+                          <TableHead className="text-[9px] uppercase font-black text-right">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {allSales?.filter(s => {
+                          const b = buyers?.find(buy => buy.id === s.buyerId);
+                          return b?.name.toLowerCase().includes(auditSearch.toLowerCase()) || b?.buyerCode.includes(auditSearch) || s.date.includes(auditSearch);
+                        }).sort((a,b) => b.date.localeCompare(a.date)).map(sale => {
+                          const b = buyers?.find(buy => buy.id === sale.buyerId);
+                          return (
+                            <TableRow key={sale.id} className="text-xs">
+                              <TableCell className="font-medium">{format(new Date(sale.date), 'dd/MM/yy')}</TableCell>
+                              <TableCell className="font-bold text-accent">{b?.buyerCode || "ERR"}</TableCell>
+                              <TableCell><Badge variant="outline" className="text-[8px] h-4">{sale.milkType}</Badge></TableCell>
+                              <TableCell className="text-right font-bold">{(sale.quantity || 0).toFixed(2)}</TableCell>
+                              <TableCell className="text-right">₹{(sale.totalAmount || 0).toFixed(2)}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                        {(!allSales || allSales.length === 0) && <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground uppercase text-[10px] font-bold">No Records Found</TableCell></TableRow>}
+                      </TableBody>
+                    </Table>
+                   </div>
+                </Card>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          {/* Special view for bulk invoices print */}
+          {viewingBulkInvoices && (
+            <div className="bulk-invoices-container hidden print-only">
+              {activeFarmerCycleBreakdown.map(f => <div key={f.id}>{renderInvoice(f.id)}</div>)}
+            </div>
+          )}
+        </div>
+      </main>
+      <Footer />
+    </div>
   );
 }
+

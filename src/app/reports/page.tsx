@@ -21,17 +21,12 @@ import {
   ChevronRight,
   FileDown
 } from "lucide-react";
-import { format, endOfMonth, subMonths, startOfMonth } from "date-fns";
+import { format, endOfMonth, subMonths, startOfMonth, isSameMonth } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
-
-// Type definition for jsPDF with autotable plugin
-interface jsPDFWithPlugin extends jsPDF {
-  autoTable: (options: any) => jsPDF;
-}
 
 export default function ReportsPage() {
   const firestore = useFirestore();
@@ -185,9 +180,8 @@ export default function ReportsPage() {
   const grandTotalQty = masterRoster.reduce((acc, curr) => acc + curr.totalQty, 0);
   const grandTotalAmt = masterRoster.reduce((acc, curr) => acc + curr.totalAmount, 0);
 
-  // PDF Download Handlers
   const handleDownloadRosterPDF = () => {
-    const doc = new jsPDF('l', 'mm', 'a4') as jsPDFWithPlugin;
+    const doc = new jsPDF('l', 'mm', 'a4');
     const companyName = ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS";
     const cycleLabel = currentCycle?.label || "";
     const monthLabel = monthOptions.find(o => o.value === selectedMonth)?.label || "";
@@ -207,7 +201,7 @@ export default function ReportsPage() {
       `Rs. ${f.totalAmount.toFixed(2)}`
     ]);
 
-    doc.autoTable({
+    (doc as any).autoTable({
       startY: 35,
       head: [['CAN', 'FARMER NAME', 'BANK A/C', 'MORNING (L)', 'EVENING (L)', 'TOTAL L', 'PAYOUT (Rs.)']],
       body: tableData,
@@ -224,7 +218,7 @@ export default function ReportsPage() {
     const f = farmers?.find(f => f.id === farmerId);
     if (!f) return;
 
-    const doc = new jsPDF() as jsPDFWithPlugin;
+    const doc = new jsPDF();
     const companyName = ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS";
     const invEntries = filteredCycleEntries.filter(e => e.farmerId === farmerId).sort((a, b) => a.date.localeCompare(b.date));
     
@@ -249,7 +243,7 @@ export default function ReportsPage() {
     const totalQty = invEntries.reduce((acc, curr) => acc + curr.quantity, 0);
     const totalAmt = invEntries.reduce((acc, curr) => acc + curr.totalAmount, 0);
 
-    doc.autoTable({
+    (doc as any).autoTable({
       startY: 55,
       head: [['Date', 'Session', 'Qty (L)', 'Rate (Rs/L)', 'Total (Rs)']],
       body: tableData,
@@ -264,7 +258,7 @@ export default function ReportsPage() {
   const handleDownloadBulkInvoicesPDF = () => {
     if (activeInvoices.length === 0) return;
 
-    const doc = new jsPDF() as jsPDFWithPlugin;
+    const doc = new jsPDF();
     const companyName = ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS";
 
     activeInvoices.forEach((f, idx) => {
@@ -289,7 +283,7 @@ export default function ReportsPage() {
         e.totalAmount.toFixed(2)
       ]);
 
-      doc.autoTable({
+      (doc as any).autoTable({
         startY: 50,
         head: [['Date', 'Session', 'Qty (L)', 'Rate (Rs/L)', 'Total (Rs)']],
         body: tableData,

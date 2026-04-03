@@ -54,8 +54,8 @@ export default function EntriesPage() {
   const { data: entries } = useCollection(entriesQuery);
   const { data: ratesConfig } = useDoc(settingsRef);
 
-  // Conversion factor from Settings (default to 0.96)
-  const conversionRate = ratesConfig?.kgToLitreRate || 0.96;
+  // Conversion factor (1 kg = 0.97 Litre as per PRD)
+  const conversionRate = ratesConfig?.kgToLitreRate || 0.97;
 
   const filteredFarmers = farmers?.filter(f => 
     f.name.toLowerCase().includes(searchTerm.toLowerCase()) || 

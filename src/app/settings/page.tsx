@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -53,7 +54,7 @@ export default function SettingsPage() {
     buffaloRate: "", 
     cowSellingRate: "",
     buffaloSellingRate: "",
-    kgToLitreRate: "0.96"
+    kgToLitreRate: "0.97"
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
@@ -93,7 +94,7 @@ export default function SettingsPage() {
         buffaloRate: currentSettings.buffaloRate?.toString() || "",
         cowSellingRate: currentSettings.cowSellingRate?.toString() || "",
         buffaloSellingRate: currentSettings.buffaloSellingRate?.toString() || "",
-        kgToLitreRate: currentSettings.kgToLitreRate?.toString() || "0.96"
+        kgToLitreRate: currentSettings.kgToLitreRate?.toString() || "0.97"
       });
     }
   }, [currentSettings]);
@@ -116,7 +117,7 @@ export default function SettingsPage() {
       buffaloRate: parseFloat(config.buffaloRate) || 0,
       cowSellingRate: parseFloat(config.cowSellingRate) || 0,
       buffaloSellingRate: parseFloat(config.buffaloSellingRate) || 0,
-      kgToLitreRate: parseFloat(config.kgToLitreRate) || 0.96,
+      kgToLitreRate: parseFloat(config.kgToLitreRate) || 0.97,
       updatedAt: serverTimestamp()
     }, { merge: true });
     setTimeout(() => {
@@ -129,7 +130,6 @@ export default function SettingsPage() {
     if (!firestore) return;
     setIsResetting(true);
     
-    // Batch deletion simulation (non-blocking per document)
     const entryCount = allEntries?.length || 0;
     const saleCount = allSales?.length || 0;
     const farmerCount = allFarmers?.length || 0;
@@ -142,7 +142,7 @@ export default function SettingsPage() {
       setIsResetting(false);
       toast({ 
         title: "Master Reset Initiated", 
-        description: `Wiping ${entryCount} entries, ${saleCount} sales, and ${farmerCount} farmers.`,
+        description: `Wiping records. Please wait for the sync to complete.`,
         variant: "destructive"
       });
     }, 1000);
@@ -203,7 +203,7 @@ export default function SettingsPage() {
                     <AlertDialogHeader>
                       <AlertDialogTitle className="font-black text-destructive uppercase">Confirm Total Wipe</AlertDialogTitle>
                       <AlertDialogDescription>
-                        You are about to delete all records from the database. This action is irreversible and will reset all reporting metrics to zero.
+                        You are about to delete all records from the database. This action is irreversible.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -234,7 +234,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Business Stamp (Visible on Invoice)</Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Business Stamp</Label>
                     <div className="h-[160px] w-full rounded-2xl border-2 border-dashed border-primary/10 bg-muted/20 relative group overflow-hidden">
                       {config.stampUrl ? (
                         <>
@@ -273,8 +273,8 @@ export default function SettingsPage() {
             </div>
 
             <div className="flex justify-end pt-4">
-              <Button onClick={handleSave} disabled={isSaving} className="rounded-full px-12 h-14 font-black uppercase tracking-widest shadow-xl transition-all hover:scale-105">
-                {isSaving ? <CheckCircle2 className="animate-pulse" /> : <Save className="mr-2" />} {isSaving ? "Saving..." : "Apply Changes"}
+              <Button onClick={handleSave} disabled={isSaving} className="rounded-full px-12 h-14 font-black uppercase tracking-widest shadow-xl">
+                {isSaving ? "Saving..." : "Apply Changes"}
               </Button>
             </div>
           </div>

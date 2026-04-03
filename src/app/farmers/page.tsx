@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -45,6 +44,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { read, utils, writeFile } from 'xlsx';
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 export default function FarmersPage() {
   const firestore = useFirestore();
@@ -138,7 +138,10 @@ export default function FarmersPage() {
     if (!farmers || !firestore) return;
     
     const count = farmers.length;
-    if (count === 0) return;
+    if (count === 0) {
+      toast({ title: "Notice", description: "Directory is already empty." });
+      return;
+    }
 
     if (!window.confirm(`CRITICAL ACTION: Are you sure you want to delete ALL ${count} farmers? This cannot be undone.`)) return;
     
@@ -476,7 +479,7 @@ export default function FarmersPage() {
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="w-[50px] pl-6 py-5">
                     <Checkbox 
-                      checked={filteredFarmers?.length ? selectedIds.length === filteredFarmers.length : false} 
+                      checked={filteredFarmers?.length ? (selectedIds.length === filteredFarmers.length && filteredFarmers.length > 0) : false} 
                       onCheckedChange={(checked) => toggleSelectAll(checked === true)} 
                       aria-label="Select all"
                     />
@@ -502,7 +505,7 @@ export default function FarmersPage() {
                   </TableRow>
                 ) : (
                   filteredFarmers?.map((farmer) => (
-                    <TableRow key={farmer.id} className="group hover:bg-primary/5 transition-colors border-b last:border-0">
+                    <TableRow key={farmer.id} className={cn("group transition-colors border-b last:border-0", selectedIds.includes(farmer.id) ? "bg-primary/5" : "hover:bg-primary/5")}>
                       <TableCell className="pl-6">
                         <Checkbox 
                           checked={selectedIds.includes(farmer.id)} 
@@ -525,7 +528,6 @@ export default function FarmersPage() {
                       </TableCell>
                       <TableCell className="text-right pr-6">
                         <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button variant="ghost" size="sm" className="rounded-full font-bold text-primary">Edit</Button>
                           <Button 
                             variant="ghost" 
                             size="sm" 

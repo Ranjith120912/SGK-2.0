@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -5,7 +6,7 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { useCollection, useMemoFirebase, useFirestore } from "@/firebase";
 import { collection, serverTimestamp, doc } from "firebase/firestore";
-import { addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -17,6 +18,7 @@ import {
   DialogTitle, 
   DialogTrigger,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { 
@@ -37,7 +39,8 @@ import {
   FileSpreadsheet,
   Upload,
   Trash2,
-  X
+  X,
+  Pencil
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { read, utils, writeFile } from 'xlsx';
@@ -50,6 +53,7 @@ export default function FarmersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [newFarmer, setNewFarmer] = useState({ name: "", canNumber: "", bankAccountNumber: "", ifscCode: "", milkType: "COW" });
+  const [editingFarmer, setEditingFarmer] = useState<any>(null);
   const [importData, setImportData] = useState("");
   const [isImporting, setIsImporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -89,6 +93,24 @@ export default function FarmersPage() {
     setNewFarmer({ name: "", canNumber: "", bankAccountNumber: "", ifscCode: "", milkType: "COW" });
     setIsAdding(false);
     toast({ title: "Success", description: "Farmer added successfully." });
+  };
+
+  const handleUpdateFarmer = () => {
+    if (!editingFarmer || !editingFarmer.name || !editingFarmer.canNumber) {
+      toast({ title: "Error", description: "Name and Can Number are required.", variant: "destructive" });
+      return;
+    }
+
+    if (!firestore) return;
+
+    updateDocumentNonBlocking(doc(firestore, 'farmers', editingFarmer.id), {
+      ...editingFarmer,
+      canNumber: editingFarmer.canNumber.toString().padStart(3, '0'),
+      updatedAt: serverTimestamp(),
+    });
+
+    setEditingFarmer(null);
+    toast({ title: "Updated", description: "Farmer details updated successfully." });
   };
 
   const toggleSelect = (id: string, checked: boolean) => {
@@ -507,6 +529,14 @@ export default function FarmersPage() {
                           <Button 
                             variant="ghost" 
                             size="sm" 
+                            className="rounded-full text-primary hover:bg-primary/10"
+                            onClick={() => setEditingFarmer(farmer)}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
                             className="rounded-full text-destructive hover:bg-destructive/10"
                             onClick={() => handleDeleteRow(farmer.id, farmer.name)}
                           >
@@ -525,6 +555,72 @@ export default function FarmersPage() {
           </Card>
         </div>
       </main>
+
+      <Dialog open={!!editingFarmer} onOpenChange={(open) => !open && setEditingFarmer(null)}>
+        <DialogContent className="sm:max-w-[500px] rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black text-primary uppercase tracking-tight">Edit Farmer Details</DialogTitle>
+            <DialogDescription>Update supplier information and account records.</DialogDescription>
+          </DialogHeader>
+          
+          {editingFarmer && (
+            <div className="grid gap-6 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Full Name</label>
+                  <Input 
+                    value={editingFarmer.name} 
+                    onChange={(e) => setEditingFarmer({...editingFarmer, name: e.target.value})}
+                    className="rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Can Number</label>
+                  <Input 
+                    value={editingFarmer.canNumber} 
+                    onChange={(e) => setEditingFarmer({...editingFarmer, canNumber: e.target.value})}
+                    className="rounded-xl"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Milk Type</label>
+                <Select value={editingFarmer.milkType} onValueChange={(v) => setEditingFarmer({...editingFarmer, milkType: v})}>
+                  <SelectTrigger className="rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="COW">COW</SelectItem>
+                    <SelectItem value="BUFFALO">BUFFALO</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Bank Account Number</label>
+                <Input 
+                  value={editingFarmer.bankAccountNumber} 
+                  onChange={(e) => setEditingFarmer({...editingFarmer, bankAccountNumber: e.target.value})}
+                  className="rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">IFSC Code</label>
+                <Input 
+                  value={editingFarmer.ifscCode} 
+                  onChange={(e) => setEditingFarmer({...editingFarmer, ifscCode: e.target.value})}
+                  className="rounded-xl"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="border-t pt-4">
+            <Button variant="ghost" onClick={() => setEditingFarmer(null)} className="rounded-full">Cancel</Button>
+            <Button onClick={handleUpdateFarmer} className="rounded-full px-8 shadow-md">Update Farmer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Footer />
     </div>
   );

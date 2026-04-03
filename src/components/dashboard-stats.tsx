@@ -42,7 +42,7 @@ export function DashboardStats() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-xs font-bold text-primary/60 uppercase tracking-widest mb-1">Collection (L)</p>
-              <h3 className="text-3xl font-black text-primary">{totalCollection.toFixed(1)} L</h3>
+              <h3 className="text-3xl font-black text-primary">{totalCollection.toFixed(2)} L</h3>
             </div>
             <div className="p-2 bg-primary/10 rounded-xl">
               <Droplets className="w-5 h-5 text-primary" />

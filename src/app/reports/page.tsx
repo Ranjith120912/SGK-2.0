@@ -159,22 +159,6 @@ export default function ReportsPage() {
     });
   }, [farmers, filteredCycleEntries]);
 
-  const farmerCycleMasterList = useMemo(() => {
-    if (!farmers) return [];
-    return farmers.map(farmer => {
-      const fEntries = filteredCycleEntries.filter(e => e.farmerId === farmer.id);
-      return {
-        ...farmer,
-        totalQty: fEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0),
-        totalAmount: fEntries.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0)
-      };
-    }).sort((a, b) => {
-      const aNum = parseInt(a.canNumber);
-      const bNum = parseInt(b.canNumber);
-      return (isNaN(aNum) || isNaN(bNum)) ? a.canNumber.localeCompare(b.canNumber) : aNum - bNum;
-    });
-  }, [farmers, filteredCycleEntries]);
-
   const dailyEntries = useMemo(() => {
     if (!allEntries || !selectedDate) return [];
     return allEntries.filter(e => e.date === selectedDate).sort((a, b) => {
@@ -201,49 +185,11 @@ export default function ReportsPage() {
   const totalMonthlySalesRevenue = monthlySales.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
   const monthlyProfit = totalMonthlySalesRevenue - totalMonthlyProcurementCost;
 
-  const currentYear = selectedMonth ? selectedMonth.split('-')[0] : format(new Date(), 'yyyy');
-  const yearlyStats = useMemo(() => {
-    if (!allEntries || !allSales || !currentYear) return [];
-    
-    const months = eachMonthOfInterval({
-      start: startOfYear(new Date(parseInt(currentYear), 0, 1)),
-      end: endOfYear(new Date(parseInt(currentYear), 0, 1))
-    });
-
-    return months.map(monthDate => {
-      const monthPrefix = format(monthDate, 'yyyy-MM');
-      const mEntries = allEntries.filter(e => e.date.startsWith(monthPrefix));
-      const mSales = allSales.filter(s => s.date.startsWith(monthPrefix));
-      
-      const cost = mEntries.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
-      const revenue = mSales.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
-      
-      return {
-        month: format(monthDate, 'MMM'),
-        fullName: format(monthDate, 'MMMM'),
-        collection: mEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0),
-        cost,
-        revenue,
-        profit: revenue - cost
-      };
-    });
-  }, [allEntries, allSales, currentYear]);
-
   const totalCollectionDailyVolume = dailyEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
   const totalSalesDailyVolume = dailySales.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
   const totalFarmerCostDaily = dailyEntries.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
   const totalSalesRevenueDaily = dailySales.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
   const profitDaily = totalSalesRevenueDaily - totalFarmerCostDaily;
-
-  const cowVolume = dailyEntries.filter(e => {
-    const f = farmers?.find(far => far.id === e.farmerId);
-    return f?.milkType === 'COW';
-  }).reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
-
-  const buffaloVolume = dailyEntries.filter(e => {
-    const f = farmers?.find(far => far.id === e.farmerId);
-    return f?.milkType === 'BUFFALO';
-  }).reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
 
   const renderInvoice = (farmerId: string) => {
     const invFarmer = farmers?.find(f => f.id === farmerId);
@@ -496,7 +442,7 @@ export default function ReportsPage() {
                   <Card className="rounded-3xl border-none shadow-xl bg-primary text-primary-foreground overflow-hidden">
                     <CardHeader className="pb-2">
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Collection Volume</p>
-                      <CardTitle className="text-4xl font-black">{totalCollectionDailyVolume.toFixed(1)} L</CardTitle>
+                      <CardTitle className="text-4xl font-black">{totalCollectionDailyVolume.toFixed(2)} L</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="flex items-center gap-1 text-xs font-bold opacity-90">
@@ -509,7 +455,7 @@ export default function ReportsPage() {
                   <Card className="rounded-3xl border-none shadow-xl bg-accent text-accent-foreground overflow-hidden">
                     <CardHeader className="pb-2">
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Distribution Volume</p>
-                      <CardTitle className="text-4xl font-black">{totalSalesDailyVolume.toFixed(1)} L</CardTitle>
+                      <CardTitle className="text-4xl font-black">{totalSalesDailyVolume.toFixed(2)} L</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="flex items-center gap-1 text-xs font-bold opacity-90">
@@ -569,7 +515,7 @@ export default function ReportsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <Card className="rounded-3xl border-none shadow-xl bg-card p-6">
                     <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Monthly Procurement</p>
-                    <p className="text-2xl font-black text-primary">{totalMonthlyCollection.toFixed(1)} Litres</p>
+                    <p className="text-2xl font-black text-primary">{totalMonthlyCollection.toFixed(2)} Litres</p>
                   </Card>
                   <Card className="rounded-3xl border-none shadow-xl bg-card p-6">
                     <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Procurement Cost</p>

@@ -6,26 +6,22 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { useCollection, useDoc, useMemoFirebase, useFirestore } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   FileText, 
   Loader2, 
-  Files,
   ArrowLeft,
   BarChart4,
   Printer,
   ShieldCheck,
-  ClipboardList,
   TrendingUp,
-  Droplets,
   IndianRupee,
   CalendarDays
 } from "lucide-react";
-import { format, endOfMonth, startOfMonth, subMonths, startOfYear, addMonths } from "date-fns";
-import { Input } from "@/components/ui/input";
+import { format, endOfMonth, subMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +32,6 @@ export default function ReportsPage() {
   const [activeCycle, setActiveCycle] = useState<number>(0);
   const [isClient, setIsClient] = useState(false);
   const [viewingInvoiceFarmerId, setViewingInvoiceFarmerId] = useState<string | null>(null);
-  const [viewingBulkInvoices, setViewingBulkInvoices] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
@@ -129,15 +124,12 @@ export default function ReportsPage() {
     
     const now = new Date();
     const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth(); // 0-indexed, Jan is 0
+    const currentMonth = now.getMonth(); 
     
-    // Determine the start of the fiscal year (April starts the FY)
-    // If we are before April (Jan, Feb, March), the fiscal year started last year
     const fiscalStartYear = currentMonth < 3 ? currentYear - 1 : currentYear;
     
-    // Generate 12 months from April of the fiscalStartYear
     return Array.from({ length: 12 }).map((_, i) => {
-      const monthIndex = (3 + i) % 12; // Start from April (3)
+      const monthIndex = (3 + i) % 12; 
       const year = fiscalStartYear + (3 + i >= 12 ? 1 : 0);
       
       const d = new Date(year, monthIndex, 1);
@@ -156,7 +148,7 @@ export default function ReportsPage() {
     });
   }, [allEntries, allSales, isClient]);
 
-  const activeFarmerCycleBreakdown = useMemo(() => {
+  const masterRoster = useMemo(() => {
     if (!farmers) return [];
     return farmers.map(farmer => {
       const fEntries = filteredCycleEntries.filter(e => e.farmerId === farmer.id);
@@ -165,12 +157,15 @@ export default function ReportsPage() {
         totalQty: fEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0),
         totalAmount: fEntries.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0)
       };
-    }).filter(f => f.totalQty > 0).sort((a, b) => {
+    }).sort((a, b) => {
       const aNum = parseInt(a.canNumber);
       const bNum = parseInt(b.canNumber);
       return (isNaN(aNum) || isNaN(bNum)) ? a.canNumber.localeCompare(b.canNumber) : aNum - bNum;
     });
   }, [farmers, filteredCycleEntries]);
+
+  const grandTotalQty = masterRoster.reduce((acc, curr) => acc + curr.totalQty, 0);
+  const grandTotalAmt = masterRoster.reduce((acc, curr) => acc + curr.totalAmount, 0);
 
   const renderInvoice = (farmerId: string) => {
     const invFarmer = farmers?.find(f => f.id === farmerId);
@@ -296,7 +291,7 @@ export default function ReportsPage() {
     );
   }
 
-  if (viewingInvoiceFarmerId && !viewingBulkInvoices) {
+  if (viewingInvoiceFarmerId) {
     return (
       <div className="min-h-screen flex flex-col bg-white">
         <Navbar />
@@ -328,7 +323,7 @@ export default function ReportsPage() {
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">
                 {ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS"} Reports
               </h1>
-              <p className="text-muted-foreground font-medium">Financial analytics, billing cycles and monthly summaries.</p>
+              <p className="text-muted-foreground font-medium">Financial analytics and cycle rosters.</p>
             </div>
             <div className="flex items-center gap-3">
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
@@ -346,8 +341,8 @@ export default function ReportsPage() {
               <TabsTrigger value="cycle" className="flex-1 rounded-full font-black gap-2 uppercase text-[10px] tracking-widest px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-white">
                 <FileText className="w-3.5 h-3.5" /> Cycle Bill
               </TabsTrigger>
-              <TabsTrigger value="summary" className="flex-1 rounded-full font-black gap-2 uppercase text-[10px] tracking-widest px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-white">
-                <TrendingUp className="w-3.5 h-3.5" /> Summary Sheet
+              <TabsTrigger value="master" className="flex-1 rounded-full font-black gap-2 uppercase text-[10px] tracking-widest px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-white">
+                <TrendingUp className="w-3.5 h-3.5" /> Master Summary
               </TabsTrigger>
               <TabsTrigger value="audit" className="flex-1 rounded-full font-black gap-2 uppercase text-[10px] tracking-widest px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-white">
                 <ShieldCheck className="w-3.5 h-3.5" /> Internal Audit
@@ -395,19 +390,18 @@ export default function ReportsPage() {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
                 <div className="flex gap-2 bg-muted p-1.5 rounded-full border">
                   {cycles.map((cycle, idx) => (
-                    <Button 
+                    <button 
                       key={idx} 
-                      variant={activeCycle === idx ? "default" : "ghost"} 
                       onClick={() => setActiveCycle(idx)} 
-                      className={cn("rounded-full text-[10px] font-black uppercase h-9 px-6", activeCycle === idx ? "shadow-md" : "text-muted-foreground")}
+                      className={cn(
+                        "rounded-full text-[10px] font-black uppercase h-9 px-6 transition-all",
+                        activeCycle === idx ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:bg-muted-foreground/10"
+                      )}
                     >
                       {cycle.label}
-                    </Button>
+                    </button>
                   ))}
                 </div>
-                <Button onClick={() => setViewingBulkInvoices(true)} variant="secondary" className="rounded-full text-[10px] font-black uppercase h-11 px-8 shadow-sm" disabled={activeFarmerCycleBreakdown.length === 0}>
-                  <Files className="w-4 h-4 mr-2" /> Bulk Invoices
-                </Button>
               </div>
               <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-2xl bg-card">
                 <Table>
@@ -421,10 +415,10 @@ export default function ReportsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {activeFarmerCycleBreakdown.length === 0 ? (
+                    {masterRoster.filter(f => f.totalQty > 0).length === 0 ? (
                       <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground font-bold uppercase tracking-widest opacity-50">No records found for this period.</TableCell></TableRow>
                     ) : (
-                      activeFarmerCycleBreakdown.map((f) => (
+                      masterRoster.filter(f => f.totalQty > 0).map((f) => (
                         <TableRow key={f.id} className="hover:bg-primary/5 transition-colors border-b last:border-0 group">
                           <TableCell className="font-black text-primary pl-10 text-2xl tracking-tighter">{f.canNumber}</TableCell>
                           <TableCell className="font-bold text-lg">{f.name}</TableCell>
@@ -441,55 +435,81 @@ export default function ReportsPage() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="summary" className="space-y-8 animate-in fade-in duration-500">
-              <div className="flex justify-end">
-                <Button onClick={() => window.print()} className="rounded-full shadow-xl h-12 px-8 font-black uppercase text-[10px] tracking-widest"><Printer className="w-4 h-4 mr-2" /> Print Summary</Button>
+            <TabsContent value="master" className="space-y-8 animate-in fade-in duration-500">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 no-print">
+                <div className="flex gap-2 bg-muted p-1.5 rounded-full border">
+                  {cycles.map((cycle, idx) => (
+                    <button 
+                      key={idx} 
+                      onClick={() => setActiveCycle(idx)} 
+                      className={cn(
+                        "rounded-full text-[10px] font-black uppercase h-9 px-6 transition-all",
+                        activeCycle === idx ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:bg-muted-foreground/10"
+                      )}
+                    >
+                      {cycle.label}
+                    </button>
+                  ))}
+                </div>
+                <Button onClick={() => window.print()} className="rounded-full shadow-xl h-11 px-8 font-black uppercase text-[10px] tracking-widest">
+                  <Printer className="w-4 h-4 mr-2" /> Print Roster
+                </Button>
               </div>
-              <div className="master-summary-print bg-white p-12 border shadow-2xl rounded-[3rem] text-black border-primary/10">
-                <div className="text-center mb-16">
-                  <h1 className="text-4xl font-black tracking-tighter uppercase mb-2 text-primary">{ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS"}</h1>
-                  <h2 className="text-xl font-bold uppercase tracking-[0.4em] text-muted-foreground">Master Summary Sheet</h2>
-                  <div className="mt-4 inline-flex items-center gap-2 bg-muted/50 px-6 py-2 rounded-full border">
-                    <CalendarDays className="w-4 h-4 text-primary" />
-                    <span className="font-black uppercase text-xs tracking-widest">{monthOptions.find(o => o.value === selectedMonth)?.label}</span>
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-16 mb-16">
-                  <div className="space-y-8">
-                    <h3 className="text-sm font-black uppercase tracking-[0.3em] border-b-2 border-primary pb-3 flex items-center gap-3 text-primary"><Droplets className="w-5 h-5" /> Procurement Log</h3>
-                    <div className="space-y-4">
-                      <div className="flex justify-between text-base"><span>Cow Milk Volume</span><span className="font-bold">{monthStats?.totalEntryQty.toFixed(2)} L</span></div>
-                      <div className="flex justify-between text-lg font-black border-t-2 border-dashed pt-4 mt-6 uppercase"><span>Total Procurement</span><span>₹ {monthStats?.totalEntryAmt.toFixed(2)}</span></div>
-                    </div>
+              <div className="master-summary-print bg-white p-8 sm:p-12 border shadow-2xl rounded-[2rem] text-black">
+                <div className="flex justify-between items-start mb-12">
+                  <div>
+                    <h1 className="text-3xl font-black text-primary tracking-tighter uppercase leading-none mb-1">Master Summary Sheet</h1>
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                      Complete Farmer Roster • {currentCycle?.label} • {monthOptions.find(o => o.value === selectedMonth)?.label}
+                    </p>
                   </div>
-                  <div className="space-y-8">
-                    <h3 className="text-sm font-black uppercase tracking-[0.3em] border-b-2 border-accent pb-3 flex items-center gap-3 text-accent"><IndianRupee className="w-5 h-5" /> Distribution Log</h3>
-                    <div className="space-y-4">
-                      <div className="flex justify-between text-base"><span>Milk Sales Volume</span><span className="font-bold">{monthStats?.totalSaleQty.toFixed(2)} L</span></div>
-                      <div className="flex justify-between text-lg font-black border-t-2 border-dashed pt-4 mt-6 uppercase"><span>Total Revenue</span><span>₹ {monthStats?.totalSaleAmt.toFixed(2)}</span></div>
+                  <div className="bg-primary p-6 rounded-2xl flex items-center gap-6 shadow-xl shadow-primary/20">
+                    <div className="p-3 bg-white/20 rounded-xl">
+                      <IndianRupee className="w-8 h-8 text-white" />
+                    </div>
+                    <div className="text-white">
+                      <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Total Cycle Amount</p>
+                      <p className="text-3xl font-black leading-none mt-1">₹ {grandTotalAmt.toLocaleString()}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-primary/5 rounded-[2.5rem] p-12 border-2 border-primary/10 mb-16 text-center">
-                  <p className="text-xs font-black uppercase tracking-[0.4em] text-muted-foreground mb-4">Monthly Financial Performance</p>
-                  <h4 className="text-2xl font-bold uppercase tracking-tight text-primary mb-2">Net Operating Surplus</h4>
-                  <div className={cn("text-7xl font-black tracking-tighter", (monthStats?.profit || 0) >= 0 ? "text-green-600" : "text-destructive")}>
-                    ₹ {monthStats?.profit.toFixed(2)}
-                  </div>
+                <div className="border rounded-xl overflow-hidden">
+                  <Table>
+                    <TableHeader className="bg-muted/30">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="font-black text-[10px] text-primary uppercase tracking-widest py-5 pl-8">CAN NO</TableHead>
+                        <TableHead className="font-black text-[10px] text-primary uppercase tracking-widest py-5">FARMER NAME</TableHead>
+                        <TableHead className="font-black text-[10px] text-primary uppercase tracking-widest py-5">A/C NUMBER</TableHead>
+                        <TableHead className="text-right font-black text-[10px] text-primary uppercase tracking-widest py-5">TOTAL LITRES</TableHead>
+                        <TableHead className="text-right font-black text-[10px] text-primary uppercase tracking-widest py-5 pr-8">AMOUNT (₹)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {masterRoster.map((f) => (
+                        <TableRow key={f.id} className="hover:bg-transparent border-b">
+                          <TableCell className="font-black text-primary text-lg pl-8 py-4">{f.canNumber}</TableCell>
+                          <TableCell className="font-bold uppercase text-sm text-foreground/80">{f.name}</TableCell>
+                          <TableCell className="font-mono text-xs text-muted-foreground">{f.bankAccountNumber || "—"}</TableCell>
+                          <TableCell className="text-right font-bold text-base">{f.totalQty.toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-black text-primary text-lg pr-8">₹ {f.totalAmount.toLocaleString()}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                    <tfoot className="bg-muted/50">
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell colSpan={3} className="pl-8 py-6 font-black text-primary uppercase tracking-widest text-base">Grand Total</TableCell>
+                        <TableCell className="text-right font-black text-xl">{grandTotalQty.toFixed(2)} L</TableCell>
+                        <TableCell className="text-right font-black text-primary text-2xl pr-8">₹ {grandTotalAmt.toLocaleString()}</TableCell>
+                      </TableRow>
+                    </tfoot>
+                  </Table>
                 </div>
 
-                <div className="mt-24 flex justify-between items-end border-t pt-12">
-                  <div className="text-[9px] text-muted-foreground font-black uppercase tracking-[0.3em] leading-relaxed">
-                    Digital Audit Record <br /> Generated: {format(new Date(), 'PPP p')}
-                  </div>
-                  <div className="text-center">
-                    <div className="h-24 flex items-center justify-center mb-4">
-                       {ratesConfig?.stampUrl && <img src={ratesConfig.stampUrl} className="max-w-[150px] mix-blend-multiply opacity-90" />}
-                    </div>
-                    <p className="border-t-2 border-black w-72 pt-3 font-black uppercase text-xs tracking-[0.3em]">Authorized Official</p>
-                  </div>
+                <div className="mt-16 flex justify-between items-end border-t pt-8 text-[10px] text-muted-foreground font-black uppercase tracking-widest italic">
+                  <div>Generated on {format(new Date(), 'PPP p')}</div>
+                  <div className="text-right">Authorized System Document</div>
                 </div>
               </div>
             </TabsContent>
@@ -527,13 +547,6 @@ export default function ReportsPage() {
               </Card>
             </TabsContent>
           </Tabs>
-
-          {/* Bulk Invoice Print Container */}
-          {viewingBulkInvoices && (
-            <div className="bulk-invoices-container hidden print-only">
-              {activeFarmerCycleBreakdown.map(f => <div key={f.id}>{renderInvoice(f.id)}</div>)}
-            </div>
-          )}
         </div>
       </main>
       <Footer />

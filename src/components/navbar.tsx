@@ -1,6 +1,6 @@
 
 import Link from "next/link";
-import { Droplets, ClipboardList, BarChart3, Settings, ShoppingCart, Calculator } from "lucide-react";
+import { Droplets, ClipboardList, BarChart3, Settings, ShoppingCart, Calculator, Users } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export function Navbar() {
@@ -21,6 +21,10 @@ export function Navbar() {
             <div className="hidden lg:flex items-center gap-6">
               <Link href="/" className="text-sm font-bold text-muted-foreground hover:text-primary transition-colors">
                 Dashboard
+              </Link>
+              <Link href="/farmers" className="text-sm font-bold text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                Farmers
               </Link>
               <Link href="/entries" className="text-sm font-bold text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
                 <ClipboardList className="w-4 h-4" />

@@ -26,6 +26,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   UserPlus, 
   Database, 
@@ -37,7 +38,9 @@ import {
   Download, 
   FileSpreadsheet,
   Upload,
-  Trash2
+  Trash2,
+  CheckSquare,
+  Square
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { read, utils, writeFile } from 'xlsx';
@@ -51,6 +54,7 @@ export default function FarmersPage() {
   const [newFarmer, setNewFarmer] = useState({ name: "", canNumber: "", bankAccountNumber: "", ifscCode: "", milkType: "COW" });
   const [importData, setImportData] = useState("");
   const [isImporting, setIsImporting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const farmersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -89,6 +93,36 @@ export default function FarmersPage() {
     toast({ title: "Success", description: "Farmer added successfully." });
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (!filteredFarmers) return;
+    if (selectedIds.length === filteredFarmers.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredFarmers.map(f => f.id));
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (!firestore || selectedIds.length === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedIds.length} selected farmers?`)) return;
+
+    selectedIds.forEach(id => {
+      deleteDocumentNonBlocking(doc(firestore, 'farmers', id));
+    });
+
+    toast({ 
+      title: "Deleted", 
+      description: `${selectedIds.length} farmers have been removed.` 
+    });
+    setSelectedIds([]);
+  };
+
   const handleDeleteAll = () => {
     if (!farmers || !firestore) return;
     if (!confirm("Are you sure you want to delete ALL farmers? This cannot be undone.")) return;
@@ -97,6 +131,7 @@ export default function FarmersPage() {
       deleteDocumentNonBlocking(doc(firestore, 'farmers', farmer.id));
     });
     toast({ title: "Deleted", description: "All farmers have been removed from the directory." });
+    setSelectedIds([]);
   };
 
   const processImportArray = (data: any[]) => {
@@ -236,6 +271,17 @@ export default function FarmersPage() {
               <p className="text-muted-foreground">Directory of suppliers and bank details.</p>
             </div>
             <div className="flex flex-wrap gap-2">
+              {selectedIds.length > 0 && (
+                <Button 
+                  variant="destructive" 
+                  onClick={handleDeleteSelected} 
+                  className="rounded-full shadow-lg animate-in zoom-in duration-300"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete ({selectedIds.length})
+                </Button>
+              )}
+
               <Button onClick={() => setIsAdding(!isAdding)} variant={isAdding ? "outline" : "default"} className="rounded-full">
                 <UserPlus className="w-4 h-4 mr-2" />
                 {isAdding ? "Cancel" : "Add Farmer"}
@@ -421,7 +467,14 @@ export default function FarmersPage() {
             <Table>
               <TableHeader className="bg-muted/50 border-b">
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-[100px] font-black text-primary pl-6 py-5">CAN</TableHead>
+                  <TableHead className="w-[50px] pl-6 py-5">
+                    <Checkbox 
+                      checked={filteredFarmers?.length ? selectedIds.length === filteredFarmers.length : false} 
+                      onCheckedChange={toggleSelectAll} 
+                      aria-label="Select all"
+                    />
+                  </TableHead>
+                  <TableHead className="w-[100px] font-black text-primary py-5">CAN</TableHead>
                   <TableHead className="font-black text-primary">Farmer Name</TableHead>
                   <TableHead className="w-[120px] font-black text-primary">Milk Type</TableHead>
                   <TableHead className="font-black text-primary">Bank Details</TableHead>
@@ -430,10 +483,10 @@ export default function FarmersPage() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground animate-pulse font-medium">Loading farmer directory...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center py-20 text-muted-foreground animate-pulse font-medium">Loading farmer directory...</TableCell></TableRow>
                 ) : filteredFarmers?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-20">
+                    <TableCell colSpan={6} className="text-center py-20">
                       <div className="flex flex-col items-center gap-3">
                         <div className="p-4 bg-muted rounded-full">
                           <ClipboardList className="w-10 h-10 text-muted-foreground/30" />
@@ -445,7 +498,14 @@ export default function FarmersPage() {
                 ) : (
                   filteredFarmers?.map((farmer) => (
                     <TableRow key={farmer.id} className="group hover:bg-primary/5 transition-colors border-b last:border-0">
-                      <TableCell className="font-black text-primary pl-6 text-lg">{farmer.canNumber}</TableCell>
+                      <TableCell className="pl-6">
+                        <Checkbox 
+                          checked={selectedIds.includes(farmer.id)} 
+                          onCheckedChange={() => toggleSelect(farmer.id)} 
+                          aria-label={`Select ${farmer.name}`}
+                        />
+                      </TableCell>
+                      <TableCell className="font-black text-primary text-lg">{farmer.canNumber}</TableCell>
                       <TableCell className="font-bold text-base text-foreground/80">{farmer.name}</TableCell>
                       <TableCell>
                         <Badge variant={farmer.milkType === 'BUFFALO' ? "secondary" : "outline"} className="rounded-full font-bold">

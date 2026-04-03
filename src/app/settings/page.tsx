@@ -37,7 +37,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 export default function SettingsPage() {
@@ -136,7 +135,7 @@ export default function SettingsPage() {
     allEntries.forEach(entry => {
       deleteDocumentNonBlocking(doc(firestore, 'entries', entry.id));
     });
-    toast({ title: "System Cleaned", description: "All collection records have been wiped." });
+    toast({ title: "System Cleaned", description: `Removed ${allEntries.length} collection logs.` });
   };
 
   const wipeSales = () => {
@@ -144,7 +143,7 @@ export default function SettingsPage() {
     allSales.forEach(sale => {
       deleteDocumentNonBlocking(doc(firestore, 'sales', sale.id));
     });
-    toast({ title: "Sales Wiped", description: "All distribution records have been wiped." });
+    toast({ title: "Sales Wiped", description: `Removed ${allSales.length} distribution records.` });
   };
 
   return (

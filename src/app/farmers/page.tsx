@@ -86,7 +86,7 @@ export default function FarmersPage() {
     const bNum = parseInt(b.canNumber);
     if (isNaN(aNum) || isNaN(bNum)) return a.canNumber.localeCompare(b.canNumber);
     return aNum - bNum;
-  });
+  }) || [];
 
   const handleAddFarmer = () => {
     if (!newFarmer.name || !newFarmer.canNumber) {
@@ -133,7 +133,6 @@ export default function FarmersPage() {
   };
 
   const toggleSelectAll = (checked: boolean) => {
-    if (!filteredFarmers) return;
     if (checked) {
       setSelectedIds(filteredFarmers.map(f => f.id));
     } else {
@@ -482,7 +481,7 @@ export default function FarmersPage() {
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="w-[50px] pl-6 py-5">
                     <Checkbox 
-                      checked={filteredFarmers?.length ? (selectedIds.length === filteredFarmers.length && filteredFarmers.length > 0) : false} 
+                      checked={filteredFarmers.length > 0 && selectedIds.length === filteredFarmers.length} 
                       onCheckedChange={(checked) => toggleSelectAll(checked === true)} 
                       aria-label="Select all"
                     />
@@ -497,7 +496,7 @@ export default function FarmersPage() {
               <TableBody>
                 {isLoading ? (
                   <TableRow><TableCell colSpan={6} className="text-center py-20 text-muted-foreground animate-pulse font-medium">Loading farmer directory...</TableCell></TableRow>
-                ) : filteredFarmers?.length === 0 ? (
+                ) : filteredFarmers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-20">
                       <div className="flex flex-col items-center gap-3">
@@ -507,7 +506,7 @@ export default function FarmersPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredFarmers?.map((farmer) => (
+                  filteredFarmers.map((farmer) => (
                     <TableRow key={farmer.id} className={cn("group transition-colors border-b last:border-0", selectedIds.includes(farmer.id) ? "bg-primary/5" : "hover:bg-primary/5")}>
                       <TableCell className="pl-6">
                         <Checkbox 

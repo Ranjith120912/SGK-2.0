@@ -35,12 +35,12 @@ import {
   FileUp, 
   ClipboardList, 
   CheckCircle2, 
-  AlertCircle, 
   Download, 
   FileSpreadsheet,
   Upload,
   Trash2,
-  X
+  X,
+  AlertTriangle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { read, utils, writeFile } from 'xlsx';
@@ -110,6 +110,7 @@ export default function FarmersPage() {
 
   const handleDeleteSelected = () => {
     if (!firestore || selectedIds.length === 0) return;
+    
     if (!window.confirm(`Are you sure you want to delete ${selectedIds.length} selected farmers?`)) return;
 
     selectedIds.forEach(id => {
@@ -117,31 +118,38 @@ export default function FarmersPage() {
     });
 
     toast({ 
-      title: "Deleted", 
-      description: `${selectedIds.length} farmers have been removed.` 
+      title: "Deletion Started", 
+      description: `Removing ${selectedIds.length} farmers from the directory.` 
     });
     setSelectedIds([]);
   };
 
   const handleDeleteRow = (id: string, name: string) => {
     if (!firestore) return;
-    if (!window.confirm(`Are you sure you want to delete farmer "${name}"?`)) return;
+    if (!window.confirm(`Delete farmer "${name}"?`)) return;
 
     deleteDocumentNonBlocking(doc(firestore, 'farmers', id));
     toast({ title: "Deleted", description: "Farmer removed from directory." });
     
-    // Remove from selected list if it was there
     setSelectedIds(prev => prev.filter(i => i !== id));
   };
 
   const handleDeleteAll = () => {
     if (!farmers || !firestore) return;
-    if (!window.confirm("Are you sure you want to delete ALL farmers? This cannot be undone.")) return;
+    
+    const count = farmers.length;
+    if (count === 0) return;
+
+    if (!window.confirm(`CRITICAL ACTION: Are you sure you want to delete ALL ${count} farmers? This cannot be undone.`)) return;
     
     farmers.forEach(farmer => {
       deleteDocumentNonBlocking(doc(firestore, 'farmers', farmer.id));
     });
-    toast({ title: "Deleted", description: "All farmers have been removed." });
+    
+    toast({ 
+      title: "Clearing Directory", 
+      description: `Removing all ${count} records from the system.` 
+    });
     setSelectedIds([]);
   };
 

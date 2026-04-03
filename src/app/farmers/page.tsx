@@ -34,15 +34,12 @@ import {
   Search, 
   FileUp, 
   ClipboardList, 
-  CircleCheck, 
-  CircleAlert, 
+  CheckCircle2, 
+  AlertCircle, 
   Download, 
   FileSpreadsheet,
   Upload,
   Trash2,
-  CheckSquare,
-  Square,
-  MoreVertical,
   X
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -113,7 +110,7 @@ export default function FarmersPage() {
 
   const handleDeleteSelected = () => {
     if (!firestore || selectedIds.length === 0) return;
-    if (!confirm(`Are you sure you want to delete ${selectedIds.length} selected farmers?`)) return;
+    if (!window.confirm(`Are you sure you want to delete ${selectedIds.length} selected farmers?`)) return;
 
     selectedIds.forEach(id => {
       deleteDocumentNonBlocking(doc(firestore, 'farmers', id));
@@ -128,15 +125,18 @@ export default function FarmersPage() {
 
   const handleDeleteRow = (id: string, name: string) => {
     if (!firestore) return;
-    if (!confirm(`Are you sure you want to delete farmer "${name}"?`)) return;
+    if (!window.confirm(`Are you sure you want to delete farmer "${name}"?`)) return;
 
     deleteDocumentNonBlocking(doc(firestore, 'farmers', id));
     toast({ title: "Deleted", description: "Farmer removed from directory." });
+    
+    // Remove from selected list if it was there
+    setSelectedIds(prev => prev.filter(i => i !== id));
   };
 
   const handleDeleteAll = () => {
     if (!farmers || !firestore) return;
-    if (!confirm("Are you sure you want to delete ALL farmers? This cannot be undone.")) return;
+    if (!window.confirm("Are you sure you want to delete ALL farmers? This cannot be undone.")) return;
     
     farmers.forEach(farmer => {
       deleteDocumentNonBlocking(doc(firestore, 'farmers', farmer.id));
@@ -361,7 +361,7 @@ export default function FarmersPage() {
                   <div className="bg-muted/50 p-6 flex justify-end gap-2 border-t">
                     <Button variant="ghost" onClick={() => setIsImporting(false)} className="rounded-full">Cancel</Button>
                     <Button onClick={handleBulkImportText} className="rounded-full px-8 shadow-md" disabled={!importData}>
-                      <CircleCheck className="w-4 h-4 mr-2" />
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
                       Process Text
                     </Button>
                   </div>
@@ -469,7 +469,7 @@ export default function FarmersPage() {
                   <TableHead className="w-[50px] pl-6 py-5">
                     <Checkbox 
                       checked={filteredFarmers?.length ? selectedIds.length === filteredFarmers.length : false} 
-                      onCheckedChange={(checked) => toggleSelectAll(!!checked)} 
+                      onCheckedChange={(checked) => toggleSelectAll(checked === true)} 
                       aria-label="Select all"
                     />
                   </TableHead>
@@ -498,7 +498,7 @@ export default function FarmersPage() {
                       <TableCell className="pl-6">
                         <Checkbox 
                           checked={selectedIds.includes(farmer.id)} 
-                          onCheckedChange={(checked) => toggleSelect(farmer.id, !!checked)} 
+                          onCheckedChange={(checked) => toggleSelect(farmer.id, checked === true)} 
                           aria-label={`Select ${farmer.name}`}
                         />
                       </TableCell>

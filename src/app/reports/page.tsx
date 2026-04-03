@@ -21,7 +21,7 @@ import {
   IndianRupee,
   CalendarDays
 } from "lucide-react";
-import { format, endOfMonth, subMonths } from "date-fns";
+import { format, endOfMonth, subMonths, startOfMonth, addMonths, setMonth, setYear } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -123,12 +123,15 @@ export default function ReportsPage() {
     if (!allEntries || !allSales || !isClient) return [];
     
     const now = new Date();
-    const currentYear = now.getFullYear();
     const currentMonth = now.getMonth(); 
+    const currentYear = now.getFullYear();
     
+    // Financial year starts in April (index 3). 
+    // If current month is Jan-Mar (0-2), the fiscal year started in previous calendar year.
     const fiscalStartYear = currentMonth < 3 ? currentYear - 1 : currentYear;
     
     return Array.from({ length: 12 }).map((_, i) => {
+      // Index 0 = April, Index 11 = March
       const monthIndex = (3 + i) % 12; 
       const year = fiscalStartYear + (3 + i >= 12 ? 1 : 0);
       
@@ -323,7 +326,7 @@ export default function ReportsPage() {
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">
                 {ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS"} Reports
               </h1>
-              <p className="text-muted-foreground font-medium">Financial analytics and cycle rosters.</p>
+              <p className="text-muted-foreground font-medium">Fiscal Analytics (April - March) & Cycle Rosters.</p>
             </div>
             <div className="flex items-center gap-3">
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
@@ -470,7 +473,7 @@ export default function ReportsPage() {
                     </div>
                     <div className="text-white">
                       <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Total Cycle Amount</p>
-                      <p className="text-3xl font-black leading-none mt-1">₹ {grandTotalAmt.toLocaleString()}</p>
+                      <p className="text-3xl font-black leading-none mt-1">₹ {grandTotalAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                     </div>
                   </div>
                 </div>
@@ -493,7 +496,7 @@ export default function ReportsPage() {
                           <TableCell className="font-bold uppercase text-sm text-foreground/80">{f.name}</TableCell>
                           <TableCell className="font-mono text-xs text-muted-foreground">{f.bankAccountNumber || "—"}</TableCell>
                           <TableCell className="text-right font-bold text-base">{f.totalQty.toFixed(2)}</TableCell>
-                          <TableCell className="text-right font-black text-primary text-lg pr-8">₹ {f.totalAmount.toLocaleString()}</TableCell>
+                          <TableCell className="text-right font-black text-primary text-lg pr-8">₹ {f.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -501,7 +504,7 @@ export default function ReportsPage() {
                       <TableRow className="hover:bg-transparent">
                         <TableCell colSpan={3} className="pl-8 py-6 font-black text-primary uppercase tracking-widest text-base">Grand Total</TableCell>
                         <TableCell className="text-right font-black text-xl">{grandTotalQty.toFixed(2)} L</TableCell>
-                        <TableCell className="text-right font-black text-primary text-2xl pr-8">₹ {grandTotalAmt.toLocaleString()}</TableCell>
+                        <TableCell className="text-right font-black text-primary text-2xl pr-8">₹ {grandTotalAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                       </TableRow>
                     </tfoot>
                   </Table>
@@ -519,7 +522,7 @@ export default function ReportsPage() {
                 <Table>
                   <TableHeader className="bg-muted/50 border-b">
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest pl-10 py-6">Month (Fiscal Cycle)</TableHead>
+                      <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest pl-10 py-6">Month (Fiscal Year)</TableHead>
                       <TableHead className="text-center font-black text-primary uppercase text-[10px] tracking-widest py-6">Collection (L)</TableHead>
                       <TableHead className="text-center font-black text-primary uppercase text-[10px] tracking-widest py-6">Farmer Cost (₹)</TableHead>
                       <TableHead className="text-center font-black text-primary uppercase text-[10px] tracking-widest py-6">Sales Revenue (₹)</TableHead>
@@ -532,18 +535,23 @@ export default function ReportsPage() {
                         <TableCell className="pl-10 py-6">
                           <span className="text-xl font-black text-primary tracking-tight">{m.monthName}</span>
                         </TableCell>
-                        <TableCell className="text-center font-bold text-lg">{m.collectionL.toFixed(1)} L</TableCell>
-                        <TableCell className="text-center font-mono font-medium text-destructive">₹ {m.cost.toFixed(0)}</TableCell>
-                        <TableCell className="text-center font-mono font-medium text-green-600">₹ {m.revenue.toFixed(0)}</TableCell>
+                        <TableCell className="text-center font-bold text-lg">{m.collectionL.toFixed(2)} L</TableCell>
+                        <TableCell className="text-center font-mono font-medium text-destructive">₹ {m.cost.toFixed(2)}</TableCell>
+                        <TableCell className="text-center font-mono font-medium text-green-600">₹ {m.revenue.toFixed(2)}</TableCell>
                         <TableCell className="text-right pr-10">
                           <span className={cn("text-2xl font-black tracking-tighter", m.profit >= 0 ? "text-primary" : "text-destructive")}>
-                            {m.profit >= 0 ? "+" : ""} ₹ {m.profit.toFixed(0)}
+                            {m.profit >= 0 ? "+" : ""} ₹ {m.profit.toFixed(2)}
                           </span>
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+                <div className="p-6 bg-muted/20 border-t">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest text-center">
+                    Fiscal Summary based on April - March Cycle
+                  </p>
+                </div>
               </Card>
             </TabsContent>
           </Tabs>

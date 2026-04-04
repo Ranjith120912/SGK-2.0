@@ -105,7 +105,6 @@ export default function ReportsPage() {
       const fid = e.farmerId;
       const farmerProfile = farmers.find(f => f.id === fid);
       
-      // Precision: Display actual name/CAN from directory, fallback to metadata, NEVER Firestore ID
       const name = farmerProfile?.name || e.farmerName || "Farmer";
       const can = farmerProfile?.canNumber || e.canNumber || "---";
       const milkType = farmerProfile?.milkType || e.milkType || "COW";

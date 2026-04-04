@@ -64,7 +64,7 @@ export default function DailyReportsPage() {
       const fid = e.farmerId;
       const farmerProfile = farmers.find(f => f.id === fid);
       
-      // IDENTITY LOCK: Use directory name, fallback to record name, NEVER Firestore ID
+      // IDENTITY LOCK: Use directory name, fallback to record name
       const name = farmerProfile?.name || e.farmerName || "Farmer";
       const can = farmerProfile?.canNumber || e.canNumber || "---";
       const milkType = farmerProfile?.milkType || e.milkType || "COW";

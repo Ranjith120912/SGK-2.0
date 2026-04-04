@@ -21,7 +21,7 @@ import {
   ChevronRight,
   FileDown
 } from "lucide-react";
-import { format, endOfMonth, subMonths, startOfMonth, isSameMonth } from "date-fns";
+import { format, endOfMonth, subMonths, startOfMonth, isSameMonth, lastDayOfMonth } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -214,117 +214,168 @@ export default function ReportsPage() {
   };
 
   const generateSingleInvoice = (doc: jsPDF, farmer: any) => {
-    const companyName = ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS";
+    const companyName = (ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS").toUpperCase();
     const [year, month] = selectedMonth.split('-').map(Number);
     
-    // Period dates
-    const startDate = `${currentCycle.start.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year.toString().slice(-2)}`;
-    const endDate = `${currentCycle.end.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year.toString().slice(-2)}`;
-    
-    // Header
+    // Cycle Date Range Calculation
+    const cycleStart = currentCycle.start;
+    const cycleEnd = currentCycle.end;
+    const startDateFormatted = `${cycleStart}/${month.toString().padStart(2, '0')}/${year.toString().slice(-2)}`;
+    const endDateFormatted = `${cycleEnd}/${month.toString().padStart(2, '0')}/${year.toString().slice(-2)}`;
+    const periodString = `${startDateFormatted} to ${endDateFormatted}`;
+
+    // Header Branding
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
-    const title = companyName.toUpperCase();
-    doc.text(title, (210 - doc.getTextWidth(title)) / 2, 20);
+    doc.text(companyName, 105, 20, { align: 'center' });
     
-    doc.setFontSize(14);
-    const subtitle = "MILK INVOICE";
-    doc.text(subtitle, (210 - doc.getTextWidth(subtitle)) / 2, 28);
+    doc.setFontSize(12);
+    doc.text("MILK INVOICE", 105, 28, { align: 'center' });
+    doc.line(88, 30, 122, 30); // Subtitle underline
 
-    // Farmer Info
-    doc.setFontSize(11);
-    const leftCol = 14;
-    const rightCol = 110;
-    let yPos = 42;
+    // Farmer Info Section (Grid Style)
+    doc.setFontSize(10);
+    const labelX1 = 20;
+    const valueX1 = 45;
+    const labelX2 = 110;
+    const valueX2 = 135;
+    let y = 45;
 
     const currentRate = farmer.milkType === 'BUFFALO' ? (ratesConfig?.buffaloRate || 0) : (ratesConfig?.cowRate || 0);
 
-    doc.text("Name:", leftCol, yPos);
+    // Row 1
     doc.setFont("helvetica", "normal");
-    doc.text(farmer.name.toUpperCase(), leftCol + 35, yPos);
-
+    doc.text("NAME:", labelX1, y);
     doc.setFont("helvetica", "bold");
-    doc.text("Date:", rightCol, yPos);
-    doc.setFont("helvetica", "normal");
-    doc.text(format(new Date(), 'dd/MM/yyyy'), rightCol + 35, yPos);
+    doc.text(farmer.name.toUpperCase(), valueX1, y);
+    doc.line(valueX1, y+1, valueX1+55, y+1);
 
-    yPos += 7;
+    doc.setFont("helvetica", "normal");
+    doc.text("DATE:", labelX2, y);
     doc.setFont("helvetica", "bold");
-    doc.text("A/C No:", leftCol, yPos);
-    doc.setFont("helvetica", "normal");
-    doc.text(farmer.bankAccountNumber || "—", leftCol + 35, yPos);
+    doc.text(format(new Date(), 'dd/MM/yyyy'), valueX2, y);
+    doc.line(valueX2, y+1, valueX2+55, y+1);
 
+    y += 10;
+    // Row 2
+    doc.setFont("helvetica", "normal");
+    doc.text("A/C NO:", labelX1, y);
     doc.setFont("helvetica", "bold");
-    doc.text("Period:", rightCol, yPos);
-    doc.setFont("helvetica", "normal");
-    doc.text(`${startDate} to ${endDate}`, rightCol + 35, yPos);
+    doc.text(farmer.bankAccountNumber || "—", valueX1, y);
+    doc.line(valueX1, y+1, valueX1+55, y+1);
 
-    yPos += 7;
+    doc.setFont("helvetica", "normal");
+    doc.text("PERIOD:", labelX2, y);
     doc.setFont("helvetica", "bold");
-    doc.text("Can No:", leftCol, yPos);
-    doc.setFont("helvetica", "normal");
-    doc.text(farmer.canNumber, leftCol + 35, yPos);
+    doc.text(periodString, valueX2, y);
+    doc.line(valueX2, y+1, valueX2+55, y+1);
 
-    yPos += 7;
+    y += 10;
+    // Row 3
+    doc.setFont("helvetica", "normal");
+    doc.text("CAN NO:", labelX1, y);
     doc.setFont("helvetica", "bold");
-    doc.text("Rate (Rs):", leftCol, yPos);
-    doc.setFont("helvetica", "normal");
-    doc.text(currentRate.toFixed(2), leftCol + 35, yPos);
+    doc.text(farmer.canNumber, valueX1, y);
+    doc.line(valueX1, y+1, valueX1+55, y+1);
 
-    // Table Data
-    const invEntries = filteredCycleEntries.filter(e => e.farmerId === farmer.id).sort((a, b) => a.date.localeCompare(b.date));
-    
+    doc.setFont("helvetica", "normal");
+    doc.text("RATE (Rs):", labelX2, y);
+    doc.setFont("helvetica", "bold");
+    doc.text(currentRate.toFixed(2), valueX2, y);
+    doc.line(valueX2, y+1, valueX2+55, y+1);
+
+    // Prepare Table Data (Fill all cycle dates)
+    const cycleEntries = filteredCycleEntries.filter(e => e.farmerId === farmer.id);
     const dateMap: Record<string, { morning: number, evening: number, rate: number }> = {};
-    invEntries.forEach(e => {
-      if (!dateMap[e.date]) {
-        dateMap[e.date] = { morning: 0, evening: 0, rate: e.rate };
+    
+    // Initialize all dates in cycle
+    for (let d = cycleStart; d <= cycleEnd; d++) {
+      const dateStr = `${year}-${month.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`;
+      dateMap[dateStr] = { morning: 0, evening: 0, rate: currentRate };
+    }
+
+    cycleEntries.forEach(e => {
+      if (dateMap[e.date]) {
+        if (e.session === 'Morning') dateMap[e.date].morning = Number(e.quantity);
+        else dateMap[e.date].evening = Number(e.quantity);
+        dateMap[e.date].rate = e.rate;
       }
-      if (e.session === 'Morning') dateMap[e.date].morning = Number(e.quantity);
-      else dateMap[e.date].evening = Number(e.quantity);
     });
 
-    const tableData = Object.keys(dateMap).sort().map(date => {
+    const tableRows = Object.keys(dateMap).sort().map(date => {
       const d = dateMap[date];
       const total = d.morning + d.evening;
+      const amount = total * d.rate;
       return [
         format(new Date(date), 'dd/MM/yy'),
         d.morning.toFixed(2),
         d.evening.toFixed(2),
         total.toFixed(2),
         d.rate.toFixed(2),
-        (total * d.rate).toFixed(2)
+        amount.toFixed(2)
       ];
     });
 
     const totalQty = farmer.totalQty;
     const totalAmt = farmer.totalAmount;
 
+    // Main Table
     (doc as any).autoTable({
-      startY: yPos + 10,
+      startY: y + 10,
       head: [['DATE', 'MORNING (L)', 'EVENING (L)', 'TOTAL LITRES', 'RATE (Rs)', 'AMOUNT (Rs)']],
-      body: tableData,
+      body: tableRows,
       theme: 'grid',
-      headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', lineWidth: 0.1, lineColor: [0, 0, 0] },
-      bodyStyles: { textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [0, 0, 0] },
+      headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', lineWidth: 0.1, lineColor: [0, 0, 0], halign: 'center' },
+      bodyStyles: { textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [0, 0, 0], halign: 'center' },
       columnStyles: {
         0: { halign: 'center' },
-        1: { halign: 'center' },
-        2: { halign: 'center' },
-        3: { halign: 'center' },
-        4: { halign: 'center' },
-        5: { halign: 'center' }
+        3: { fontStyle: 'bold' }
       },
-      foot: [['TOTAL', '', '', totalQty.toFixed(2), '', totalAmt.toFixed(2)]],
-      footStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', lineWidth: 0.1, lineColor: [0, 0, 0] }
+      margin: { left: 20, right: 20 }
     });
 
-    const finalY = (doc as any).lastAutoTable.finalY + 12;
+    const finalY = (doc as any).lastAutoTable.finalY + 5;
+
+    // Total Row (Bold inside/under table)
     doc.setFont("helvetica", "bold");
-    doc.text("Total Litres:", leftCol, finalY);
-    doc.text(totalQty.toFixed(2), leftCol + 60, finalY, { align: 'right' });
-    
-    doc.text("Total Amount (Rs):", leftCol, finalY + 8);
-    doc.text(totalAmt.toFixed(2), leftCol + 60, finalY + 8, { align: 'right' });
+    doc.line(20, finalY, 190, finalY);
+    doc.text("TOTAL", 25, finalY + 5);
+    doc.text(totalQty.toFixed(2), 125, finalY + 5, { align: 'center' });
+    doc.text(totalAmt.toFixed(2), 185, finalY + 5, { align: 'right' });
+    doc.line(20, finalY + 8, 190, finalY + 8);
+
+    // Summary Block (Right Aligned)
+    let summaryY = finalY + 25;
+    doc.setFont("helvetica", "normal");
+    doc.text("Total Litres:", 155, summaryY, { align: 'right' });
+    doc.setFont("helvetica", "bold");
+    doc.text(totalQty.toFixed(2), 185, summaryY, { align: 'right' });
+
+    summaryY += 8;
+    doc.setFont("helvetica", "normal");
+    doc.text("Total Amount (Rs):", 155, summaryY, { align: 'right' });
+    doc.setFont("helvetica", "bold");
+    doc.text(totalAmt.toFixed(2), 185, summaryY, { align: 'right' });
+
+    // Footer & Signature
+    const footerY = 275;
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(8);
+    doc.text(`Generated by ${companyName} Management System`, 20, footerY);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.line(140, footerY - 5, 190, footerY - 5);
+    doc.text("AUTHORIZED SIGNATURE", 140, footerY);
+
+    // Optional Stamp
+    if (ratesConfig?.stampUrl) {
+      try {
+        doc.addImage(ratesConfig.stampUrl, 'PNG', 155, footerY - 30, 25, 25);
+      } catch (e) {
+        console.warn("Could not add stamp to PDF", e);
+      }
+    }
   };
 
   const handleDownloadFarmerBillPDF = (farmerId: string) => {

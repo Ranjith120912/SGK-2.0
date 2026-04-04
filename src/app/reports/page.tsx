@@ -27,7 +27,7 @@ import { format, endOfMonth, subMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import jsPDF from "jsPDF";
+import jsPDF from "jspdf";
 import "jspdf-autotable";
 
 export default function ReportsPage() {

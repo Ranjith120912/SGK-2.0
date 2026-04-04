@@ -69,12 +69,14 @@ export default function DailyReportsPage() {
     
     filteredEntries.forEach(e => {
       const fid = e.farmerId;
-      // PRECISION LOOKUP: Prioritize live Directory to fix "Farmer [ID]" issue
+      // DIRECTORY VALIDATION: Only include entries where the farmer exists in Management
       const farmerProfile = farmers.find(f => f.id === fid || f.canNumber === e.canNumber);
       
-      const name = farmerProfile?.name || e.farmerName || "Unknown Farmer";
-      const can = farmerProfile?.canNumber || e.canNumber || "---";
-      const milkType = farmerProfile?.milkType || e.milkType || "COW";
+      if (!farmerProfile) return; // SKIP entries for farmers not in the directory
+
+      const name = farmerProfile.name;
+      const can = farmerProfile.canNumber;
+      const milkType = farmerProfile.milkType || "COW";
 
       if (!map[fid]) {
         map[fid] = {
@@ -91,10 +93,10 @@ export default function DailyReportsPage() {
       const kg = Number(e.kgWeight) || 0;
       const ltr = kg * CONVERSION_RATE;
       
-      // BUFFALO RATE RESOLUTION: Custom Farmer Rate > Global Buffalo Rate
+      // BUFFALO RATE RESOLUTION
       let rate = 0;
       if (milkType === 'BUFFALO') {
-        rate = farmerProfile && Number(farmerProfile.customRate) > 0 
+        rate = Number(farmerProfile.customRate) > 0 
           ? Number(farmerProfile.customRate) 
           : (Number(ratesConfig.buffaloRate) || 0);
       } else {
@@ -143,7 +145,7 @@ export default function DailyReportsPage() {
 
   const handlePrintPDF = () => {
     const pdf = new jsPDF('l', 'mm', 'a4');
-    const company = (ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS").toUpperCase();
+    const company = (ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS").toUpperCase();
     pdf.setFontSize(18);
     pdf.text(company, 148, 20, { align: 'center' });
     pdf.setFontSize(12);
@@ -182,12 +184,12 @@ export default function DailyReportsPage() {
             <div>
               <div className="flex items-center gap-2 text-primary mb-1">
                 <FileBarChart className="w-5 h-5" />
-                <span className="text-xs font-black uppercase tracking-widest">Enterprise Precision</span>
+                <span className="text-xs font-black uppercase tracking-widest">Directory Sync</span>
               </div>
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Daily Reports</h1>
               <p className="text-muted-foreground font-medium flex items-center gap-2">
                 <Users className="w-4 h-4" /> 
-                Synchronized Directory & Transactions
+                Validated Farmer Collections
               </p>
             </div>
             <div className="flex flex-col sm:flex-row items-center gap-4">
@@ -253,7 +255,7 @@ export default function DailyReportsPage() {
                 ) : dailyData.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-20 italic text-muted-foreground font-medium uppercase text-[10px] tracking-widest">
-                      No procurement records found for this date.
+                      No matching directory records found for this date.
                     </TableCell>
                   </TableRow>
                 ) : (

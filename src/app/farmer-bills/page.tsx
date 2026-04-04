@@ -90,12 +90,14 @@ export default function FarmerBillsPage() {
 
     cycleEntries.forEach(e => {
       const fid = e.farmerId;
-      // PRECISION IDENTITY RESOLUTION
+      // STRICT DIRECTORY LOOKUP
       const farmerProfile = farmers.find(f => f.id === fid || f.canNumber === e.canNumber);
       
-      const name = farmerProfile?.name || e.farmerName || "Unknown Farmer";
-      const can = farmerProfile?.canNumber || e.canNumber || "---";
-      const milkType = farmerProfile?.milkType || e.milkType || "COW";
+      if (!farmerProfile) return; // REMOVE unknown farmers
+
+      const name = farmerProfile.name;
+      const can = farmerProfile.canNumber;
+      const milkType = farmerProfile.milkType || "COW";
 
       if (!map[fid]) {
         map[fid] = {
@@ -112,7 +114,7 @@ export default function FarmerBillsPage() {
       
       let rate = 0;
       if (milkType === 'BUFFALO') {
-        rate = farmerProfile && Number(farmerProfile.customRate) > 0 
+        rate = Number(farmerProfile.customRate) > 0 
           ? Number(farmerProfile.customRate) 
           : (Number(ratesConfig.buffaloRate) || 0);
       } else {
@@ -132,7 +134,7 @@ export default function FarmerBillsPage() {
   }, [allEntries, farmers, selectedMonth, activeCycle, ratesConfig, currentCycle]);
 
   const generateProfessionalInvoice = (pdf: jsPDF, f: any) => {
-    const company = (ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS").toUpperCase();
+    const company = (ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS").toUpperCase();
     const [year, month] = selectedMonth.split('-').map(Number);
     const periodStartStr = `${currentCycle.start}/${month}/${year.toString().slice(-2)}`;
     const periodEndStr = `${currentCycle.end}/${month}/${year.toString().slice(-2)}`;
@@ -241,10 +243,10 @@ export default function FarmerBillsPage() {
             <div>
               <div className="flex items-center gap-2 text-primary mb-1">
                 <FileText className="w-5 h-5" />
-                <span className="text-xs font-black uppercase tracking-widest">Enterprise Billing</span>
+                <span className="text-xs font-black uppercase tracking-widest">Validated Billing</span>
               </div>
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Farmer Bills</h1>
-              <p className="text-muted-foreground font-medium">Generate professional invoices for your supplier directory.</p>
+              <p className="text-muted-foreground font-medium">Invoices synchronized with Management Directory.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4">
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
@@ -302,7 +304,7 @@ export default function FarmerBillsPage() {
                 {entriesLoading || farmersLoading ? (
                   <TableRow><TableCell colSpan={6} className="text-center py-20"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" /></TableCell></TableRow>
                 ) : masterRoster.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-20 italic text-muted-foreground">No transaction data found for this cycle.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center py-20 italic text-muted-foreground">No matching directory data found for this cycle.</TableCell></TableRow>
                 ) : (
                   masterRoster.map(f => (
                     <TableRow key={f.id} className="hover:bg-primary/5 transition-colors group">

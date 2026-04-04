@@ -113,12 +113,14 @@ export default function ReportsPage() {
 
     cycleEntries.forEach(e => {
       const fid = e.farmerId;
-      // PRECISION IDENTITY RESOLUTION: Prioritize Directory
+      // STRICT DIRECTORY VALIDATION: Only include validated farmers
       const farmerProfile = farmers.find(f => f.id === fid || f.canNumber === e.canNumber);
       
-      const name = farmerProfile?.name || e.farmerName || "Unknown Farmer";
-      const can = farmerProfile?.canNumber || e.canNumber || "---";
-      const milkType = farmerProfile?.milkType || e.milkType || "COW";
+      if (!farmerProfile) return; // REMOVE unknown farmers
+
+      const name = farmerProfile.name;
+      const can = farmerProfile.canNumber;
+      const milkType = farmerProfile.milkType || "COW";
 
       if (!map[fid]) {
         map[fid] = {
@@ -134,7 +136,7 @@ export default function ReportsPage() {
       
       let rate = 0;
       if (milkType === 'BUFFALO') {
-        rate = farmerProfile && Number(farmerProfile.customRate) > 0 
+        rate = Number(farmerProfile.customRate) > 0 
           ? Number(farmerProfile.customRate) 
           : (Number(ratesConfig.buffaloRate) || 0);
       } else {
@@ -212,7 +214,7 @@ export default function ReportsPage() {
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Reports & Audit</h1>
               <p className="text-muted-foreground font-medium flex items-center gap-2">
                 <Users className="w-4 h-4" /> 
-                Enterprise Business Intelligence Resolution
+                Validated Business Resolution
               </p>
             </div>
             <div className="flex gap-4">
@@ -282,7 +284,7 @@ export default function ReportsPage() {
                 </div>
                 <Button onClick={() => {
                   const pdf = new jsPDF('l', 'mm', 'a4');
-                  const company = (ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS").toUpperCase();
+                  const company = (ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS").toUpperCase();
                   pdf.setFontSize(18);
                   pdf.text(company, 14, 20);
                   pdf.setFontSize(12);
@@ -315,21 +317,25 @@ export default function ReportsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {masterRoster.map(f => (
-                      <TableRow key={f.id} className="hover:bg-primary/5 transition-colors group">
-                        <TableCell className="pl-10 font-black text-primary text-lg">{f.can}</TableCell>
-                        <TableCell className="font-bold uppercase text-sm">{f.name}</TableCell>
-                        <TableCell>
-                          <Badge variant={f.milkType === 'BUFFALO' ? "secondary" : "outline"} className="text-[9px] rounded-full px-2 font-black">
-                            {f.milkType}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground">{f.morningQty.toFixed(2)}</TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground">{f.eveningQty.toFixed(2)}</TableCell>
-                        <TableCell className="text-right font-bold text-base">{f.totalQty.toFixed(2)}</TableCell>
-                        <TableCell className="text-right pr-10 font-black text-primary text-base">₹ {f.totalAmount.toFixed(2)}</TableCell>
-                      </TableRow>
-                    ))}
+                    {masterRoster.length === 0 ? (
+                      <TableRow><TableCell colSpan={7} className="text-center py-20 italic text-muted-foreground">No validated directory records found.</TableCell></TableRow>
+                    ) : (
+                      masterRoster.map(f => (
+                        <TableRow key={f.id} className="hover:bg-primary/5 transition-colors group">
+                          <TableCell className="pl-10 font-black text-primary text-lg">{f.can}</TableCell>
+                          <TableCell className="font-bold uppercase text-sm">{f.name}</TableCell>
+                          <TableCell>
+                            <Badge variant={f.milkType === 'BUFFALO' ? "secondary" : "outline"} className="text-[9px] rounded-full px-2 font-black">
+                              {f.milkType}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right text-xs text-muted-foreground">{f.morningQty.toFixed(2)}</TableCell>
+                          <TableCell className="text-right text-xs text-muted-foreground">{f.eveningQty.toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-bold text-base">{f.totalQty.toFixed(2)}</TableCell>
+                          <TableCell className="text-right pr-10 font-black text-primary text-base">₹ {f.totalAmount.toFixed(2)}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </Card>
@@ -355,12 +361,14 @@ export default function ReportsPage() {
                        let tCost = 0, tRev = 0, tQty = 0;
                        mEntries.forEach(e => {
                          const f = farmers?.find(item => item.id === e.farmerId || item.canNumber === e.canNumber);
-                         const milkType = f?.milkType || e.milkType || "COW";
+                         if (!f) return; // ONLY include directory farmers
+                         
+                         const milkType = f.milkType || "COW";
                          const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
                          
                          let rate = 0;
                          if (milkType === 'BUFFALO') {
-                           rate = f && Number(f.customRate) > 0 ? Number(f.customRate) : (Number(ratesConfig?.buffaloRate) || 0);
+                           rate = Number(f.customRate) > 0 ? Number(f.customRate) : (Number(ratesConfig?.buffaloRate) || 0);
                          } else {
                            rate = Number(ratesConfig?.cowRate) || 0;
                          }

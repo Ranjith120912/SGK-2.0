@@ -19,7 +19,8 @@ import {
   Printer,
   Calendar,
   FileSpreadsheet,
-  Users
+  Users,
+  CheckCircle2
 } from "lucide-react";
 import { format, endOfMonth, subMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -81,11 +82,6 @@ export default function ReportsPage() {
     return collection(firestore, 'sales');
   }, [firestore]);
 
-  const buyersQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'buyers');
-  }, [firestore]);
-
   const settingsRef = useMemoFirebase(() => {
     if (!firestore) return null;
     return doc(firestore, 'settings', 'milk_rates');
@@ -94,23 +90,27 @@ export default function ReportsPage() {
   const { data: allEntries, isLoading: entriesLoading } = useCollection(entriesQuery);
   const { data: farmers, isLoading: farmersLoading } = useCollection(farmersQuery);
   const { data: allSales } = useCollection(salesQuery);
-  const { data: buyers } = useCollection(buyersQuery);
   const { data: ratesConfig } = useDoc(settingsRef);
 
   const currentCycle = cycles[activeCycle];
 
-  // --- ACCURACY ENGINE: 0.96 Standard ---
+  // --- UNIFIED FINANCIAL RESOLUTION ENGINE ---
   const resolveEntryFinancials = (entry: any, farmersList: any[]) => {
     const f = farmersList?.find(item => item.id === entry.farmerId);
     
+    // Priority: Live Directory Name > Saved Transaction Name > Default Label
+    const name = f?.name || entry.farmerName || "Farmer";
+    const can = f?.canNumber || entry.canNumber || "---";
+    
+    // Strict 0.96 Standard
     const kg = Number(entry.kgWeight) || 0;
     const ltr = entry.quantity !== undefined ? Number(entry.quantity) : parseFloat((kg * 0.96).toFixed(2));
     const rate = Number(entry.rate) || 0;
     const amount = entry.totalAmount !== undefined ? Number(entry.totalAmount) : parseFloat((ltr * rate).toFixed(2));
     
     return {
-      can: f?.canNumber || entry.canNumber || "???",
-      name: f?.name || entry.farmerName || "Supplier",
+      can,
+      name,
       kg,
       ltr,
       rate,
@@ -119,7 +119,7 @@ export default function ReportsPage() {
     };
   };
 
-  // --- DAILY REPORT (HORIZONTAL AM/PM) ---
+  // --- DAILY REPORT (SESSION GROUPED HORIZONTALLY) ---
   const dailyData = useMemo(() => {
     const map: Record<string, any> = {};
     const filteredEntries = allEntries?.filter(e => e.date === selectedDailyDate) || [];
@@ -145,28 +145,29 @@ export default function ReportsPage() {
         map[fid].pmKg += res.kg;
         map[fid].pmLtr += res.ltr;
       }
+      
+      // Precision recalculation for the combined row
       map[fid].totalLtr = parseFloat((map[fid].amLtr + map[fid].pmLtr).toFixed(2));
       map[fid].totalAmt = parseFloat((map[fid].totalAmt + res.amount).toFixed(2));
     });
 
-    const procurement = Object.values(map).sort((a: any, b: any) => parseInt(a.can) - parseInt(b.can));
+    const procurement = Object.values(map).sort((a: any, b: any) => {
+      const aNum = parseInt(a.can);
+      const bNum = parseInt(b.can);
+      if (isNaN(aNum) || isNaN(bNum)) return a.can.localeCompare(b.can);
+      return aNum - bNum;
+    });
 
     const sales = allSales
       ?.filter(s => s.date === selectedDailyDate)
-      .map(s => {
-        const qty = Number(s.quantity) || 0;
-        const rate = Number(s.rate) || 0;
-        const amount = Number(s.totalAmount) || parseFloat((qty * rate).toFixed(2));
-        const buyer = buyers?.find(b => b.id === s.buyerId);
-        return {
-          buyerName: s.buyerName || buyer?.name || "Unknown",
-          session: s.session,
-          milkType: s.milkType,
-          qty,
-          rate,
-          amount
-        };
-      }) || [];
+      .map(s => ({
+        buyerName: s.buyerName || "Distribution",
+        session: s.session,
+        milkType: s.milkType,
+        qty: Number(s.quantity) || 0,
+        rate: Number(s.rate) || 0,
+        amount: Number(s.totalAmount) || 0
+      })) || [];
 
     return {
       procurement,
@@ -174,11 +175,11 @@ export default function ReportsPage() {
       totalProc: procurement.reduce((acc, c: any) => acc + c.totalAmt, 0),
       totalSale: sales.reduce((acc, c: any) => acc + c.amount, 0)
     };
-  }, [allEntries, allSales, farmers, buyers, selectedDailyDate]);
+  }, [allEntries, allSales, farmers, selectedDailyDate]);
 
   // --- MASTER ROSTER & CYCLE STATS ---
   const masterRoster = useMemo(() => {
-    if (!allEntries || !farmers || !selectedMonth || !currentCycle) return [];
+    if (!allEntries || !selectedMonth || !currentCycle) return [];
     
     const map: Record<string, any> = {};
     const cycleEntries = allEntries.filter(e => {
@@ -188,7 +189,7 @@ export default function ReportsPage() {
     });
 
     cycleEntries.forEach(e => {
-      const res = resolveEntryFinancials(e, farmers);
+      const res = resolveEntryFinancials(e, farmers || []);
       const fid = e.farmerId;
       
       if (!map[fid]) {
@@ -211,7 +212,12 @@ export default function ReportsPage() {
       eveningQty: parseFloat(f.eveningQty.toFixed(2)),
       totalQty: parseFloat((f.morningQty + f.eveningQty).toFixed(2)),
       totalAmount: parseFloat(f.totalAmount.toFixed(2))
-    })).sort((a, b) => parseInt(a.can) - parseInt(b.can));
+    })).sort((a, b) => {
+      const aNum = parseInt(a.can);
+      const bNum = parseInt(b.can);
+      if (isNaN(aNum) || isNaN(bNum)) return a.can.localeCompare(b.can);
+      return aNum - bNum;
+    });
   }, [allEntries, farmers, selectedMonth, currentCycle]);
 
   const cycleStats = useMemo(() => {
@@ -224,12 +230,7 @@ export default function ReportsPage() {
       return day >= currentCycle.start && day <= currentCycle.end;
     }) || [];
 
-    let totalSaleAmt = 0;
-    cycleSales.forEach(s => {
-      const qty = Number(s.quantity) || 0;
-      const rate = Number(s.rate) || 0;
-      totalSaleAmt += Number(s.totalAmount) || (qty * rate);
-    });
+    const totalSaleAmt = cycleSales.reduce((acc, s) => acc + (Number(s.totalAmount) || 0), 0);
 
     return {
       qty: totalProcQty,
@@ -304,7 +305,7 @@ export default function ReportsPage() {
     drawField("DATE:", format(new Date(), 'dd/MM/yyyy'), 110, y);
     y += 10;
     const farmerInDir = farmers?.find(item => item.id === f.id);
-    drawField("A/C NO:", farmerInDir?.bankAccountNumber || "—", 20, y);
+    drawField("A/C NO:", farmerInDir?.bankAccountNumber || "---", 20, y);
     drawField("PERIOD:", dateRange, 110, y);
     y += 10;
     drawField("CAN NO:", f.can, 20, y);
@@ -312,7 +313,7 @@ export default function ReportsPage() {
 
     const fEntries = allEntries!.filter(e => e.farmerId === f.id && e.date.startsWith(selectedMonth) && parseInt(e.date.split('-')[2]) >= currentCycle.start && parseInt(e.date.split('-')[2]) <= currentCycle.end);
     const rows = fEntries.sort((a, b) => a.date.localeCompare(b.date) || a.session.localeCompare(b.session)).map(e => {
-      const res = resolveEntryFinancials(e, farmers!);
+      const res = resolveEntryFinancials(e, farmers || []);
       return [
         format(new Date(e.date), 'dd/MM/yy'),
         e.session === 'Morning' ? res.ltr.toFixed(2) : "0.00",
@@ -356,7 +357,7 @@ export default function ReportsPage() {
             <div>
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Reports & Audit</h1>
               <Badge variant="outline" className="rounded-full mt-1 border-primary/20 text-primary">
-                <Users className="w-3 h-3 mr-2" /> {farmers?.length || 0} Management Suppliers
+                <Users className="w-3 h-3 mr-2" /> {farmers?.length || 0} Management Farmers
               </Badge>
             </div>
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
@@ -431,7 +432,7 @@ export default function ReportsPage() {
                   <TableHeader className="bg-muted/50">
                     <TableRow>
                       <TableHead rowSpan={2} className="text-center font-black text-[10px] border-r">CAN</TableHead>
-                      <TableHead rowSpan={2} className="font-black text-[10px] border-r">Supplier Name</TableHead>
+                      <TableHead rowSpan={2} className="font-black text-[10px] border-r">Farmer Name</TableHead>
                       <TableHead colSpan={2} className="text-center font-black text-[10px] border-r bg-orange-500/5">AM (Morning)</TableHead>
                       <TableHead colSpan={2} className="text-center font-black text-[10px] border-r bg-blue-500/5">PM (Evening)</TableHead>
                       <TableHead rowSpan={2} className="text-center font-black text-[10px] border-r">Total L</TableHead>
@@ -446,7 +447,7 @@ export default function ReportsPage() {
                   </TableHeader>
                   <TableBody>
                     {dailyData.procurement.length === 0 ? (
-                      <TableRow><TableCell colSpan={8} className="text-center py-20 italic text-muted-foreground">No collections for this date.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={8} className="text-center py-20 italic text-muted-foreground">No collections recorded for this date.</TableCell></TableRow>
                     ) : (
                       dailyData.procurement.map((p: any, i) => (
                         <TableRow key={i} className="hover:bg-primary/5">
@@ -473,7 +474,7 @@ export default function ReportsPage() {
                   const valid = masterRoster.filter(f => f.totalQty > 0);
                   valid.forEach((f, i) => { if (i > 0) pdf.addPage(); generateSingleInvoice(pdf, f); });
                   pdf.save(`Bills_${selectedMonth}_${currentCycle.label}.pdf`);
-                }} className="rounded-full bg-red-600 hover:bg-red-700 h-12 px-10">
+                }} className="rounded-full bg-red-600 hover:bg-red-700 h-12 px-10 shadow-lg">
                   <Download className="mr-2 h-4 w-4" /> Download All Bills
                 </Button>
               </div>
@@ -482,7 +483,7 @@ export default function ReportsPage() {
                   <TableHeader className="bg-muted/50">
                     <TableRow>
                       <TableHead className="pl-10 font-black text-[10px]">CAN</TableHead>
-                      <TableHead className="font-black text-[10px]">Supplier Name</TableHead>
+                      <TableHead className="font-black text-[10px]">Farmer Name</TableHead>
                       <TableHead className="text-right font-black text-[10px]">Volume (L)</TableHead>
                       <TableHead className="text-right font-black text-[10px]">Payout (Rs)</TableHead>
                       <TableHead className="text-right pr-10 font-black text-[10px]">Action</TableHead>
@@ -522,7 +523,7 @@ export default function ReportsPage() {
                   pdf.text("MASTER PROCUREMENT ROSTER", 14, 20);
                   (pdf as any).autoTable({
                     startY: 25,
-                    head: [['CAN', 'SUPPLIER NAME', 'MORNING', 'EVENING', 'TOTAL L', 'PAYOUT (Rs)']],
+                    head: [['CAN', 'FARMER NAME', 'MORNING', 'EVENING', 'TOTAL L', 'PAYOUT (Rs)']],
                     body: masterRoster.map(f => [f.can, f.name, f.morningQty.toFixed(2), f.eveningQty.toFixed(2), f.totalQty.toFixed(2), f.totalAmount.toFixed(2)]),
                     theme: 'grid',
                     headStyles: { fillColor: [240, 240, 240], textColor: 0 }

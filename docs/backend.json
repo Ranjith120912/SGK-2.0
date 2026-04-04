@@ -16,6 +16,10 @@
           "type": "string",
           "enum": ["COW", "BUFFALO"]
         },
+        "customRate": {
+          "type": "number",
+          "description": "Specific rate for Buffalo farmers if different from global default"
+        },
         "bankAccountNumber": {
           "type": "string"
         },

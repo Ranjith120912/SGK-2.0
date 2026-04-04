@@ -51,7 +51,8 @@ import {
   Trash2,
   X,
   Pencil,
-  AlertTriangle
+  AlertTriangle,
+  IndianRupee
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { read, utils, writeFile } from 'xlsx';
@@ -63,7 +64,7 @@ export default function FarmersPage() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [isAdding, setIsAdding] = useState(false);
-  const [newFarmer, setNewFarmer] = useState({ name: "", canNumber: "", bankAccountNumber: "", ifscCode: "", milkType: "COW" });
+  const [newFarmer, setNewFarmer] = useState({ name: "", canNumber: "", bankAccountNumber: "", ifscCode: "", milkType: "COW", customRate: "" });
   const [editingFarmer, setEditingFarmer] = useState<any>(null);
   const [importData, setImportData] = useState("");
   const [isImporting, setIsImporting] = useState(false);
@@ -99,11 +100,12 @@ export default function FarmersPage() {
     addDocumentNonBlocking(collection(firestore, 'farmers'), {
       ...newFarmer,
       canNumber: newFarmer.canNumber.toString().padStart(3, '0'),
+      customRate: newFarmer.milkType === 'BUFFALO' ? parseFloat(newFarmer.customRate) || 0 : 0,
       active: true,
       createdAt: serverTimestamp(),
     });
 
-    setNewFarmer({ name: "", canNumber: "", bankAccountNumber: "", ifscCode: "", milkType: "COW" });
+    setNewFarmer({ name: "", canNumber: "", bankAccountNumber: "", ifscCode: "", milkType: "COW", customRate: "" });
     setIsAdding(false);
     toast({ title: "Success", description: "Farmer added successfully." });
   };
@@ -119,6 +121,7 @@ export default function FarmersPage() {
     updateDocumentNonBlocking(doc(firestore, 'farmers', editingFarmer.id), {
       ...editingFarmer,
       canNumber: editingFarmer.canNumber.toString().padStart(3, '0'),
+      customRate: editingFarmer.milkType === 'BUFFALO' ? parseFloat(editingFarmer.customRate) || 0 : 0,
       updatedAt: serverTimestamp(),
     });
 
@@ -195,6 +198,7 @@ export default function FarmersPage() {
       const bankAccountNumber = item['Bank Account Number'] || item['Account Number'] || item.bankAccountNumber || normalizedItem.bankaccountnumber || normalizedItem.accountnumber || normalizedItem.account;
       const ifscCode = item['IFSC Code'] || item.ifscCode || normalizedItem.ifsccode || normalizedItem.ifsc;
       const milkTypeRaw = item['Milk Type'] || item.milkType || normalizedItem.milktype || normalizedItem.type;
+      const customRateRaw = item['Buffalo Rate'] || item.customRate || normalizedItem.buffalorate || normalizedItem.customrate;
       
       let milkType = "COW";
       if (milkTypeRaw?.toString().toUpperCase().includes("BUFFALO")) milkType = "BUFFALO";
@@ -206,6 +210,7 @@ export default function FarmersPage() {
           bankAccountNumber: (bankAccountNumber || "").toString(),
           ifscCode: (ifscCode || "").toString(),
           milkType: milkType,
+          customRate: milkType === 'BUFFALO' ? parseFloat(customRateRaw) || 0 : 0,
           active: true,
           createdAt: serverTimestamp(),
         });
@@ -279,8 +284,8 @@ export default function FarmersPage() {
 
   const downloadExcelTemplate = () => {
     const templateData = [
-      { "Name": "Rajesh Kumar", "Can Number": "101", "Bank Account Number": "9876543210", "IFSC Code": "SBIN0001234", "Milk Type": "COW" },
-      { "Name": "Suresh Singh", "Can Number": "102", "Bank Account Number": "1234567890", "IFSC Code": "HDFC0005678", "Milk Type": "BUFFALO" }
+      { "Name": "Rajesh Kumar", "Can Number": "101", "Bank Account Number": "9876543210", "IFSC Code": "SBIN0001234", "Milk Type": "COW", "Buffalo Rate": "" },
+      { "Name": "Suresh Singh", "Can Number": "102", "Bank Account Number": "1234567890", "IFSC Code": "HDFC0005678", "Milk Type": "BUFFALO", "Buffalo Rate": "55.50" }
     ];
     const ws = utils.json_to_sheet(templateData);
     const wb = utils.book_new();
@@ -369,7 +374,7 @@ export default function FarmersPage() {
                         Or Paste Data
                       </label>
                       <Textarea 
-                        placeholder="Name, Can Number, Account, IFSC, Milk Type..." 
+                        placeholder="Name, Can Number, Account, IFSC, Milk Type, Buffalo Rate..." 
                         value={importData}
                         onChange={(e) => setImportData(e.target.value)}
                         className="min-h-[120px] font-mono text-xs rounded-2xl border-primary/20 bg-background/50"
@@ -408,7 +413,7 @@ export default function FarmersPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Full Name</label>
                     <Input 
@@ -439,6 +444,21 @@ export default function FarmersPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  {newFarmer.milkType === 'BUFFALO' && (
+                    <div className="space-y-2 animate-in slide-in-from-left-2">
+                      <label className="text-[10px] font-black text-accent uppercase tracking-[0.2em]">Buffalo Rate (₹)</label>
+                      <div className="relative">
+                        <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-accent" />
+                        <Input 
+                          type="number"
+                          placeholder="e.g. 55.00" 
+                          value={newFarmer.customRate}
+                          onChange={(e) => setNewFarmer({...newFarmer, customRate: e.target.value})}
+                          className="rounded-xl h-11 border-accent/20 pl-8 font-bold"
+                        />
+                      </div>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Account Number</label>
                     <Input 
@@ -489,16 +509,17 @@ export default function FarmersPage() {
                   <TableHead className="w-[100px] font-black text-primary py-5 uppercase text-[10px] tracking-widest">CAN</TableHead>
                   <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Farmer Name</TableHead>
                   <TableHead className="w-[120px] font-black text-primary uppercase text-[10px] tracking-widest">Milk Type</TableHead>
+                  <TableHead className="w-[120px] font-black text-accent uppercase text-[10px] tracking-widest">Rate (₹)</TableHead>
                   <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Bank Details</TableHead>
                   <TableHead className="text-right pr-6 font-black text-primary uppercase text-[10px] tracking-widest">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-20 text-muted-foreground animate-pulse font-medium">Loading farmer directory...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center py-20 text-muted-foreground animate-pulse font-medium">Loading farmer directory...</TableCell></TableRow>
                 ) : filteredFarmers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-20">
+                    <TableCell colSpan={7} className="text-center py-20">
                       <div className="flex flex-col items-center gap-3">
                         <ClipboardList className="w-10 h-10 text-muted-foreground/30" />
                         <p className="text-muted-foreground font-semibold">No farmers found.</p>
@@ -521,6 +542,16 @@ export default function FarmersPage() {
                         <Badge variant={farmer.milkType === 'BUFFALO' ? "secondary" : "outline"} className="rounded-full font-black text-[10px] uppercase">
                           {farmer.milkType || 'COW'}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {farmer.milkType === 'BUFFALO' && farmer.customRate ? (
+                          <div className="flex items-center gap-1 font-black text-accent">
+                            <IndianRupee className="w-3 h-3" />
+                            {parseFloat(farmer.customRate).toFixed(2)}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest">Default</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col text-xs">
@@ -600,6 +631,21 @@ export default function FarmersPage() {
                   </SelectContent>
                 </Select>
               </div>
+              {editingFarmer.milkType === 'BUFFALO' && (
+                <div className="space-y-2 animate-in slide-in-from-top-2">
+                  <label className="text-[10px] font-black text-accent uppercase tracking-widest">Buffalo Rate (₹)</label>
+                  <div className="relative">
+                    <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-accent" />
+                    <Input 
+                      type="number"
+                      step="0.01"
+                      value={editingFarmer.customRate} 
+                      onChange={(e) => setEditingFarmer({...editingFarmer, customRate: e.target.value})}
+                      className="rounded-xl pl-8 font-bold border-accent/20"
+                    />
+                  </div>
+                </div>
+              )}
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Bank Account Number</label>
                 <Input 

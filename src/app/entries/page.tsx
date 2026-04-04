@@ -88,11 +88,12 @@ export default function EntriesPage() {
     // Determine the value to save: current input or existing value
     const kgValue = kgStr !== undefined ? parseFloat(kgStr) : (existingEntry ? existingEntry.kgWeight : 0);
     
-    // Determine the rate to save: current input override, or setting default
+    // Determine the rate to save: current input override, or farmer specific, or setting default
     const manualRate = rateValues[farmerId];
     const defaultRate = farmer.milkType === 'BUFFALO' 
-      ? (ratesConfig?.buffaloRate || 0) 
+      ? (farmer.customRate || ratesConfig?.buffaloRate || 0) 
       : (ratesConfig?.cowRate || 0);
+    
     const finalRate = manualRate !== undefined && manualRate !== "" ? parseFloat(manualRate) : (existingEntry ? existingEntry.rate : defaultRate);
 
     if (isNaN(kgValue) || kgValue < 0 || isNaN(finalRate)) return;
@@ -219,7 +220,7 @@ export default function EntriesPage() {
                   const previewLitre = !isNaN(kgNum) ? (kgNum * conversionRate).toFixed(2) : "0.00";
                   
                   const defaultRate = farmer.milkType === 'BUFFALO' 
-                    ? (ratesConfig?.buffaloRate || 0) 
+                    ? (farmer.customRate || ratesConfig?.buffaloRate || 0) 
                     : (ratesConfig?.cowRate || 0);
                   
                   const currentRateStr = rateValues[farmer.id] !== undefined
@@ -270,12 +271,18 @@ export default function EntriesPage() {
                             type="number" 
                             placeholder={defaultRate.toString()}
                             step="0.1"
-                            className="h-11 rounded-xl pr-6 font-medium text-sm border-primary/10 focus:border-primary"
+                            className={cn(
+                              "h-11 rounded-xl pr-6 font-medium text-sm border-primary/10 focus:border-primary",
+                              farmer.milkType === 'BUFFALO' && farmer.customRate && "border-accent/40 bg-accent/5 text-accent font-black"
+                            )}
                             value={currentRateStr}
                             onChange={(e) => handleRateChange(farmer.id, e.target.value)}
                             onBlur={() => handleAutoSave(farmer.id)}
                             onKeyDown={(e) => e.key === 'Enter' && handleAutoSave(farmer.id)}
                           />
+                          {farmer.milkType === 'BUFFALO' && farmer.customRate && (
+                            <div className="absolute -top-3 left-2 bg-accent text-[8px] font-black text-white px-1.5 rounded-full uppercase tracking-widest">Fixed</div>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -295,7 +302,7 @@ export default function EntriesPage() {
               </TableBody>
             </Table>
             <div className="p-4 bg-muted/20 text-center text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] border-t">
-              Buffalo milk rates and weights are editable per entry. System auto-saves all changes.
+              Buffalo milk rates and weights are editable per entry. System prioritizes farmer-specific fixed rates.
             </div>
           </Card>
         </div>

@@ -30,7 +30,8 @@ import {
   Sun,
   Moon,
   Scale,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Users
 } from "lucide-react";
 import { format, endOfMonth, subMonths, startOfMonth } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -102,9 +103,9 @@ export default function ReportsPage() {
     return doc(firestore, 'settings', 'milk_rates');
   }, [firestore]);
 
-  const { data: allEntries } = useCollection(entriesQuery);
-  const { data: farmers } = useCollection(farmersQuery);
-  const { data: allSales } = useCollection(salesQuery);
+  const { data: allEntries, isLoading: entriesLoading } = useCollection(entriesQuery);
+  const { data: farmers, isLoading: farmersLoading } = useCollection(farmersQuery);
+  const { data: allSales, isLoading: salesLoading } = useCollection(salesQuery);
   const { data: buyers } = useCollection(buyersQuery);
   const { data: ratesConfig } = useDoc(settingsRef);
 
@@ -116,13 +117,17 @@ export default function ReportsPage() {
    */
   const resolveEntryFinancials = (entry: any, farmersList: any[], config: any) => {
     const kg = Number(entry.kgWeight) || 0;
-    // Prefer database saved quantity or calculate with strict 0.96
-    const quantity = Number(entry.quantity) || parseFloat((kg * 0.96).toFixed(2));
+    // Strictly re-calculate volume from weight using 0.96 standard
+    const quantity = parseFloat((kg * 0.96).toFixed(2));
     
-    // Identity Sync Logic: Live Directory > Persisted Metadata
+    // Identity Priority: 
+    // 1. Saved Name in entry (Historical Persistence)
+    // 2. Live Directory Name (If it matches)
+    // 3. Fallback to "Supplier {CAN}"
     const farmerInDirectory = farmersList?.find(f => f.id === entry.farmerId);
-    const farmerName = farmerInDirectory?.name || entry.farmerName || "Supplier " + (entry.canNumber || entry.farmerId);
-    const canNumber = farmerInDirectory?.canNumber || entry.canNumber || "???";
+    
+    const farmerName = entry.farmerName || farmerInDirectory?.name || "Supplier " + (entry.canNumber || "???");
+    const canNumber = entry.canNumber || farmerInDirectory?.canNumber || "???";
 
     let rate = Number(entry.rate) || 0;
     if (rate === 0 && farmerInDirectory) {
@@ -135,18 +140,18 @@ export default function ReportsPage() {
       }
     }
 
-    // Prefer database saved amount or calculate with 2-decimal precision
-    const amount = Number(entry.totalAmount) || parseFloat((quantity * rate).toFixed(2));
+    // Amount recalculated with 2-decimal precision
+    const amount = parseFloat((quantity * rate).toFixed(2));
     
     return { 
       kgWeight: kg,
-      qtyLitre: parseFloat(quantity.toFixed(2)), 
-      cost: parseFloat(amount.toFixed(2)), 
+      qtyLitre: quantity, 
+      cost: amount, 
       appliedRate: rate,
       farmerName: farmerName,
       canNumber: canNumber,
       session: entry.session || "Morning",
-      milkType: farmerInDirectory?.milkType || 'COW'
+      milkType: farmerInDirectory?.milkType || entry.milkType || 'COW'
     };
   };
 
@@ -156,12 +161,12 @@ export default function ReportsPage() {
     if (rate === 0) {
       rate = sale.milkType === 'BUFFALO' ? (Number(config?.buffaloSellingRate) || 0) : (Number(config?.cowSellingRate) || 0);
     }
-    const amount = Number(sale.totalAmount) || parseFloat((qty * rate).toFixed(2));
+    const amount = parseFloat((qty * rate).toFixed(2));
     const buyer = buyersList?.find(b => b.id === sale.buyerId);
     
     return { 
-      qty: parseFloat(qty.toFixed(2)), 
-      cost: parseFloat(amount.toFixed(2)), 
+      qty: qty, 
+      cost: amount, 
       appliedRate: rate,
       buyerName: sale.buyerName || buyer?.name || "Unknown Buyer",
       milkType: sale.milkType,
@@ -169,9 +174,9 @@ export default function ReportsPage() {
     };
   };
 
-  // --- Daily Report Logic ---
+  // --- Daily Report Logic (Horizontal AM/PM) ---
   const dailyData = useMemo(() => {
-    if (!allEntries || !allSales || !farmers || !buyers || !ratesConfig || !selectedDailyDate) {
+    if (!allEntries || !allSales || !farmers || !ratesConfig || !selectedDailyDate) {
       return { procurement: [], sales: [], totalProc: 0, totalSale: 0 };
     }
 
@@ -180,10 +185,10 @@ export default function ReportsPage() {
     
     filteredEntries.forEach(e => {
       const res = resolveEntryFinancials(e, farmers, ratesConfig);
-      const fId = e.farmerId;
+      const key = e.farmerId;
       
-      if (!procMap[fId]) {
-        procMap[fId] = {
+      if (!procMap[key]) {
+        procMap[key] = {
           can: res.canNumber,
           name: res.farmerName,
           amKg: 0, amLtr: 0,
@@ -194,15 +199,15 @@ export default function ReportsPage() {
       }
       
       if (e.session === 'Morning') {
-        procMap[fId].amKg = res.kgWeight;
-        procMap[fId].amLtr = res.qtyLitre;
+        procMap[key].amKg = res.kgWeight;
+        procMap[key].amLtr = res.qtyLitre;
       } else {
-        procMap[fId].pmKg = res.kgWeight;
-        procMap[fId].pmLtr = res.qtyLitre;
+        procMap[key].pmKg = res.kgWeight;
+        procMap[key].pmLtr = res.qtyLitre;
       }
       
-      procMap[fId].totalLtr = parseFloat((procMap[fId].amLtr + procMap[fId].pmLtr).toFixed(2));
-      procMap[fId].totalAmt = parseFloat((procMap[fId].totalAmt + res.cost).toFixed(2));
+      procMap[key].totalLtr = parseFloat((procMap[key].amLtr + procMap[key].pmLtr).toFixed(2));
+      procMap[key].totalAmt = parseFloat((procMap[key].totalAmt + res.cost).toFixed(2));
     });
 
     const dProc = Object.values(procMap).sort((a, b) => {
@@ -214,18 +219,18 @@ export default function ReportsPage() {
 
     const dSale = allSales
       .filter(s => s.date === selectedDailyDate)
-      .map(s => resolveSaleFinancials(s, buyers, ratesConfig))
-      .sort((a, b) => a.buyerName.localeCompare(b.buyerName) || a.session.localeCompare(b.session));
+      .map(s => resolveSaleFinancials(s, buyers || [], ratesConfig))
+      .sort((a, b) => a.buyerName.localeCompare(b.buyerName));
 
     return {
       procurement: dProc,
       sales: dSale,
-      totalProc: dProc.reduce((acc: number, c: any) => acc + c.totalAmt, 0),
-      totalSale: dSale.reduce((acc, c) => acc + c.cost, 0)
+      totalProc: dProc.reduce((acc, c: any) => acc + c.totalAmt, 0),
+      totalSale: dSale.reduce((acc, c: any) => acc + c.cost, 0)
     };
   }, [allEntries, allSales, farmers, buyers, ratesConfig, selectedDailyDate]);
 
-  // --- Master Summary Roster Logic ---
+  // --- Master Summary & Cycle Stats ---
   const masterRoster = useMemo(() => {
     if (!allEntries || !farmers || !ratesConfig || !selectedMonth || !currentCycle) return [];
     
@@ -239,20 +244,20 @@ export default function ReportsPage() {
 
     cycleEntries.forEach(entry => {
       const res = resolveEntryFinancials(entry, farmers, ratesConfig);
-      const fId = entry.farmerId;
+      const key = entry.farmerId;
       
-      if (!farmerMap[fId]) {
-        farmerMap[fId] = {
-          id: fId,
+      if (!farmerMap[key]) {
+        farmerMap[key] = {
+          id: key,
           name: res.farmerName,
           canNumber: res.canNumber,
           morningQty: 0, eveningQty: 0, totalQty: 0, totalAmount: 0
         };
       }
 
-      if (entry.session === 'Morning') farmerMap[fId].morningQty += res.qtyLitre;
-      else farmerMap[fId].eveningQty += res.qtyLitre;
-      farmerMap[fId].totalAmount += res.cost;
+      if (entry.session === 'Morning') farmerMap[key].morningQty += res.qtyLitre;
+      else farmerMap[key].eveningQty += res.qtyLitre;
+      farmerMap[key].totalAmount += res.cost;
     });
 
     return Object.values(farmerMap).map(f => ({
@@ -273,14 +278,14 @@ export default function ReportsPage() {
     const totalProcurementAmt = masterRoster.reduce((acc, curr) => acc + curr.totalAmount, 0);
     const totalProcurementQty = masterRoster.reduce((acc, curr) => acc + curr.totalQty, 0);
 
-    let totalSaleAmt = 0;
-    let totalSaleQty = 0;
-
     const cycleSales = allSales?.filter(s => {
       if (!s.date.startsWith(selectedMonth)) return false;
       const day = parseInt(s.date.split('-')[2]);
       return day >= currentCycle.start && day <= currentCycle.end;
     }) || [];
+
+    let totalSaleAmt = 0;
+    let totalSaleQty = 0;
 
     cycleSales.forEach(s => {
       const res = resolveSaleFinancials(s, buyers || [], ratesConfig);
@@ -289,90 +294,70 @@ export default function ReportsPage() {
     });
 
     return {
-      totalEntryQty: parseFloat(totalProcurementQty.toFixed(2)),
-      totalSaleQty: parseFloat(totalSaleQty.toFixed(2)),
-      totalEntryAmt: parseFloat(totalProcurementAmt.toFixed(2)),
-      totalSaleAmt: parseFloat(totalSaleAmt.toFixed(2)),
-      profit: parseFloat((totalSaleAmt - totalProcurementAmt).toFixed(2))
+      totalEntryQty: totalProcurementQty,
+      totalSaleQty: totalSaleQty,
+      totalEntryAmt: totalProcurementAmt,
+      totalSaleAmt: totalSaleAmt,
+      profit: totalSaleAmt - totalProcurementAmt
     };
   }, [masterRoster, allSales, selectedMonth, currentCycle, ratesConfig, buyers]);
 
-  // --- PDF & Excel Generation ---
-  const generateDailyReportPDF = () => {
+  // --- Exports (PDF & Excel) ---
+  const generateDailyPDF = () => {
     const pdf = new jsPDF('l', 'mm', 'a4');
     const company = (ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS").toUpperCase();
     const dateStr = format(new Date(selectedDailyDate), 'dd/MM/yyyy');
 
     pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(16);
+    pdf.setFontSize(18);
     pdf.text(company, 148, 20, { align: 'center' });
     pdf.setFontSize(12);
-    pdf.text("DAILY COLLECTION & SALES REPORT", 148, 28, { align: 'center' });
-    pdf.setFontSize(10);
-    pdf.text(`REPORT DATE: ${dateStr}`, 148, 35, { align: 'center' });
+    pdf.text(`DAILY PROCUREMENT & SALES REPORT - ${dateStr}`, 148, 28, { align: 'center' });
 
-    pdf.setFontSize(11);
-    pdf.text("I. PROCUREMENT SUMMARY (HORIZONTAL AM/PM)", 14, 45);
+    pdf.setFontSize(10);
+    pdf.text("I. DAILY PROCUREMENT (HORIZONTAL AM/PM)", 14, 40);
     const procRows = dailyData.procurement.map((p: any) => [
-      p.can,
-      p.name.toUpperCase(),
-      p.amKg > 0 ? p.amKg.toFixed(2) : "0.00",
-      p.amLtr > 0 ? p.amLtr.toFixed(2) : "0.00",
-      p.pmKg > 0 ? p.pmKg.toFixed(2) : "0.00",
-      p.pmLtr > 0 ? p.pmLtr.toFixed(2) : "0.00",
-      p.totalLtr.toFixed(2),
-      p.totalAmt.toFixed(2)
+      p.can, p.name, p.amKg.toFixed(2), p.amLtr.toFixed(2), p.pmKg.toFixed(2), p.pmLtr.toFixed(2), p.totalLtr.toFixed(2), p.totalAmt.toFixed(2)
     ]);
 
     (pdf as any).autoTable({
-      startY: 48,
-      head: [['CAN', 'FARMER NAME', 'AM-KG', 'AM-LITRE', 'PM-KG', 'PM-LITRE', 'TOT-LTR', 'AMOUNT (Rs)']],
+      startY: 43,
+      head: [['CAN', 'FARMER NAME', 'AM-KG', 'AM-LTR', 'PM-KG', 'PM-LTR', 'TOT-LTR', 'AMOUNT (Rs)']],
       body: procRows,
       theme: 'grid',
-      headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 9 },
-      bodyStyles: { fontSize: 8 },
+      headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' },
       margin: { left: 14, right: 14 }
     });
 
     let nextY = (pdf as any).lastAutoTable.finalY + 15;
-    pdf.setFontSize(11);
-    pdf.text("II. DISTRIBUTION / SALES SUMMARY", 14, nextY);
-    const saleRows = dailyData.sales.map(s => [
-      s.buyerName.toUpperCase(),
-      s.session.toUpperCase(),
-      s.milkType,
-      s.qty.toFixed(2),
-      s.appliedRate.toFixed(2),
-      s.cost.toFixed(2)
-    ]);
+    pdf.text("II. DAILY SALES / DISTRIBUTION", 14, nextY);
+    const saleRows = dailyData.sales.map(s => [s.buyerName, s.session, s.milkType, s.qty.toFixed(2), s.appliedRate.toFixed(2), s.cost.toFixed(2)]);
 
     (pdf as any).autoTable({
       startY: nextY + 3,
       head: [['BUYER NAME', 'SESSION', 'MILK TYPE', 'QTY (L)', 'RATE (Rs)', 'AMOUNT (Rs)']],
       body: saleRows,
       theme: 'grid',
-      headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
+      headStyles: { fillColor: [240, 240, 240], textColor: 0 },
       margin: { left: 14, right: 14 }
     });
 
     pdf.save(`Daily_Report_${selectedDailyDate}.pdf`);
   };
 
-  const generateDailyReportExcel = () => {
+  const generateDailyExcel = () => {
     const procData = dailyData.procurement.map((p: any) => ({
       "CAN": p.can,
-      "FARMER NAME": p.name.toUpperCase(),
-      "AM-KG": p.amKg || 0,
-      "AM-LITRE": p.amLtr || 0,
-      "PM-KG": p.pmKg || 0,
-      "PM-LITRE": p.pmLtr || 0,
+      "FARMER NAME": p.name,
+      "AM-KG": p.amKg, "AM-LITRE": p.amLtr,
+      "PM-KG": p.pmKg, "PM-LITRE": p.pmLtr,
       "TOTAL LITRES": p.totalLtr,
-      "AMOUNT (Rs)": p.totalAmt
+      "TOTAL AMOUNT (Rs)": p.totalAmt
     }));
-    
+
     const saleData = dailyData.sales.map(s => ({
-      "BUYER NAME": s.buyerName.toUpperCase(),
-      "SESSION": s.session.toUpperCase(),
+      "BUYER NAME": s.buyerName,
+      "SESSION": s.session,
       "MILK TYPE": s.milkType,
       "QUANTITY (L)": s.qty,
       "RATE (Rs)": s.appliedRate,
@@ -380,10 +365,10 @@ export default function ReportsPage() {
     }));
 
     const wb = utils.book_new();
-    const wsProc = utils.json_to_sheet(procData);
-    utils.book_append_sheet(wb, wsProc, "Procurement");
-    const wsSale = utils.json_to_sheet(saleData);
-    utils.book_append_sheet(wb, wsSale, "Sales");
+    const ws1 = utils.json_to_sheet(procData);
+    utils.book_append_sheet(wb, ws1, "Procurement");
+    const ws2 = utils.json_to_sheet(saleData);
+    utils.book_append_sheet(wb, ws2, "Sales");
 
     writeFile(wb, `Daily_Report_${selectedDailyDate}.xlsx`);
   };
@@ -392,23 +377,14 @@ export default function ReportsPage() {
     const company = (ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS").toUpperCase();
     const [y_part, m_part] = selectedMonth.split('-').map(Number);
     const range = `${currentCycle.start.toString().padStart(2, '0')}/${m_part.toString().padStart(2, '0')}/${y_part.toString().slice(-2)} to ${currentCycle.end.toString().padStart(2, '0')}/${m_part.toString().padStart(2, '0')}/${y_part.toString().slice(-2)}`;
-    const todayStr = format(new Date(), 'dd/MM/yyyy');
-
+    
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(18);
     pdf.text(company, 105, 20, { align: 'center' });
     pdf.setFontSize(13);
     pdf.text("MILK INVOICE", 105, 28, { align: 'center' });
-    pdf.setLineWidth(0.1);
     pdf.line(85, 30, 125, 30); 
 
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "normal");
-    const col1_X = 20;
-    const col2_X = 110;
-    let y = 45;
-
-    // Field Drawing Helper
     const drawField = (label: string, value: string, x: number, y: number) => {
       pdf.setFont("helvetica", "normal");
       pdf.text(label, x, y);
@@ -418,19 +394,19 @@ export default function ReportsPage() {
       pdf.line(x + labelW + 4, y + 1, x + labelW + 65, y + 1);
     };
 
-    drawField("NAME:", f.name.toUpperCase(), col1_X, y);
-    drawField("DATE:", todayStr, col2_X, y);
+    let y = 45;
+    drawField("NAME:", f.name.toUpperCase(), 20, y);
+    drawField("DATE:", format(new Date(), 'dd/MM/yyyy'), 110, y);
     y += 10;
     const farmerInDir = farmers?.find(item => item.id === f.id);
-    drawField("A/C NO:", farmerInDir?.bankAccountNumber || "—", col1_X, y);
-    drawField("PERIOD:", range, col2_X, y);
+    drawField("A/C NO:", farmerInDir?.bankAccountNumber || "—", 20, y);
+    drawField("PERIOD:", range, 110, y);
     y += 10;
-    drawField("CAN NO:", f.canNumber, col1_X, y);
+    drawField("CAN NO:", f.canNumber, 20, y);
     const effectiveRate = farmerInDir?.customRate > 0 ? farmerInDir.customRate : (farmerInDir?.milkType === 'BUFFALO' ? ratesConfig?.buffaloRate : ratesConfig?.cowRate);
-    drawField("RATE (Rs):", Number(effectiveRate || 0).toFixed(2), col2_X, y);
+    drawField("RATE (Rs):", Number(effectiveRate || 0).toFixed(2), 110, y);
 
     const fEntries = allEntries!.filter(e => e.farmerId === f.id && e.date.startsWith(selectedMonth) && parseInt(e.date.split('-')[2]) >= currentCycle.start && parseInt(e.date.split('-')[2]) <= currentCycle.end);
-    
     const rows = fEntries.sort((a, b) => a.date.localeCompare(b.date) || a.session.localeCompare(b.session)).map(e => {
       const res = resolveEntryFinancials(e, farmers!, ratesConfig!);
       return [
@@ -445,30 +421,28 @@ export default function ReportsPage() {
 
     (pdf as any).autoTable({
       startY: y + 10,
-      head: [['DATE', 'MORNING (L)', 'EVENING (L)', 'TOTAL LITRES', 'RATE (Rs)', 'AMOUNT (Rs)']],
+      head: [['DATE', 'MORNING (L)', 'EVENING (L)', 'TOTAL L', 'RATE (Rs)', 'AMOUNT (Rs)']],
       body: rows,
       theme: 'grid',
-      headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center', lineWidth: 0.1, lineColor: [0, 0, 0] },
-      bodyStyles: { textColor: [0, 0, 0], halign: 'center', lineWidth: 0.1, lineColor: [0, 0, 0], fontSize: 9 },
+      headStyles: { fillColor: [240, 240, 240], textColor: 0, halign: 'center' },
+      bodyStyles: { halign: 'center' },
       margin: { left: 20, right: 20 }
     });
 
     const finalY = (pdf as any).lastAutoTable.finalY;
-    pdf.setFontSize(11);
     pdf.setFont("helvetica", "bold");
     pdf.text("TOTAL", 20, finalY + 10);
-    pdf.text(f.totalQty.toFixed(2), 125, finalY + 10, { align: 'center' }); 
+    pdf.text(f.totalQty.toFixed(2), 115, finalY + 10, { align: 'center' }); 
     pdf.text(f.totalAmount.toFixed(2), 190, finalY + 10, { align: 'right' });
 
     pdf.setFontSize(8);
     pdf.setFont("helvetica", "italic");
-    pdf.text("System generated invoice - Precision Locked to 0.96 Standard", 105, 275, { align: 'center' });
-    pdf.setFont("helvetica", "bold");
+    pdf.text("Precision Locked to 0.96 Standard", 105, 275, { align: 'center' });
     pdf.line(140, 285, 190, 285);
     pdf.text("AUTHORIZED SIGNATURE", 165, 289, { align: 'center' });
   };
 
-  if (!isClient) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
+  if (!isClient) return null;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -478,24 +452,29 @@ export default function ReportsPage() {
           <header className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Reports & Audit</h1>
-              <p className="text-muted-foreground font-medium">Standard 0.96 Payouts • {monthOptions.find(o => o.value === selectedMonth)?.label}</p>
+              <div className="flex items-center gap-4 mt-1">
+                <Badge variant="outline" className="rounded-full flex items-center gap-2 border-primary/20 text-primary">
+                  <Users className="w-3 h-3" /> {farmers?.length || 0} Suppliers Registered
+                </Badge>
+                <Badge variant="outline" className="rounded-full flex items-center gap-2 border-accent/20 text-accent">
+                  <Scale className="w-3 h-3" /> Standard 0.96 Payouts
+                </Badge>
+              </div>
             </div>
-            <div className="flex gap-4">
-               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger className="w-[200px] rounded-full font-bold h-11"><SelectValue /></SelectTrigger>
-                <SelectContent>{monthOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-[200px] rounded-full font-bold h-11"><SelectValue /></SelectTrigger>
+              <SelectContent>{monthOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
+            </Select>
           </header>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
-              <TabsList className="bg-muted p-1 rounded-full h-auto">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b pb-4">
+              <TabsList className="bg-muted p-1 rounded-full h-auto overflow-x-auto max-w-full no-scrollbar">
                 <TabsTrigger value="overview" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Overview</TabsTrigger>
                 <TabsTrigger value="daily" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Daily Report</TabsTrigger>
                 <TabsTrigger value="cycle" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Farmer Bills</TabsTrigger>
-                <TabsTrigger value="master" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Master Summary</TabsTrigger>
-                <TabsTrigger value="audit" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Internal Audit</TabsTrigger>
+                <TabsTrigger value="master" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Master Roster</TabsTrigger>
+                <TabsTrigger value="audit" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Audit Log</TabsTrigger>
               </TabsList>
 
               {["overview", "cycle", "master"].includes(activeTab) && (
@@ -517,139 +496,114 @@ export default function ReportsPage() {
             </div>
 
             <TabsContent value="overview" className="space-y-12">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-primary font-black uppercase tracking-widest text-xs">
-                  <CalendarDays className="w-4 h-4" /> Cycle Performance ({currentCycle?.label})
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <Card className="rounded-[2rem] bg-primary text-white p-8 shadow-xl">
-                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Cycle Volume</p>
-                    <p className="text-4xl font-black mt-2">{cycleStats.totalEntryQty.toFixed(2)} L</p>
-                  </Card>
-                  <Card className="rounded-[2rem] bg-accent text-white p-8 shadow-xl">
-                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Cycle Revenue</p>
-                    <p className="text-4xl font-black mt-2">Rs. {cycleStats.totalSaleAmt.toFixed(2)}</p>
-                  </Card>
-                  <Card className="rounded-[2rem] p-8 border-none bg-destructive/10 text-destructive">
-                    <p className="text-[10px] font-black uppercase opacity-70">Cycle Payout</p>
-                    <p className="text-3xl font-black mt-2">Rs. {cycleStats.totalEntryAmt.toFixed(2)}</p>
-                  </Card>
-                  <Card className="rounded-[2rem] p-8 border-none bg-green-500/10 text-green-600">
-                    <p className="text-[10px] font-black uppercase opacity-70">Cycle Profit</p>
-                    <p className="text-3xl font-black mt-2">Rs. {cycleStats.profit.toFixed(2)}</p>
-                  </Card>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <Card className="rounded-[2rem] bg-primary text-white p-8 shadow-xl">
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Cycle Volume</p>
+                  <p className="text-4xl font-black mt-2">{cycleStats.totalEntryQty.toFixed(2)} L</p>
+                </Card>
+                <Card className="rounded-[2rem] bg-accent text-white p-8 shadow-xl">
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Cycle Revenue</p>
+                  <p className="text-4xl font-black mt-2">Rs. {cycleStats.totalSaleAmt.toFixed(2)}</p>
+                </Card>
+                <Card className="rounded-[2rem] p-8 border-none bg-destructive/10 text-destructive">
+                  <p className="text-[10px] font-black uppercase opacity-70">Cycle Payout</p>
+                  <p className="text-3xl font-black mt-2">Rs. {cycleStats.totalEntryAmt.toFixed(2)}</p>
+                </Card>
+                <Card className="rounded-[2rem] p-8 border-none bg-green-500/10 text-green-600">
+                  <p className="text-[10px] font-black uppercase opacity-70">Cycle Profit</p>
+                  <p className="text-3xl font-black mt-2">Rs. {cycleStats.profit.toFixed(2)}</p>
+                </Card>
               </div>
             </TabsContent>
 
-            <TabsContent value="daily" className="space-y-8">
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
-                <div className="flex items-center gap-4 w-full sm:w-auto bg-card p-3 rounded-2xl border shadow-sm">
-                  <Calendar className="w-5 h-5 text-primary" />
-                  <Input 
-                    type="date" 
-                    value={selectedDailyDate} 
-                    onChange={(e) => setSelectedDailyDate(e.target.value)} 
-                    className="border-none focus-visible:ring-0 font-bold"
-                  />
+            <TabsContent value="daily" className="space-y-6">
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-card p-6 rounded-3xl border shadow-sm">
+                <div className="flex items-center gap-4">
+                  <Calendar className="text-primary" />
+                  <Input type="date" value={selectedDailyDate} onChange={(e) => setSelectedDailyDate(e.target.value)} className="w-[200px] font-bold" />
                 </div>
                 <div className="flex gap-2">
-                  <Button onClick={generateDailyReportExcel} variant="outline" className="rounded-full h-12 px-6 font-black uppercase border-primary text-primary hover:bg-primary/5">
-                    <FileSpreadsheet className="w-4 h-4 mr-2" /> Excel
-                  </Button>
-                  <Button onClick={generateDailyReportPDF} className="rounded-full h-12 px-10 font-black uppercase bg-primary hover:bg-primary/90">
-                    <Printer className="w-4 h-4 mr-2" /> PDF Report
-                  </Button>
+                  <Button onClick={generateDailyExcel} variant="outline" className="rounded-full h-11 px-6"><FileSpreadsheet className="mr-2 h-4 w-4" /> Excel</Button>
+                  <Button onClick={generateDailyPDF} className="rounded-full h-11 px-8"><Printer className="mr-2 h-4 w-4" /> PDF Report</Button>
                 </div>
               </div>
 
-              <div className="space-y-10">
-                <Card className="rounded-3xl border-none shadow-xl overflow-hidden">
-                  <div className="p-6 bg-primary/5 border-b flex items-center justify-between">
-                    <h3 className="font-black text-primary uppercase text-xs tracking-widest flex items-center gap-2">
-                      <ClipboardList className="w-4 h-4" /> Daily Procurement (Horizontal AM/PM)
-                    </h3>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-1 text-[10px] font-black text-muted-foreground uppercase"><Scale className="w-3 h-3"/> Standard: 0.96</div>
-                      <Badge className="rounded-full font-black">Rs. {dailyData.totalProc.toFixed(2)}</Badge>
-                    </div>
-                  </div>
-                  <Table>
-                    <TableHeader className="bg-muted/50 border-b">
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead rowSpan={2} className="font-black text-[10px] uppercase border-r text-center">CAN</TableHead>
-                        <TableHead rowSpan={2} className="font-black text-[10px] uppercase border-r text-center">Farmer Name</TableHead>
-                        <TableHead colSpan={2} className="font-black text-[10px] uppercase border-r text-center bg-orange-500/5 text-orange-600">Morning (AM)</TableHead>
-                        <TableHead colSpan={2} className="font-black text-[10px] uppercase border-r text-center bg-blue-500/5 text-blue-600">Evening (PM)</TableHead>
-                        <TableHead rowSpan={2} className="font-black text-[10px] uppercase border-r text-center">Total Litres</TableHead>
-                        <TableHead rowSpan={2} className="font-black text-[10px] uppercase text-center">Amount (Rs)</TableHead>
-                      </TableRow>
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead className="font-black text-[9px] uppercase text-center border-r bg-orange-500/5">KG</TableHead>
-                        <TableHead className="font-black text-[9px] uppercase text-center border-r bg-orange-500/5">Litre</TableHead>
-                        <TableHead className="font-black text-[9px] uppercase text-center border-r bg-blue-500/5">KG</TableHead>
-                        <TableHead className="font-black text-[9px] uppercase text-center border-r bg-blue-500/5">Litre</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {dailyData.procurement.length === 0 ? (
-                        <TableRow><TableCell colSpan={8} className="text-center py-10 text-muted-foreground italic">No collections recorded for this date.</TableCell></TableRow>
-                      ) : (
-                        dailyData.procurement.map((p: any, i: number) => (
-                          <TableRow key={i} className="hover:bg-primary/5 transition-colors">
-                            <TableCell className="font-black text-primary text-center border-r">{p.can}</TableCell>
-                            <TableCell className="font-bold uppercase text-xs border-r">{p.name}</TableCell>
-                            <TableCell className="text-center border-r font-medium text-orange-600/70">{p.amKg > 0 ? p.amKg.toFixed(2) : "—"}</TableCell>
-                            <TableCell className="text-center border-r font-bold text-orange-600">{p.amLtr > 0 ? p.amLtr.toFixed(2) : "—"}</TableCell>
-                            <TableCell className="text-center border-r font-medium text-blue-600/70">{p.pmKg > 0 ? p.pmKg.toFixed(2) : "—"}</TableCell>
-                            <TableCell className="text-center border-r font-bold text-blue-600">{p.pmLtr > 0 ? p.pmLtr.toFixed(2) : "—"}</TableCell>
-                            <TableCell className="text-center border-r font-black text-primary">{p.totalLtr.toFixed(2)}</TableCell>
-                            <TableCell className="text-right font-mono font-bold pr-6 text-primary">₹ {p.totalAmt.toFixed(2)}</TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </Card>
-              </div>
+              <Card className="rounded-3xl border-none shadow-xl overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead rowSpan={2} className="text-center font-black text-[10px] border-r">CAN</TableHead>
+                      <TableHead rowSpan={2} className="font-black text-[10px] border-r">Supplier Name</TableHead>
+                      <TableHead colSpan={2} className="text-center font-black text-[10px] border-r bg-orange-500/5">AM (Morning)</TableHead>
+                      <TableHead colSpan={2} className="text-center font-black text-[10px] border-r bg-blue-500/5">PM (Evening)</TableHead>
+                      <TableHead rowSpan={2} className="text-center font-black text-[10px] border-r">Total L</TableHead>
+                      <TableHead rowSpan={2} className="text-right font-black text-[10px] pr-6">Amount (Rs)</TableHead>
+                    </TableRow>
+                    <TableRow>
+                      <TableHead className="text-center text-[9px] border-r">KG</TableHead>
+                      <TableHead className="text-center text-[9px] border-r">LTR</TableHead>
+                      <TableHead className="text-center text-[9px] border-r">KG</TableHead>
+                      <TableHead className="text-center text-[9px] border-r">LTR</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {dailyData.procurement.length === 0 ? (
+                      <TableRow><TableCell colSpan={8} className="text-center py-20 italic text-muted-foreground">No collections for this date.</TableCell></TableRow>
+                    ) : (
+                      dailyData.procurement.map((p: any, i) => (
+                        <TableRow key={i} className="hover:bg-primary/5">
+                          <TableCell className="text-center font-black border-r text-primary">{p.can}</TableCell>
+                          <TableCell className="font-bold border-r">{p.name}</TableCell>
+                          <TableCell className="text-center border-r font-medium">{p.amKg.toFixed(2)}</TableCell>
+                          <TableCell className="text-center border-r font-bold text-orange-600">{p.amLtr.toFixed(2)}</TableCell>
+                          <TableCell className="text-center border-r font-medium">{p.pmKg.toFixed(2)}</TableCell>
+                          <TableCell className="text-center border-r font-bold text-blue-600">{p.pmLtr.toFixed(2)}</TableCell>
+                          <TableCell className="text-center border-r font-black text-primary">{p.totalLtr.toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-black pr-6">₹ {p.totalAmt.toFixed(2)}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </Card>
             </TabsContent>
 
             <TabsContent value="cycle" className="space-y-6">
               <div className="flex justify-end">
                 <Button onClick={() => {
                   const pdf = new jsPDF();
-                  const activeInvoices = masterRoster.filter(f => f.totalQty > 0);
-                  activeInvoices.forEach((f, i) => { if (i > 0) pdf.addPage(); generateSingleInvoice(pdf, f); });
-                  pdf.save(`Bulk_Bills_${selectedMonth}_${currentCycle.label}.pdf`);
-                }} disabled={masterRoster.filter(f => f.totalQty > 0).length === 0} className="rounded-full bg-red-600 hover:bg-red-700 h-12 px-8">
-                  <Download className="w-4 h-4 mr-2" /> Download All Bills
+                  const valid = masterRoster.filter(f => f.totalQty > 0);
+                  valid.forEach((f, i) => { if (i > 0) pdf.addPage(); generateSingleInvoice(pdf, f); });
+                  pdf.save(`Bills_${selectedMonth}_${currentCycle.label}.pdf`);
+                }} className="rounded-full bg-red-600 hover:bg-red-700 h-12 px-10">
+                  <Download className="mr-2 h-4 w-4" /> Download All Bills
                 </Button>
               </div>
-              <Card className="rounded-3xl overflow-hidden border-none shadow-xl">
+              <Card className="rounded-3xl border-none shadow-xl overflow-hidden">
                 <Table>
                   <TableHeader className="bg-muted/50">
                     <TableRow>
-                      <TableHead className="pl-10 font-black text-[10px] uppercase py-5">CAN</TableHead>
-                      <TableHead className="font-black text-[10px] uppercase py-5">Farmer Name</TableHead>
-                      <TableHead className="text-right font-black text-[10px] uppercase py-5">Total L</TableHead>
-                      <TableHead className="text-right font-black text-[10px] uppercase py-5">Total Rs</TableHead>
-                      <TableHead className="text-right pr-10 font-black text-[10px] uppercase py-5">Action</TableHead>
+                      <TableHead className="pl-10 font-black text-[10px]">CAN</TableHead>
+                      <TableHead className="font-black text-[10px]">Supplier Name</TableHead>
+                      <TableHead className="text-right font-black text-[10px]">Volume (L)</TableHead>
+                      <TableHead className="text-right font-black text-[10px]">Payout (Rs)</TableHead>
+                      <TableHead className="text-right pr-10 font-black text-[10px]">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {masterRoster.filter(f => f.totalQty > 0).map(f => (
                       <TableRow key={f.id} className="hover:bg-primary/5">
                         <TableCell className="pl-10 font-black text-primary text-lg">{f.canNumber}</TableCell>
-                        <TableCell className="font-bold uppercase text-sm">{f.name}</TableCell>
-                        <TableCell className="text-right font-black">{f.totalQty.toFixed(2)}</TableCell>
-                        <TableCell className="text-right font-mono text-primary font-bold">Rs. {f.totalAmount.toFixed(2)}</TableCell>
+                        <TableCell className="font-bold uppercase">{f.name}</TableCell>
+                        <TableCell className="text-right font-bold">{f.totalQty.toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-black text-primary">₹ {f.totalAmount.toFixed(2)}</TableCell>
                         <TableCell className="text-right pr-10">
                           <Button variant="ghost" size="sm" onClick={() => {
                             const pdf = new jsPDF();
                             generateSingleInvoice(pdf, f);
                             pdf.save(`Bill_${f.canNumber}_${f.name}.pdf`);
-                          }} className="text-red-600 font-black uppercase text-[10px]">
-                            <Download className="w-3 h-3 mr-2" /> PDF Bill
+                          }} className="text-red-600 font-bold uppercase text-[10px]">
+                            PDF Bill
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -659,40 +613,39 @@ export default function ReportsPage() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="master" className="space-y-10">
-              <div className="flex justify-between items-center">
-                <div className="bg-primary/5 border border-primary/20 px-8 py-4 rounded-[2rem]">
-                  <p className="text-[10px] font-black uppercase text-primary opacity-60">Cycle Grand Total</p>
-                  <p className="text-3xl font-black text-primary">Rs. {cycleStats.totalEntryAmt.toFixed(2)}</p>
+            <TabsContent value="master" className="space-y-6">
+              <div className="flex justify-between items-center bg-primary p-8 rounded-[2rem] text-white shadow-xl">
+                <div>
+                  <p className="text-xs font-black uppercase opacity-60">Cycle Grand Total</p>
+                  <p className="text-4xl font-black mt-1">₹ {cycleStats.totalEntryAmt.toFixed(2)}</p>
                 </div>
                 <Button onClick={() => {
-                   const pdf = new jsPDF('l', 'mm', 'a4');
-                   pdf.setFontSize(16);
-                   pdf.text("MASTER PROCUREMENT ROSTER", 14, 20);
-                   (pdf as any).autoTable({
-                     startY: 25,
-                     head: [['CAN', 'FARMER NAME', 'MORNING', 'EVENING', 'TOTAL L', 'PAYOUT (Rs)']],
-                     body: masterRoster.map(f => [f.canNumber, f.name, f.morningQty.toFixed(2), f.eveningQty.toFixed(2), f.totalQty.toFixed(2), f.totalAmount.toFixed(2)]),
-                     theme: 'grid',
-                     headStyles: { fillColor: [240, 240, 240], textColor: 0 },
-                   });
-                   pdf.save(`Master_Roster_${selectedMonth}_${currentCycle.label}.pdf`);
-                }} className="rounded-full h-12 px-10 font-black uppercase">
-                  <FileDown className="w-4 h-4 mr-2" /> Export Roster PDF
+                  const pdf = new jsPDF('l', 'mm', 'a4');
+                  pdf.text("MASTER PROCUREMENT ROSTER", 14, 20);
+                  (pdf as any).autoTable({
+                    startY: 25,
+                    head: [['CAN', 'SUPPLIER NAME', 'MORNING', 'EVENING', 'TOTAL L', 'PAYOUT (Rs)']],
+                    body: masterRoster.map(f => [f.canNumber, f.name, f.morningQty.toFixed(2), f.eveningQty.toFixed(2), f.totalQty.toFixed(2), f.totalAmount.toFixed(2)]),
+                    theme: 'grid',
+                    headStyles: { fillColor: [240, 240, 240], textColor: 0 }
+                  });
+                  pdf.save(`Master_Roster_${selectedMonth}_${currentCycle.label}.pdf`);
+                }} className="rounded-full bg-white text-primary hover:bg-white/90 h-12 px-8">
+                  <FileDown className="mr-2 h-4 w-4" /> Export Roster PDF
                 </Button>
               </div>
             </TabsContent>
 
-            <TabsContent value="audit" className="space-y-8">
+            <TabsContent value="audit" className="space-y-6">
               <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-2xl">
                 <Table>
                   <TableHeader className="bg-muted/50">
                     <TableRow>
-                      <TableHead className="pl-10 font-black text-[10px] uppercase py-5">Month</TableHead>
-                      <TableHead className="text-center font-black text-[10px] uppercase py-5">Volume (L)</TableHead>
-                      <TableHead className="text-center font-black text-[10px] uppercase py-5">Cost (Rs)</TableHead>
-                      <TableHead className="text-center font-black text-[10px] uppercase py-5">Revenue (Rs)</TableHead>
-                      <TableHead className="text-right pr-10 font-black text-[10px] uppercase py-5">Profit (Rs)</TableHead>
+                      <TableHead className="pl-10 font-black text-[10px] py-5">Month</TableHead>
+                      <TableHead className="text-center font-black text-[10px]">Volume (L)</TableHead>
+                      <TableHead className="text-center font-black text-[10px]">Procurement (Rs)</TableHead>
+                      <TableHead className="text-center font-black text-[10px]">Revenue (Rs)</TableHead>
+                      <TableHead className="text-right pr-10 font-black text-[10px]">Profit (Rs)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -712,13 +665,13 @@ export default function ReportsPage() {
                        });
 
                        return (
-                        <TableRow key={i} className="hover:bg-muted/10 transition-colors">
+                        <TableRow key={i} className="hover:bg-muted/10">
                           <TableCell className="pl-10 font-black text-primary uppercase text-sm">{opt.label}</TableCell>
                           <TableCell className="text-center font-bold">{tQty.toFixed(2)}</TableCell>
-                          <TableCell className="text-center text-destructive font-bold">Rs. {tCost.toFixed(2)}</TableCell>
-                          <TableCell className="text-center text-green-600 font-bold">Rs. {tRev.toFixed(2)}</TableCell>
+                          <TableCell className="text-center text-destructive font-bold">₹ {tCost.toFixed(2)}</TableCell>
+                          <TableCell className="text-center text-green-600 font-bold">₹ {tRev.toFixed(2)}</TableCell>
                           <TableCell className="text-right pr-10 font-black text-lg">
-                            <span className={(tRev - tCost) >= 0 ? "text-green-600" : "text-destructive"}>Rs. {(tRev - tCost).toFixed(2)}</span>
+                            <span className={(tRev - tCost) >= 0 ? "text-green-600" : "text-destructive"}>₹ {(tRev - tCost).toFixed(2)}</span>
                           </TableCell>
                         </TableRow>
                        );

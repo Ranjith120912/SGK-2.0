@@ -106,6 +106,7 @@ export default function EntriesPage() {
       farmerId,
       farmerName: farmer.name,
       canNumber: farmer.canNumber,
+      milkType: farmer.milkType || 'COW',
       date,
       session,
       kgWeight: kgValue,
@@ -122,7 +123,7 @@ export default function EntriesPage() {
     }, 500);
   };
 
-  if (!date) return <div className="min-h-screen flex flex-col bg-background pt-24 items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+  if (!date) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">

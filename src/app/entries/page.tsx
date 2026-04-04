@@ -54,7 +54,7 @@ export default function EntriesPage() {
   const { data: entries } = useCollection(entriesQuery);
   const { data: ratesConfig } = useDoc(settingsRef);
 
-  // Conversion factor (Strictly 0.96 Standard)
+  // STRICT Business Standard: 0.96
   const conversionRate = 0.96;
 
   const filteredFarmers = farmers?.filter(f => 
@@ -65,7 +65,7 @@ export default function EntriesPage() {
     const bNum = parseInt(b.canNumber);
     if (isNaN(aNum) || isNaN(bNum)) return a.canNumber.localeCompare(b.canNumber);
     return aNum - bNum;
-  });
+  }) || [];
 
   const handleKgChange = (farmerId: string, value: string) => {
     setKgValues(prev => ({ ...prev, [farmerId]: value }));
@@ -80,7 +80,7 @@ export default function EntriesPage() {
     const existingEntry = entries?.find(e => e.farmerId === farmerId);
     const kgValue = kgStr !== undefined && kgStr !== "" ? parseFloat(kgStr) : (existingEntry ? Number(existingEntry.kgWeight) : 0);
     
-    // Rate Prioritization Logic (Buffalo Custom > Global Config)
+    // Rate Prioritization Logic (Buffalo Custom > Buffalo Global Config > Cow Global Config)
     let managedRate = 0;
     if (farmer.milkType === 'BUFFALO') {
       managedRate = Number(farmer.customRate) > 0 
@@ -94,6 +94,7 @@ export default function EntriesPage() {
 
     setSavingStatus(prev => ({ ...prev, [farmerId]: 'saving' }));
 
+    // Precision Locked Calculations (2 Decimals)
     const quantityLitre = parseFloat((kgValue * conversionRate).toFixed(2));
     const totalAmount = parseFloat((quantityLitre * managedRate).toFixed(2));
 
@@ -118,17 +119,7 @@ export default function EntriesPage() {
     }, 500);
   };
 
-  if (!date) {
-    return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <Navbar />
-        <main className="flex-grow pt-24 pb-20 flex items-center justify-center">
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
-        </main>
-        <Footer />
-      </div>
-    );
-  }
+  if (!date) return <div className="min-h-screen flex flex-col bg-background pt-24 items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -138,7 +129,7 @@ export default function EntriesPage() {
           <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
             <div>
               <h1 className="text-3xl font-black text-primary tracking-tight">Daily Collection</h1>
-              <p className="text-muted-foreground font-medium">Auto-saving entries for {format(new Date(date), 'MMMM dd, yyyy')}</p>
+              <p className="text-muted-foreground font-medium">Standard Payouts for {format(new Date(date), 'MMMM dd, yyyy')}</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
               <div className="flex items-center gap-2 bg-card p-1 rounded-full border shadow-sm">
@@ -167,7 +158,7 @@ export default function EntriesPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input 
                 className="pl-10 h-12 bg-card rounded-2xl border-primary/10 shadow-sm" 
-                placeholder="Search CAN or Farmer Name..." 
+                placeholder="Search CAN or Farmer..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -175,15 +166,15 @@ export default function EntriesPage() {
             <div className="flex items-center gap-3 px-4 py-2 bg-primary/5 rounded-2xl border border-primary/10">
               <Scale className="w-5 h-5 text-primary" />
               <div className="text-xs">
-                <p className="font-bold text-primary">Standard Conversion</p>
-                <p className="text-muted-foreground">1 Kg = {conversionRate} L</p>
+                <p className="font-bold text-primary uppercase">Business Standard</p>
+                <p className="text-muted-foreground font-black">1 Kg = 0.96 L</p>
               </div>
             </div>
             <div className="flex items-center gap-3 px-4 py-2 bg-accent/5 rounded-2xl border border-accent/10">
               <IndianRupee className="w-5 h-5 text-accent" />
               <div className="text-xs">
-                <p className="font-bold text-accent">Default Rates</p>
-                <p className="text-muted-foreground">Cow: ₹{Number(ratesConfig?.cowRate || 0).toFixed(2)} | Buffalo: ₹{Number(ratesConfig?.buffaloRate || 0).toFixed(2)}</p>
+                <p className="font-bold text-accent uppercase">Current Rates</p>
+                <p className="text-muted-foreground font-black">Cow: ₹{Number(ratesConfig?.cowRate || 0).toFixed(2)} | Buf: ₹{Number(ratesConfig?.buffaloRate || 0).toFixed(2)}</p>
               </div>
             </div>
           </div>
@@ -197,21 +188,20 @@ export default function EntriesPage() {
                   <TableHead className="w-[120px] font-bold">Calculation</TableHead>
                   <TableHead className="w-[180px] font-bold">Entry (Kg)</TableHead>
                   <TableHead className="w-[150px] font-bold">Rate (₹/L)</TableHead>
-                  <TableHead className="w-[120px] font-bold">Amount (₹)</TableHead>
+                  <TableHead className="w-[120px] font-bold text-right">Amount (₹)</TableHead>
                   <TableHead className="w-[80px] text-right pr-6 font-bold">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredFarmers?.map((farmer) => {
+                {filteredFarmers.map((farmer) => {
                   const existingEntry = entries?.find(e => e.farmerId === farmer.id);
                   const currentKgStr = kgValues[farmer.id] !== undefined 
                     ? kgValues[farmer.id] 
                     : (existingEntry ? Number(existingEntry.kgWeight).toString() : "");
                   
                   const kgNum = parseFloat(currentKgStr);
-                  const previewLitre = !isNaN(kgNum) ? (kgNum * conversionRate).toFixed(2) : "0.00";
+                  const previewLitre = !isNaN(kgNum) ? (kgNum * 0.96).toFixed(2) : "0.00";
                   
-                  // Rate Logic (Buffalo Custom > Buffalo Global > Cow Global)
                   let managedRate = 0;
                   const isBuffalo = farmer.milkType === 'BUFFALO';
                   if (isBuffalo) {
@@ -226,20 +216,18 @@ export default function EntriesPage() {
                   const status = savingStatus[farmer.id] || (existingEntry ? 'saved' : 'idle');
 
                   return (
-                    <TableRow key={farmer.id} className={cn(existingEntry && "bg-primary/5")}>
+                    <TableRow key={farmer.id} className={cn(existingEntry && "bg-primary/5 transition-colors")}>
                       <TableCell className="font-black text-primary pl-6 text-lg">{farmer.canNumber}</TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
-                          <span className="font-bold text-base">{farmer.name}</span>
-                          <div className="flex items-center gap-2">
-                            <Badge variant={isBuffalo ? "secondary" : "outline"} className="text-[10px] h-4 rounded-full px-1.5">
-                              {farmer.milkType || 'COW'}
-                            </Badge>
-                          </div>
+                          <span className="font-bold text-base uppercase">{farmer.name}</span>
+                          <Badge variant={isBuffalo ? "secondary" : "outline"} className="text-[10px] w-fit h-4 rounded-full font-black">
+                            {farmer.milkType || 'COW'}
+                          </Badge>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1 text-sm font-bold text-primary/70">
+                        <div className="flex items-center gap-1 text-sm font-black text-primary/70">
                           <Droplets className="w-3 h-3" /> {previewLitre} L
                         </div>
                       </TableCell>
@@ -249,28 +237,28 @@ export default function EntriesPage() {
                             type="number" 
                             placeholder="0.00"
                             step="0.01"
-                            className="h-11 rounded-xl pr-12 font-bold text-lg border-primary/10 focus:border-primary transition-all"
+                            className="h-11 rounded-xl pr-12 font-bold text-lg border-primary/10 focus:border-primary"
                             value={currentKgStr}
                             onChange={(e) => handleKgChange(farmer.id, e.target.value)}
                             onBlur={() => handleAutoSave(farmer.id)}
                             onKeyDown={(e) => e.key === 'Enter' && handleAutoSave(farmer.id)}
                           />
-                          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground uppercase tracking-tighter">KG</span>
+                          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground opacity-40 uppercase">KG</span>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className={cn(
-                          "h-11 flex items-center justify-between px-4 rounded-xl border border-transparent font-bold text-sm bg-muted/30 text-muted-foreground",
-                          isBuffalo && Number(farmer.customRate) > 0 && "bg-accent/5 text-accent border-accent/20"
+                          "h-11 flex items-center justify-between px-4 rounded-xl border border-transparent font-black text-sm bg-muted/30 text-muted-foreground",
+                          isBuffalo && Number(farmer.customRate) > 0 && "bg-accent/10 text-accent border-accent/20"
                         )}>
                           <span>₹ {managedRate.toFixed(2)}</span>
                           <Lock className="w-3 h-3 opacity-30" />
                           {isBuffalo && Number(farmer.customRate) > 0 && (
-                            <div className="absolute -top-3 left-2 bg-accent text-[8px] font-black text-white px-1.5 rounded-full uppercase tracking-widest">Fixed</div>
+                            <div className="absolute -top-3 left-2 bg-accent text-[8px] font-black text-white px-1.5 rounded-full uppercase tracking-widest shadow-sm">Fixed</div>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-right">
                         <div className="text-sm font-black text-foreground">
                           ₹ {previewAmount}
                         </div>
@@ -287,7 +275,7 @@ export default function EntriesPage() {
               </TableBody>
             </Table>
             <div className="p-4 bg-muted/20 text-center text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] border-t">
-              System using standard conversion: 1 Kg = {conversionRate} Litres.
+              Business standard enforcement: 1 Kg = 0.96 Litres • Accuracy locked to 2 decimals.
             </div>
           </Card>
         </div>

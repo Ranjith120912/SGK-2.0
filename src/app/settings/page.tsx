@@ -9,15 +9,12 @@ import { doc, serverTimestamp, collection } from "firebase/firestore";
 import { setDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { 
   Settings as SettingsIcon, 
   Milk, 
-  Save, 
-  CheckCircle2, 
-  ShoppingBag, 
   Building2, 
   Upload, 
   X, 
@@ -25,10 +22,10 @@ import {
   RefreshCcw,
   DatabaseZap,
   AlertTriangle,
-  Loader2
+  Loader2,
+  ShoppingBag
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,8 +50,7 @@ export default function SettingsPage() {
     cowRate: "", 
     buffaloRate: "", 
     cowSellingRate: "",
-    buffaloSellingRate: "",
-    kgToLitreRate: "0.96"
+    buffaloSellingRate: ""
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
@@ -64,25 +60,7 @@ export default function SettingsPage() {
     return doc(firestore, 'settings', 'milk_rates');
   }, [firestore]);
 
-  const entriesRef = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'entries');
-  }, [firestore]);
-
-  const salesRef = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'sales');
-  }, [firestore]);
-
-  const farmersRef = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'farmers');
-  }, [firestore]);
-
-  const { data: currentSettings, isLoading } = useDoc(settingsRef);
-  const { data: allEntries } = useCollection(entriesRef);
-  const { data: allSales } = useCollection(salesRef);
-  const { data: allFarmers } = useCollection(farmersRef);
+  const { data: currentSettings } = useDoc(settingsRef);
 
   useEffect(() => {
     if (currentSettings) {
@@ -93,8 +71,7 @@ export default function SettingsPage() {
         cowRate: currentSettings.cowRate?.toString() || "",
         buffaloRate: currentSettings.buffaloRate?.toString() || "",
         cowSellingRate: currentSettings.cowSellingRate?.toString() || "",
-        buffaloSellingRate: currentSettings.buffaloSellingRate?.toString() || "",
-        kgToLitreRate: "0.96" // Locked to business standard
+        buffaloSellingRate: currentSettings.buffaloSellingRate?.toString() || ""
       });
     }
   }, [currentSettings]);
@@ -117,31 +94,13 @@ export default function SettingsPage() {
       buffaloRate: parseFloat(config.buffaloRate) || 0,
       cowSellingRate: parseFloat(config.cowSellingRate) || 0,
       buffaloSellingRate: parseFloat(config.buffaloSellingRate) || 0,
-      kgToLitreRate: 0.96, // Strictly enforced
+      kgToLitreRate: 0.96, // Strictly enforced standard
       updatedAt: serverTimestamp()
     }, { merge: true });
     setTimeout(() => {
       setIsSaving(false);
-      toast({ title: "Settings Saved", description: "System updated successfully." });
+      toast({ title: "Configuration Updated", description: "Business settings applied successfully." });
     }, 800);
-  };
-
-  const masterReset = () => {
-    if (!firestore) return;
-    setIsResetting(true);
-    
-    allEntries?.forEach(e => deleteDocumentNonBlocking(doc(firestore, 'entries', e.id)));
-    allSales?.forEach(s => deleteDocumentNonBlocking(doc(firestore, 'sales', s.id)));
-    allFarmers?.forEach(f => deleteDocumentNonBlocking(doc(firestore, 'farmers', f.id)));
-
-    setTimeout(() => {
-      setIsResetting(false);
-      toast({ 
-        title: "Master Reset Initiated", 
-        description: `Wiping records. Please wait for the sync to complete.`,
-        variant: "destructive"
-      });
-    }, 1000);
   };
 
   return (
@@ -153,52 +112,12 @@ export default function SettingsPage() {
             <h1 className="text-3xl font-black text-primary tracking-tight flex items-center gap-3 uppercase">
               <SettingsIcon className="w-8 h-8" /> System Configuration
             </h1>
-            <p className="text-muted-foreground font-medium">Manage pricing, business identity, and conversion standards.</p>
+            <p className="text-muted-foreground font-medium">Manage pricing and business identity standards.</p>
           </header>
 
           <div className="space-y-8">
-            <Card className="rounded-[2rem] border-2 border-destructive/20 bg-destructive/5 overflow-hidden shadow-xl">
-              <CardHeader className="bg-destructive/10">
-                <div className="flex justify-between items-center">
-                  <CardTitle className="text-xl font-black flex items-center gap-3 text-destructive uppercase">
-                    <DatabaseZap className="w-6 h-6" /> System Wipe
-                  </CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="p-6 flex flex-col sm:flex-row justify-between items-center gap-6">
-                <div className="flex gap-4">
-                  <AlertTriangle className="w-10 h-10 text-destructive animate-pulse" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-bold text-destructive uppercase">Irreversible Action</p>
-                    <p className="text-xs text-muted-foreground">
-                      This will delete all farmers, collection logs, and sales records across your database.
-                    </p>
-                  </div>
-                </div>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="lg" className="rounded-full px-10 h-14 font-black uppercase shadow-xl" disabled={isResetting}>
-                      {isResetting ? <Loader2 className="animate-spin mr-2" /> : <RefreshCcw className="mr-2" />} Master Reset
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent className="rounded-3xl">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle className="font-black text-destructive uppercase">Confirm Total Wipe</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will delete ALL data. This action cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={masterReset} className="rounded-full bg-destructive">Proceed with Reset</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-[2rem] shadow-lg border-none bg-card/50 backdrop-blur-sm overflow-hidden">
-              <CardHeader className="bg-primary/5 p-6 border-b border-primary/10">
+            <Card className="rounded-[2rem] shadow-lg border-none bg-card overflow-hidden">
+              <CardHeader className="bg-primary/5 p-6 border-b">
                 <CardTitle className="text-xl font-black flex items-center gap-3 text-primary uppercase">
                   <Building2 className="w-6 h-6" /> Business Identity
                 </CardTitle>
@@ -217,10 +136,10 @@ export default function SettingsPage() {
                   </div>
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Business Stamp</Label>
-                    <div className="h-[160px] w-full rounded-2xl border-2 border-dashed border-primary/10 bg-muted/20 relative group overflow-hidden">
+                    <div className="h-[160px] w-full rounded-2xl border-2 border-dashed border-primary/10 relative group overflow-hidden bg-muted/20">
                       {config.stampUrl ? (
                         <>
-                          <img src={config.stampUrl} className="w-full h-full object-contain p-4 mix-blend-multiply" />
+                          <img src={config.stampUrl} className="w-full h-full object-contain p-4 mix-blend-multiply" alt="Business Stamp" />
                           <Button variant="destructive" size="icon" className="absolute top-2 right-2 h-7 w-7 rounded-full opacity-0 group-hover:opacity-100" onClick={() => setConfig({...config, stampUrl: ""})}><X /></Button>
                         </>
                       ) : (
@@ -248,19 +167,19 @@ export default function SettingsPage() {
                   <div className="space-y-2"><Label className="text-[9px] font-bold uppercase">Buffalo (₹/L)</Label><Input type="number" value={config.buffaloSellingRate} onChange={(e) => setConfig({...config, buffaloSellingRate: e.target.value})} /></div>
                 </div>
               </Card>
-              <Card className="rounded-3xl border-none shadow-md p-6">
+              <Card className="rounded-3xl border-none shadow-md p-6 bg-primary/5">
                 <CardTitle className="text-xs font-black uppercase tracking-widest text-foreground mb-6 flex items-center gap-2"><Scale className="w-4 h-4" /> Conversion Standard</CardTitle>
                 <div className="space-y-2">
                   <Label className="text-[9px] font-bold uppercase">Kg to Litre</Label>
-                  <Input type="number" value="0.96" disabled className="bg-muted/50 font-black" />
-                  <p className="text-[8px] text-muted-foreground mt-1 uppercase font-black">Strict Business Standard Locked</p>
+                  <Input type="number" value="0.96" disabled className="bg-white font-black text-primary border-primary/20" />
+                  <p className="text-[8px] text-primary mt-2 uppercase font-black tracking-widest">Strict Business Standard Locked</p>
                 </div>
               </Card>
             </div>
 
             <div className="flex justify-end pt-4">
               <Button onClick={handleSave} disabled={isSaving} className="rounded-full px-12 h-14 font-black uppercase tracking-widest shadow-xl">
-                {isSaving ? "Applying..." : "Apply Config"}
+                {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />} Apply Configuration
               </Button>
             </div>
           </div>

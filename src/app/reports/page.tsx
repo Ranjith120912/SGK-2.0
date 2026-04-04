@@ -40,19 +40,18 @@ export default function ReportsPage() {
 
   useEffect(() => {
     setIsClient(true);
-    const now = new Date();
-    setSelectedMonth(format(now, 'yyyy-MM'));
+    setSelectedMonth(format(new Date(), 'yyyy-MM'));
   }, []);
+
+  // Standard locked conversion
+  const STANDARD_CONVERSION = 0.96;
 
   const monthOptions = useMemo(() => {
     if (!isClient) return [];
     const now = new Date();
     return Array.from({ length: 12 }).map((_, i) => {
       const d = subMonths(now, i);
-      return {
-        value: format(d, 'yyyy-MM'),
-        label: format(d, 'MMMM yyyy')
-      };
+      return { value: format(d, 'yyyy-MM'), label: format(d, 'MMMM yyyy') };
     });
   }, [isClient]);
 
@@ -61,7 +60,6 @@ export default function ReportsPage() {
     const [year, month] = selectedMonth.split('-').map(Number);
     const monthEnd = endOfMonth(new Date(year, month - 1));
     const lastDay = monthEnd.getDate();
-
     return [
       { id: 0, label: "Cycle 1", range: "1st - 10th", start: 1, end: 10 },
       { id: 1, label: "Cycle 2", range: "11th - 20th", start: 11, end: 20 },
@@ -96,115 +94,74 @@ export default function ReportsPage() {
 
   const currentCycle = cycles[activeCycle];
 
-  // Global Standard Conversion Rate (Strict 0.96)
-  const globalConversionRate = Number(ratesConfig?.kgToLitreRate) || 0.96;
-
   /**
-   * CENTRAL FINANCIAL RESOLUTION ENGINE
-   * This is the single source of truth for ALL payout calculations in the app.
+   * UNIFIED FINANCIAL RESOLUTION ENGINE (REPORTS VERSION)
+   * This is the single source of truth for ALL report math.
    */
-  const resolveEntryFinancials = (entry: any, farmersList: any[], config: any) => {
-    // 1. Prefer saved values from database for volume and cost
-    const savedQty = Number(entry.quantity);
-    const savedCost = Number(entry.totalAmount);
-    const savedRate = Number(entry.rate);
-    
-    if (savedQty > 0 && savedCost > 0) {
-      return { qtyLitre: savedQty, cost: savedCost, resolvedRate: savedRate };
-    }
-
-    // 2. Fallback to calculation if values are missing
+  const resolveEntryData = (entry: any, farmersList: any[], config: any) => {
+    // Volume: Standard 0.96 conversion from KgWeight
     const kg = Number(entry.kgWeight) || 0;
-    const qtyLitre = parseFloat((kg * globalConversionRate).toFixed(2));
+    const qtyLitre = Number(entry.quantity) || parseFloat((kg * STANDARD_CONVERSION).toFixed(2));
     
+    // Rate: Buffalo Custom > Global Config
     const farmer = farmersList?.find(f => f.id === entry.farmerId);
-    let resolvedRate = 0;
+    let resolvedRate = Number(entry.rate) || 0;
     
-    if (farmer) {
+    if (resolvedRate === 0 && farmer) {
       if (farmer.milkType === 'BUFFALO') {
-        resolvedRate = Number(farmer.customRate) > 0 
-          ? Number(farmer.customRate) 
-          : (Number(config?.buffaloRate) || 0);
+        resolvedRate = Number(farmer.customRate) > 0 ? Number(farmer.customRate) : (Number(config?.buffaloRate) || 0);
       } else {
         resolvedRate = Number(config?.cowRate) || 0;
       }
-    } else {
-      resolvedRate = savedRate || 0;
     }
 
-    const cost = parseFloat((qtyLitre * resolvedRate).toFixed(2));
+    // Amount: Precision Locked multiplication
+    const cost = Number(entry.totalAmount) || parseFloat((qtyLitre * resolvedRate).toFixed(2));
+    
     return { qtyLitre, cost, resolvedRate };
   };
 
-  const resolveSaleFinancials = (sale: any, config: any) => {
-    const savedQty = Number(sale.quantity);
-    const savedRevenue = Number(sale.totalAmount);
-    const savedRate = Number(sale.rate);
-
-    if (savedQty > 0 && savedRevenue > 0) {
-      return { qty: savedQty, revenue: savedRevenue, rate: savedRate };
-    }
-
+  const resolveSaleData = (sale: any, config: any) => {
     const qty = Number(sale.quantity) || 0;
-    let rate = savedRate;
-    
-    if (!rate || rate === 0) {
-      rate = sale.milkType === 'BUFFALO' 
-        ? (Number(config?.buffaloSellingRate) || 0) 
-        : (Number(config?.cowSellingRate) || 0);
+    let rate = Number(sale.rate) || 0;
+    if (rate === 0) {
+      rate = sale.milkType === 'BUFFALO' ? (Number(config?.buffaloSellingRate) || 0) : (Number(config?.cowSellingRate) || 0);
     }
-    
-    const revenue = parseFloat((qty * rate).toFixed(2));
+    const revenue = Number(sale.totalAmount) || parseFloat((qty * rate).toFixed(2));
     return { qty, revenue, rate };
   };
 
-  // 1. Entry Filtering & Processing
-  const filteredCycleEntries = useMemo(() => {
-    if (!allEntries || !selectedMonth || !currentCycle) return [];
-    return allEntries.filter(entry => {
-      if (!entry.date.startsWith(selectedMonth)) return false;
-      const day = parseInt(entry.date.split('-')[2]);
-      return day >= currentCycle.start && day <= currentCycle.end;
-    });
-  }, [allEntries, selectedMonth, currentCycle]);
-
-  const filteredCycleSales = useMemo(() => {
-    if (!allSales || !selectedMonth || !currentCycle) return [];
-    return allSales.filter(sale => {
-      if (!sale.date.startsWith(selectedMonth)) return false;
-      const day = parseInt(sale.date.split('-')[2]);
-      return day >= currentCycle.start && day <= currentCycle.end;
-    });
-  }, [allSales, selectedMonth, currentCycle]);
-
-  // 2. Master Roster Generation (Driven by entries to ensure 100% sync)
+  // 1. MASTER ROSTER (Source of Truth for Cycle)
   const masterRoster = useMemo(() => {
-    if (!filteredCycleEntries || !farmers || !ratesConfig) return [];
+    if (!allEntries || !farmers || !ratesConfig || !selectedMonth || !currentCycle) return [];
     
+    const cycleEntries = allEntries.filter(e => {
+      if (!e.date.startsWith(selectedMonth)) return false;
+      const day = parseInt(e.date.split('-')[2]);
+      return day >= currentCycle.start && day <= currentCycle.end;
+    });
+
     const farmerMap: Record<string, any> = {};
 
-    filteredCycleEntries.forEach(entry => {
-      const farmerId = entry.farmerId;
-      if (!farmerMap[farmerId]) {
-        const farmerInfo = farmers.find(f => f.id === farmerId);
-        farmerMap[farmerId] = {
-          id: farmerId,
-          name: farmerInfo?.name || "Unknown/Deleted",
-          canNumber: farmerInfo?.canNumber || "???",
-          bankAccountNumber: farmerInfo?.bankAccountNumber || "",
-          milkType: farmerInfo?.milkType || "COW",
-          customRate: farmerInfo?.customRate || 0,
-          morningQty: 0,
-          eveningQty: 0,
-          totalQty: 0,
-          totalAmount: 0
+    cycleEntries.forEach(entry => {
+      const fId = entry.farmerId;
+      if (!farmerMap[fId]) {
+        const info = farmers.find(f => f.id === fId);
+        farmerMap[fId] = {
+          id: fId,
+          name: info?.name || "Deleted Supplier",
+          canNumber: info?.canNumber || "???",
+          bankAccountNumber: info?.bankAccountNumber || "",
+          milkType: info?.milkType || "COW",
+          customRate: info?.customRate || 0,
+          morningQty: 0, eveningQty: 0, totalQty: 0, totalAmount: 0
         };
       }
 
-      const { qtyLitre, cost } = resolveEntryFinancials(entry, farmers, ratesConfig);
-      if (entry.session === 'Morning') farmerMap[farmerId].morningQty += qtyLitre;
-      else farmerMap[farmerId].eveningQty += qtyLitre;
-      farmerMap[farmerId].totalAmount += cost;
+      const { qtyLitre, cost } = resolveEntryData(entry, farmers, ratesConfig);
+      if (entry.session === 'Morning') farmerMap[fId].morningQty += qtyLitre;
+      else farmerMap[fId].eveningQty += qtyLitre;
+      farmerMap[fId].totalAmount += cost;
     });
 
     return Object.values(farmerMap).map(f => ({
@@ -213,17 +170,13 @@ export default function ReportsPage() {
       eveningQty: parseFloat(f.eveningQty.toFixed(2)),
       totalQty: parseFloat((f.morningQty + f.eveningQty).toFixed(2)),
       totalAmount: parseFloat(f.totalAmount.toFixed(2))
-    })).sort((a, b) => {
-      const aNum = parseInt(a.canNumber);
-      const bNum = parseInt(b.canNumber);
-      return (isNaN(aNum) || isNaN(bNum)) ? a.canNumber.localeCompare(b.canNumber) : aNum - bNum;
-    });
-  }, [filteredCycleEntries, farmers, ratesConfig]);
+    })).sort((a, b) => parseInt(a.canNumber) - parseInt(b.canNumber));
+  }, [allEntries, farmers, ratesConfig, selectedMonth, currentCycle]);
 
   const cowRoster = masterRoster.filter(f => f.milkType === 'COW');
   const buffaloRoster = masterRoster.filter(f => f.milkType === 'BUFFALO');
 
-  // 3. Cycle & Month Statistics (Derived from rosters and identical logic)
+  // 2. CYCLE STATS (Overview Sync - Derived from Roster)
   const cycleStats = useMemo(() => {
     const totalEntryAmt = masterRoster.reduce((acc, curr) => acc + curr.totalAmount, 0);
     const totalEntryQty = masterRoster.reduce((acc, curr) => acc + curr.totalQty, 0);
@@ -231,8 +184,14 @@ export default function ReportsPage() {
     let totalSaleAmt = 0;
     let totalSaleQty = 0;
 
-    filteredCycleSales.forEach(sale => {
-      const { revenue, qty } = resolveSaleFinancials(sale, ratesConfig);
+    const cycleSales = allSales?.filter(s => {
+      if (!s.date.startsWith(selectedMonth)) return false;
+      const day = parseInt(s.date.split('-')[2]);
+      return day >= currentCycle.start && day <= currentCycle.end;
+    }) || [];
+
+    cycleSales.forEach(s => {
+      const { revenue, qty } = resolveSaleData(s, ratesConfig);
       totalSaleAmt += revenue;
       totalSaleQty += qty;
     });
@@ -244,8 +203,9 @@ export default function ReportsPage() {
       totalSaleAmt: parseFloat(totalSaleAmt.toFixed(2)),
       profit: parseFloat((totalSaleAmt - totalEntryAmt).toFixed(2))
     };
-  }, [masterRoster, filteredCycleSales, ratesConfig]);
+  }, [masterRoster, allSales, selectedMonth, currentCycle, ratesConfig]);
 
+  // 3. MONTHLY SUMMARY & AUDIT (Synchronized reduction)
   const monthStats = useMemo(() => {
     if (!allEntries || !allSales || !selectedMonth || !farmers || !ratesConfig) {
       return { totalEntryQty: 0, totalSaleQty: 0, totalEntryAmt: 0, totalSaleAmt: 0, profit: 0 };
@@ -254,308 +214,170 @@ export default function ReportsPage() {
     const mEntries = allEntries.filter(e => e.date.startsWith(selectedMonth));
     const mSales = allSales.filter(s => s.date.startsWith(selectedMonth));
 
-    let totalEntryQty = 0;
-    let totalEntryAmt = 0;
-    let totalSaleQty = 0;
-    let totalSaleAmt = 0;
+    let tEntryQty = 0, tEntryAmt = 0, tSaleQty = 0, tSaleAmt = 0;
 
-    mEntries.forEach(entry => {
-      const { qtyLitre, cost } = resolveEntryFinancials(entry, farmers, ratesConfig);
-      totalEntryQty += qtyLitre;
-      totalEntryAmt += cost;
+    mEntries.forEach(e => {
+      const res = resolveEntryData(e, farmers, ratesConfig);
+      tEntryQty += res.qtyLitre;
+      tEntryAmt += res.cost;
     });
 
-    mSales.forEach(sale => {
-      const { revenue, qty } = resolveSaleFinancials(sale, ratesConfig);
-      totalSaleAmt += revenue;
-      totalSaleQty += qty;
+    mSales.forEach(s => {
+      const res = resolveSaleData(s, ratesConfig);
+      tSaleQty += res.qty;
+      tSaleAmt += res.revenue;
     });
 
     return {
-      totalEntryQty: parseFloat(totalEntryQty.toFixed(2)),
-      totalSaleQty: parseFloat(totalSaleQty.toFixed(2)),
-      totalEntryAmt: parseFloat(totalEntryAmt.toFixed(2)),
-      totalSaleAmt: parseFloat(totalSaleAmt.toFixed(2)),
-      profit: parseFloat((totalSaleAmt - totalEntryAmt).toFixed(2))
+      totalEntryQty: parseFloat(tEntryQty.toFixed(2)),
+      totalSaleQty: parseFloat(tSaleQty.toFixed(2)),
+      totalEntryAmt: parseFloat(tEntryAmt.toFixed(2)),
+      totalSaleAmt: parseFloat(tSaleAmt.toFixed(2)),
+      profit: parseFloat((tSaleAmt - tEntryAmt).toFixed(2))
     };
   }, [allEntries, allSales, selectedMonth, farmers, ratesConfig]);
 
-  // 4. Monthly Audit Summary (Locked to Fiscal Year April-March)
   const monthlyAuditSummary = useMemo(() => {
     if (!allEntries || !allSales || !isClient || !farmers || !ratesConfig || !selectedMonth) return [];
     
     const [yearPart] = selectedMonth.split('-').map(Number);
     const monthOfSelection = parseInt(selectedMonth.split('-')[1]);
+    // Fiscal Year April to March
     const fiscalYearStart = monthOfSelection <= 3 ? yearPart - 1 : yearPart;
     
     return Array.from({ length: 12 }).map((_, i) => {
       const monthIdx = (3 + i) % 12; // Start from April
       const year = fiscalYearStart + (3 + i >= 12 ? 1 : 0);
       const d = new Date(year, monthIdx, 1);
-      const monthStr = format(d, 'yyyy-MM');
+      const mStr = format(d, 'yyyy-MM');
       
-      const mEntries = allEntries.filter(e => e.date.startsWith(monthStr));
-      const mSales = allSales.filter(s => s.date.startsWith(monthStr));
+      const mEntries = allEntries.filter(e => e.date.startsWith(mStr));
+      const mSales = allSales.filter(s => s.date.startsWith(mStr));
       
-      let collectionL = 0;
-      let cost = 0;
-      let revenue = 0;
+      let collL = 0, cost = 0, rev = 0;
 
-      mEntries.forEach(entry => {
-        const res = resolveEntryFinancials(entry, farmers, ratesConfig);
-        collectionL += res.qtyLitre;
+      mEntries.forEach(e => {
+        const res = resolveEntryData(e, farmers, ratesConfig);
+        collL += res.qtyLitre;
         cost += res.cost;
       });
 
-      mSales.forEach(sale => {
-        const res = resolveSaleFinancials(sale, ratesConfig);
-        revenue += res.revenue;
+      mSales.forEach(s => {
+        const res = resolveSaleData(s, ratesConfig);
+        rev += res.revenue;
       });
       
       return { 
         monthName: format(d, 'MMMM yyyy'), 
-        collectionL: parseFloat(collectionL.toFixed(2)), 
+        collectionL: parseFloat(collL.toFixed(2)), 
         cost: parseFloat(cost.toFixed(2)), 
-        revenue: parseFloat(revenue.toFixed(2)), 
-        profit: parseFloat((revenue - cost).toFixed(2)) 
+        revenue: parseFloat(rev.toFixed(2)), 
+        profit: parseFloat((rev - cost).toFixed(2)) 
       };
     });
   }, [allEntries, allSales, isClient, farmers, ratesConfig, selectedMonth]);
 
   const activeInvoices = masterRoster.filter(f => f.totalQty > 0);
 
-  const calculateRosterTotals = (roster: any[]) => {
-    return {
-      morning: roster.reduce((acc, curr) => acc + curr.morningQty, 0),
-      evening: roster.reduce((acc, curr) => acc + curr.eveningQty, 0),
-      total: roster.reduce((acc, curr) => acc + curr.totalQty, 0),
-      amount: roster.reduce((acc, curr) => acc + curr.totalAmount, 0)
-    };
-  };
+  const rosterTotals = (r: any[]) => ({
+    morning: r.reduce((acc, c) => acc + c.morningQty, 0),
+    evening: r.reduce((acc, c) => acc + c.eveningQty, 0),
+    total: r.reduce((acc, c) => acc + c.totalQty, 0),
+    amount: r.reduce((acc, c) => acc + c.totalAmount, 0)
+  });
 
-  const cowTotals = calculateRosterTotals(cowRoster);
-  const buffaloTotals = calculateRosterTotals(buffaloRoster);
+  const cowTotals = rosterTotals(cowRoster);
+  const buffaloTotals = rosterTotals(buffaloRoster);
 
-  // 5. PDF Generation Logic (Synchronized)
-  const generateSingleInvoice = (doc: jsPDF, farmer: any) => {
-    const companyName = (ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS").toUpperCase();
-    const [year, month] = selectedMonth.split('-').map(Number);
-    const cycleStart = currentCycle.start;
-    const cycleEnd = currentCycle.end;
-    const startDateFormatted = `${cycleStart.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year.toString().slice(-2)}`;
-    const endDateFormatted = `${cycleEnd.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year.toString().slice(-2)}`;
-    const periodString = `${startDateFormatted} to ${endDateFormatted}`;
+  // 4. PDF ENGINE (Fully Synchronized)
+  const generateSingleInvoice = (pdf: jsPDF, f: any) => {
+    const company = (ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS").toUpperCase();
+    const [y_part, m_part] = selectedMonth.split('-').map(Number);
+    const range = `${currentCycle.start.toString().padStart(2, '0')}/${m_part.toString().padStart(2, '0')} to ${currentCycle.end.toString().padStart(2, '0')}/${m_part.toString().padStart(2, '0')}/${y_part.toString().slice(-2)}`;
 
-    let resolvedRate = 0;
-    if (farmer.milkType === 'BUFFALO') {
-      resolvedRate = Number(farmer.customRate) > 0 ? Number(farmer.customRate) : (Number(ratesConfig?.buffaloRate) || 0);
-    } else {
-      resolvedRate = Number(ratesConfig?.cowRate) || 0;
-    }
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(16);
+    pdf.text(company, 105, 20, { align: 'center' });
+    pdf.setFontSize(11);
+    pdf.text("SUPPLIER MILK PAYMENT BILL", 105, 26, { align: 'center' });
+    pdf.line(20, 30, 190, 30);
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text(companyName, 105, 20, { align: 'center' });
-    doc.setFontSize(12);
-    doc.text("MILK INVOICE", 105, 28, { align: 'center' });
-    doc.line(88, 30, 122, 30);
+    pdf.setFontSize(9);
+    let y = 40;
+    pdf.setFont("helvetica", "normal"); pdf.text("NAME:", 20, y); pdf.setFont("helvetica", "bold"); pdf.text(f.name.toUpperCase(), 45, y);
+    pdf.setFont("helvetica", "normal"); pdf.text("PERIOD:", 110, y); pdf.setFont("helvetica", "bold"); pdf.text(range, 135, y);
+    
+    y += 8;
+    pdf.setFont("helvetica", "normal"); pdf.text("CAN NO:", 20, y); pdf.setFont("helvetica", "bold"); pdf.text(f.canNumber, 45, y);
+    pdf.setFont("helvetica", "normal"); pdf.text("A/C NO:", 110, y); pdf.setFont("helvetica", "bold"); pdf.text(f.bankAccountNumber || "—", 135, y);
 
-    doc.setFontSize(10);
-    let y = 45;
+    y += 8;
+    pdf.setFont("helvetica", "normal"); pdf.text("TYPE:", 20, y); pdf.setFont("helvetica", "bold"); pdf.text(f.milkType, 45, y);
 
-    doc.setFont("helvetica", "normal");
-    doc.text("NAME:", 20, y);
-    doc.setFont("helvetica", "bold");
-    doc.text(farmer.name.toUpperCase(), 45, y);
-    doc.line(45, y+1, 100, y+1);
-
-    doc.setFont("helvetica", "normal");
-    doc.text("DATE:", 110, y);
-    doc.setFont("helvetica", "bold");
-    doc.text(format(new Date(), 'dd/MM/yyyy'), 135, y);
-    doc.line(135, y+1, 190, y+1);
-
-    y += 10;
-    doc.setFont("helvetica", "normal");
-    doc.text("A/C NO:", 20, y);
-    doc.setFont("helvetica", "bold");
-    doc.text(farmer.bankAccountNumber || "—", 45, y);
-    doc.line(45, y+1, 100, y+1);
-
-    doc.setFont("helvetica", "normal");
-    doc.text("PERIOD:", 110, y);
-    doc.setFont("helvetica", "bold");
-    doc.text(periodString, 135, y);
-    doc.line(135, y+1, 190, y+1);
-
-    y += 10;
-    doc.setFont("helvetica", "normal");
-    doc.text("CAN NO:", 20, y);
-    doc.setFont("helvetica", "bold");
-    doc.text(farmer.canNumber, 45, y);
-    doc.line(45, y+1, 100, y+1);
-
-    doc.setFont("helvetica", "normal");
-    doc.text("MILK TYPE:", 110, y);
-    doc.setFont("helvetica", "bold");
-    doc.text(farmer.milkType || "COW", 135, y);
-    doc.line(135, y+1, 190, y+1);
-
-    const cycleEntries = filteredCycleEntries.filter(e => e.farmerId === farmer.id);
-    const tableRows = cycleEntries.sort((a, b) => a.date.localeCompare(b.date)).map(e => {
-      const { qtyLitre, cost, resolvedRate } = resolveEntryFinancials(e, farmers, ratesConfig);
+    const fEntries = allEntries!.filter(e => e.farmerId === f.id && e.date.startsWith(selectedMonth) && parseInt(e.date.split('-')[2]) >= currentCycle.start && parseInt(e.date.split('-')[2]) <= currentCycle.end);
+    
+    const rows = fEntries.sort((a, b) => a.date.localeCompare(b.date)).map(e => {
+      const res = resolveEntryData(e, farmers!, ratesConfig);
       return [
-        format(new Date(e.date), 'dd/MM/yy'),
-        e.session === 'Morning' ? qtyLitre.toFixed(2) : "0.00",
-        e.session === 'Evening' ? qtyLitre.toFixed(2) : "0.00",
-        qtyLitre.toFixed(2),
-        resolvedRate.toFixed(2),
-        cost.toFixed(2)
+        format(new Date(e.date), 'dd/MM'),
+        e.session === 'Morning' ? res.qtyLitre.toFixed(2) : "-",
+        e.session === 'Evening' ? res.qtyLitre.toFixed(2) : "-",
+        res.qtyLitre.toFixed(2),
+        res.resolvedRate.toFixed(2),
+        res.cost.toFixed(2)
       ];
     });
 
-    (doc as any).autoTable({
-      startY: y + 15,
-      head: [['DATE', 'MORNING (L)', 'EVENING (L)', 'TOTAL L', 'RATE (Rs)', 'AMOUNT (Rs)']],
-      body: tableRows,
+    (pdf as any).autoTable({
+      startY: y + 10,
+      head: [['DATE', 'MORNING', 'EVENING', 'TOTAL L', 'RATE', 'AMOUNT']],
+      body: rows,
       theme: 'grid',
-      headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', lineWidth: 0.1, lineColor: [0, 0, 0], halign: 'center' },
-      bodyStyles: { textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [0, 0, 0], halign: 'center' },
+      headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold', halign: 'center' },
+      bodyStyles: { textColor: 0, halign: 'center' },
       margin: { left: 20, right: 20 }
     });
 
-    const finalY = (doc as any).lastAutoTable.finalY + 5;
-    doc.setFont("helvetica", "bold");
-    doc.line(20, finalY, 190, finalY);
-    doc.text("TOTAL", 25, finalY + 5);
-    doc.text(farmer.totalQty.toFixed(2), 125, finalY + 5, { align: 'center' });
-    doc.text(farmer.totalAmount.toFixed(2), 185, finalY + 5, { align: 'right' });
-    doc.line(20, finalY + 8, 190, finalY + 8);
-
-    doc.setFontSize(9);
-    doc.text("AUTHORIZED SIGNATURE", 140, 275);
+    const finalY = (pdf as any).lastAutoTable.finalY + 8;
+    pdf.setFontSize(12);
+    pdf.text(`TOTAL VOLUME: ${f.totalQty.toFixed(2)} L`, 20, finalY);
+    pdf.text(`TOTAL PAYOUT: Rs. ${f.totalAmount.toFixed(2)}`, 190, finalY, { align: 'right' });
+    pdf.line(20, finalY + 2, 190, finalY + 2);
+    
+    pdf.setFontSize(8);
+    pdf.text("Authorized Signature", 160, 270);
   };
 
-  const handleDownloadRosterPDF = () => {
-    const doc = new jsPDF('l', 'mm', 'a4');
-    const companyName = ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS";
-    const cycleLabel = currentCycle?.label || "";
-    const monthLabel = monthOptions.find(o => o.value === selectedMonth)?.label || "";
+  const downloadRosterPDF = () => {
+    const pdf = new jsPDF('l', 'mm', 'a4');
+    const label = `${currentCycle.label} - ${monthOptions.find(o => o.value === selectedMonth)?.label}`;
 
-    const addRosterSection = (title: string, roster: any[], startY: number, totals: any) => {
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text(title, 14, startY);
+    pdf.setFontSize(16);
+    pdf.text("MASTER PROCUREMENT ROSTER", 14, 20);
+    pdf.setFontSize(10);
+    pdf.text(label, 14, 26);
 
-      const tableData = roster.map(f => [
-        f.canNumber,
-        f.name,
-        f.bankAccountNumber || "—",
-        f.morningQty.toFixed(2),
-        f.eveningQty.toFixed(2),
-        f.totalQty.toFixed(2),
-        `Rs. ${f.totalAmount.toFixed(2)}`
-      ]);
-
-      (doc as any).autoTable({
-        startY: startY + 5,
-        head: [['CAN', 'FARMER NAME', 'BANK A/C', 'MORNING (L)', 'EVENING (L)', 'TOTAL L', 'PAYOUT (Rs)']],
-        body: tableData,
-        theme: 'grid',
-        headStyles: { fillColor: [37, 99, 235], textColor: 255 },
-        foot: [['', 'Totals', '', totals.morning.toFixed(2), totals.evening.toFixed(2), totals.total.toFixed(2), `Rs. ${totals.amount.toFixed(2)}`]],
-        footStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' },
+    const addSect = (t: string, r: any[], y: number, tot: any) => {
+      pdf.setFontSize(12); pdf.text(t, 14, y);
+      (pdf as any).autoTable({
+        startY: y + 4,
+        head: [['CAN', 'FARMER NAME', 'MORNING', 'EVENING', 'TOTAL L', 'PAYOUT (Rs)']],
+        body: r.map(f => [f.canNumber, f.name, f.morningQty.toFixed(2), f.eveningQty.toFixed(2), f.totalQty.toFixed(2), f.totalAmount.toFixed(2)]),
+        theme: 'striped',
+        foot: [['', 'TOTALS', tot.morning.toFixed(2), tot.evening.toFixed(2), tot.total.toFixed(2), tot.amount.toFixed(2)]],
         margin: { bottom: 20 }
       });
-
-      return (doc as any).lastAutoTable.finalY + 15;
+      return (pdf as any).lastAutoTable.finalY + 15;
     };
 
-    doc.setFontSize(18);
-    doc.text(companyName.toUpperCase(), 14, 20);
-    doc.setFontSize(12);
-    doc.text(`Master Roster: ${cycleLabel} - ${monthLabel}`, 14, 28);
+    let curY = 35;
+    if (cowRoster.length) curY = addSect("COW MILK PROCUREMENT", cowRoster, curY, cowTotals);
+    if (buffaloRoster.length) addSect("BUFFALO MILK PROCUREMENT", buffaloRoster, curY, buffaloTotals);
 
-    let currentY = 35;
-    if (cowRoster.length > 0) currentY = addRosterSection("COW MILK ROSTER", cowRoster, currentY, cowTotals);
-    if (buffaloRoster.length > 0) {
-      if (currentY > 160) { doc.addPage('l', 'mm', 'a4'); currentY = 20; }
-      addRosterSection("BUFFALO MILK ROSTER", buffaloRoster, currentY, buffaloTotals);
-    }
-
-    doc.save(`Master_Roster_${selectedMonth}_${cycleLabel}.pdf`);
+    pdf.save(`Roster_${selectedMonth}_${currentCycle.label}.pdf`);
   };
 
-  const handleDownloadFarmerBillPDF = (farmerId: string) => {
-    const f = masterRoster.find(m => m.id === farmerId);
-    if (!f) return;
-    const doc = new jsPDF();
-    generateSingleInvoice(doc, f);
-    doc.save(`Invoice_${f.canNumber}_${f.name}_${selectedMonth}.pdf`);
-  };
-
-  const handleDownloadBulkInvoicesPDF = () => {
-    if (activeInvoices.length === 0) return;
-    const doc = new jsPDF();
-    activeInvoices.forEach((f, idx) => {
-      if (idx > 0) doc.addPage();
-      generateSingleInvoice(doc, f);
-    });
-    doc.save(`Bulk_Invoices_${selectedMonth}_${currentCycle?.label}.pdf`);
-  };
-
-  const renderRosterTable = (title: string, roster: any[], totals: any, colorClass: string) => {
-    if (roster.length === 0) return null;
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <div className={cn("p-2 rounded-xl", colorClass.replace('text-', 'bg-').replace('600', '50'))}>
-            <Milk className={cn("w-5 h-5", colorClass)} />
-          </div>
-          <h2 className={cn("text-xl font-black uppercase tracking-tight", colorClass)}>{title}</h2>
-        </div>
-        <div className="border rounded-2xl overflow-hidden border-black/10 bg-white">
-          <Table>
-            <TableHeader className="bg-muted/30">
-              <TableRow className="hover:bg-transparent border-b border-black/10">
-                <TableHead className="font-black text-[10px] text-primary uppercase tracking-widest py-5 pl-8 border-r border-black/5">CAN</TableHead>
-                <TableHead className="font-black text-[10px] text-primary uppercase tracking-widest py-5 border-r border-black/5">FARMER NAME</TableHead>
-                <TableHead className="font-black text-[10px] text-primary uppercase tracking-widest py-5 border-r border-black/5">BANK A/C</TableHead>
-                <TableHead className="text-center font-black text-[10px] text-primary uppercase tracking-widest py-5 border-r border-black/5">MORNING (L)</TableHead>
-                <TableHead className="text-center font-black text-[10px] text-primary uppercase tracking-widest py-5 border-r border-black/5">EVENING (L)</TableHead>
-                <TableHead className="text-center font-black text-[10px] text-primary uppercase tracking-widest py-5 border-r border-black/5">TOTAL L</TableHead>
-                <TableHead className="text-right font-black text-[10px] text-primary uppercase tracking-widest py-5 pr-8">PAYOUT (Rs)</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {roster.map((f) => (
-                <TableRow key={f.id} className="hover:bg-primary/5 border-b border-black/5 transition-colors">
-                  <TableCell className="font-black text-primary text-lg pl-8 py-4 border-r border-black/5">{f.canNumber}</TableCell>
-                  <TableCell className="font-bold uppercase text-sm border-r border-black/5">{f.name}</TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground border-r border-black/5">{f.bankAccountNumber || "—"}</TableCell>
-                  <TableCell className="text-center font-medium border-r border-black/5">{f.morningQty.toFixed(2)}</TableCell>
-                  <TableCell className="text-center font-medium border-r border-black/5">{f.eveningQty.toFixed(2)}</TableCell>
-                  <TableCell className="text-center font-bold border-r border-black/5">{f.totalQty.toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-black text-primary pr-8">Rs. {f.totalAmount.toFixed(2)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-            <tfoot className="bg-muted/50 border-t border-black/10">
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={3} className="pl-8 py-5 font-black text-primary uppercase text-xs border-r border-black/5">{title} Totals</TableCell>
-                <TableCell className="text-center font-black border-r border-black/5">{totals.morning.toFixed(2)}</TableCell>
-                <TableCell className="text-center font-black border-r border-black/5">{totals.evening.toFixed(2)}</TableCell>
-                <TableCell className="text-center font-black border-r border-black/5">{totals.total.toFixed(2)} L</TableCell>
-                <TableCell className="text-right font-black text-primary text-lg pr-8">Rs. {totals.amount.toFixed(2)}</TableCell>
-              </TableRow>
-            </tfoot>
-          </Table>
-        </div>
-      </div>
-    );
-  };
-
-  if (!isClient || !selectedMonth) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
+  if (!isClient) return null;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -565,7 +387,7 @@ export default function ReportsPage() {
           <header className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Reports & Audit</h1>
-              <p className="text-muted-foreground font-medium">Synced financial data • {monthOptions.find(o => o.value === selectedMonth)?.label}</p>
+              <p className="text-muted-foreground font-medium">Standard 0.96 Payouts • {monthOptions.find(o => o.value === selectedMonth)?.label}</p>
             </div>
             <div className="flex gap-4">
                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
@@ -580,19 +402,19 @@ export default function ReportsPage() {
               <TabsList className="bg-muted p-1 rounded-full h-auto">
                 <TabsTrigger value="overview" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Overview</TabsTrigger>
                 <TabsTrigger value="cycle" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Farmer Bills</TabsTrigger>
-                <TabsTrigger value="master" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Master Roster</TabsTrigger>
+                <TabsTrigger value="master" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Master Summary</TabsTrigger>
                 <TabsTrigger value="audit" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Internal Audit</TabsTrigger>
               </TabsList>
 
               {activeTab !== "audit" && (
-                <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-full border animate-in fade-in zoom-in duration-300">
+                <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-full border">
                   {cycles.map((c, i) => (
                     <button 
                       key={i} 
                       onClick={() => setActiveCycle(i)} 
                       className={cn(
                         "rounded-full text-[10px] font-black px-4 h-8 transition-all", 
-                        activeCycle === i ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:bg-muted"
+                        activeCycle === i ? "bg-primary text-white" : "text-muted-foreground hover:bg-muted"
                       )}
                     >
                       {c.label}
@@ -602,138 +424,173 @@ export default function ReportsPage() {
               )}
             </div>
 
-            <TabsContent value="overview" className="animate-in fade-in duration-500 space-y-12">
+            <TabsContent value="overview" className="space-y-12">
               <div className="space-y-4">
-                <div className="flex items-center gap-2 text-primary">
-                  <CalendarDays className="w-5 h-5" />
-                  <h2 className="font-black uppercase tracking-widest text-sm">Selected Cycle Stats ({currentCycle.label})</h2>
+                <div className="flex items-center gap-2 text-primary font-black uppercase tracking-widest text-xs">
+                  <CalendarDays className="w-4 h-4" /> Cycle Performance ({currentCycle.label})
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <Card className="rounded-[2rem] bg-primary text-white p-8 shadow-xl shadow-primary/20">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <Card className="rounded-[2rem] bg-primary text-white p-8 shadow-xl">
                     <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Cycle Volume</p>
-                    <p className="text-4xl font-black mt-4">{cycleStats.totalEntryQty.toFixed(2)} L</p>
+                    <p className="text-4xl font-black mt-2">{cycleStats.totalEntryQty.toFixed(2)} L</p>
                   </Card>
-                  <Card className="rounded-[2rem] bg-accent text-white p-8 shadow-xl shadow-accent/20">
-                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Cycle Sales</p>
-                    <p className="text-4xl font-black mt-4">Rs. {cycleStats.totalSaleAmt.toFixed(2)}</p>
+                  <Card className="rounded-[2rem] bg-accent text-white p-8 shadow-xl">
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Cycle Revenue</p>
+                    <p className="text-4xl font-black mt-2">₹{cycleStats.totalSaleAmt.toFixed(2)}</p>
                   </Card>
-                  <Card className="rounded-[2rem] p-8 border-none shadow-xl bg-card border-l-4 border-destructive">
-                    <p className="text-[10px] font-black uppercase text-muted-foreground">Cycle Payout</p>
-                    <p className="text-3xl font-black mt-4 text-destructive">Rs. {cycleStats.totalEntryAmt.toFixed(2)}</p>
+                  <Card className="rounded-[2rem] p-8 border-none bg-destructive/10 text-destructive">
+                    <p className="text-[10px] font-black uppercase opacity-70">Cycle Payout</p>
+                    <p className="text-3xl font-black mt-2">₹{cycleStats.totalEntryAmt.toFixed(2)}</p>
                   </Card>
-                  <Card className="rounded-[2rem] p-8 border-none shadow-xl bg-card border-l-4 border-green-500">
-                    <p className="text-[10px] font-black uppercase text-muted-foreground">Cycle Profit</p>
-                    <p className={cn("text-3xl font-black mt-4", cycleStats.profit >= 0 ? "text-green-600" : "text-destructive")}>
-                      Rs. {cycleStats.profit.toFixed(2)}
-                    </p>
+                  <Card className="rounded-[2rem] p-8 border-none bg-green-500/10 text-green-600">
+                    <p className="text-[10px] font-black uppercase opacity-70">Cycle Profit</p>
+                    <p className="text-3xl font-black mt-2">₹{cycleStats.profit.toFixed(2)}</p>
                   </Card>
                 </div>
               </div>
 
-              <div className="space-y-4 pt-4 border-t">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <PieChart className="w-5 h-5" />
-                  <h2 className="font-black uppercase tracking-widest text-sm">Monthly Summary ({monthOptions.find(o => o.value === selectedMonth)?.label})</h2>
+              <div className="space-y-4 pt-8 border-t">
+                <div className="flex items-center gap-2 text-muted-foreground font-black uppercase tracking-widest text-xs">
+                  <PieChart className="w-4 h-4" /> Monthly Snapshot
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="flex items-center justify-between p-6 bg-muted/30 rounded-3xl border">
-                    <span className="text-xs font-bold text-muted-foreground uppercase">Monthly Volume</span>
+                  <div className="p-6 bg-muted/30 rounded-3xl border flex justify-between items-center">
+                    <span className="text-[10px] font-black uppercase text-muted-foreground">Volume</span>
                     <span className="text-2xl font-black text-primary">{monthStats.totalEntryQty.toFixed(2)} L</span>
                   </div>
-                  <div className="flex items-center justify-between p-6 bg-muted/30 rounded-3xl border">
-                    <span className="text-xs font-bold text-muted-foreground uppercase">Monthly Payout</span>
-                    <span className="text-2xl font-black text-destructive">Rs. {monthStats.totalEntryAmt.toFixed(2)}</span>
+                  <div className="p-6 bg-muted/30 rounded-3xl border flex justify-between items-center">
+                    <span className="text-[10px] font-black uppercase text-muted-foreground">Procurement</span>
+                    <span className="text-2xl font-black text-destructive">₹{monthStats.totalEntryAmt.toFixed(2)}</span>
                   </div>
-                  <div className="flex items-center justify-between p-6 bg-muted/30 rounded-3xl border">
-                    <span className="text-xs font-bold text-muted-foreground uppercase">Monthly Profit</span>
-                    <span className={cn("text-2xl font-black", monthStats.profit >= 0 ? "text-green-600" : "text-destructive")}>
-                      Rs. {monthStats.profit.toFixed(2)}
-                    </span>
+                  <div className="p-6 bg-muted/30 rounded-3xl border flex justify-between items-center">
+                    <span className="text-[10px] font-black uppercase text-muted-foreground">Profit</span>
+                    <span className={cn("text-2xl font-black", monthStats.profit >= 0 ? "text-green-600" : "text-destructive")}>₹{monthStats.profit.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
             </TabsContent>
 
-            <TabsContent value="cycle" className="space-y-6 animate-in fade-in">
-              <div className="flex justify-end items-center">
-                <Button onClick={handleDownloadBulkInvoicesPDF} disabled={activeInvoices.length === 0} className="rounded-full bg-red-600 shadow-lg shadow-red-200 hover:bg-red-700">
-                  <Download className="w-4 h-4 mr-2" /> Download Bulk Invoices
+            <TabsContent value="cycle" className="space-y-6">
+              <div className="flex justify-end">
+                <Button onClick={() => {
+                  const doc = new jsPDF();
+                  activeInvoices.forEach((f, i) => { if (i > 0) doc.addPage(); generateSingleInvoice(doc, f); });
+                  doc.save(`Bulk_Bills_${selectedMonth}_${currentCycle.label}.pdf`);
+                }} disabled={activeInvoices.length === 0} className="rounded-full bg-red-600 hover:bg-red-700 h-12 px-8">
+                  <Download className="w-4 h-4 mr-2" /> Download All Bills
                 </Button>
               </div>
-              <Card className="rounded-3xl overflow-hidden border-none shadow-lg bg-card/50 backdrop-blur-sm">
+              <Card className="rounded-3xl overflow-hidden border-none shadow-xl">
                 <Table>
                   <TableHeader className="bg-muted/50">
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="pl-10 font-black text-[10px] text-primary uppercase tracking-widest py-5">CAN</TableHead>
-                      <TableHead className="font-black text-[10px] text-primary uppercase tracking-widest py-5">Farmer Name</TableHead>
-                      <TableHead className="text-right font-black text-[10px] text-primary uppercase tracking-widest py-5">Qty (L)</TableHead>
-                      <TableHead className="text-right font-black text-[10px] text-primary uppercase tracking-widest py-5">Amount (Rs)</TableHead>
-                      <TableHead className="text-right pr-10 font-black text-[10px] text-primary uppercase tracking-widest py-5">Actions</TableHead>
+                    <TableRow>
+                      <TableHead className="pl-10 font-black text-[10px] uppercase py-5">CAN</TableHead>
+                      <TableHead className="font-black text-[10px] uppercase py-5">Farmer Name</TableHead>
+                      <TableHead className="text-right font-black text-[10px] uppercase py-5">Total L</TableHead>
+                      <TableHead className="text-right font-black text-[10px] uppercase py-5">Total Rs</TableHead>
+                      <TableHead className="text-right pr-10 font-black text-[10px] uppercase py-5">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {activeInvoices.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground font-medium">No active collections in this cycle.</TableCell></TableRow>
-                    ) : (
-                      activeInvoices.map(f => (
-                        <TableRow key={f.id} className="hover:bg-primary/5 transition-colors">
-                          <TableCell className="pl-10 font-black text-primary text-lg">{f.canNumber}</TableCell>
-                          <TableCell className="font-bold uppercase text-sm">{f.name}</TableCell>
-                          <TableCell className="text-right font-black">{f.totalQty.toFixed(2)}</TableCell>
-                          <TableCell className="text-right font-mono text-primary">Rs. {f.totalAmount.toFixed(2)}</TableCell>
-                          <TableCell className="text-right pr-10">
-                            <Button variant="ghost" onClick={() => handleDownloadFarmerBillPDF(f.id)} className="text-red-600 font-black uppercase text-[10px] hover:bg-red-50">
-                              <Download className="w-3 h-3 mr-2" /> Download Bill
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
+                    {activeInvoices.map(f => (
+                      <TableRow key={f.id} className="hover:bg-primary/5">
+                        <TableCell className="pl-10 font-black text-primary text-lg">{f.canNumber}</TableCell>
+                        <TableCell className="font-bold uppercase text-sm">{f.name}</TableCell>
+                        <TableCell className="text-right font-black">{f.totalQty.toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-mono text-primary font-bold">₹{f.totalAmount.toFixed(2)}</TableCell>
+                        <TableCell className="text-right pr-10">
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            const pdf = new jsPDF();
+                            generateSingleInvoice(pdf, f);
+                            pdf.save(`Bill_${f.canNumber}_${f.name}.pdf`);
+                          }} className="text-red-600 font-black uppercase text-[10px]">
+                            <Download className="w-3 h-3 mr-2" /> PDF
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </Card>
             </TabsContent>
 
-            <TabsContent value="master" className="space-y-10 animate-in fade-in">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-                <div className="flex items-center gap-4">
-                  <div className="bg-primary px-8 py-4 rounded-[2rem] text-white shadow-xl shadow-primary/10 border-b-4 border-black/10">
-                    <p className="text-[10px] font-black uppercase opacity-70 tracking-widest">Grand Total Payout ({currentCycle.label})</p>
-                    <p className="text-3xl font-black mt-1">Rs. {cycleStats.totalEntryAmt.toFixed(2)}</p>
-                  </div>
+            <TabsContent value="master" className="space-y-10">
+              <div className="flex justify-between items-center">
+                <div className="bg-primary/5 border border-primary/20 px-8 py-4 rounded-[2rem]">
+                  <p className="text-[10px] font-black uppercase text-primary opacity-60">Cycle Grand Total</p>
+                  <p className="text-3xl font-black text-primary">₹{cycleStats.totalEntryAmt.toFixed(2)}</p>
                 </div>
-                <Button onClick={handleDownloadRosterPDF} className="rounded-full h-12 px-10 font-black uppercase text-[10px] shadow-lg hover:shadow-primary/20 transition-all">
-                  <FileDown className="w-4 h-4 mr-2" /> Export PDF Roster
+                <Button onClick={downloadRosterPDF} className="rounded-full h-12 px-10 font-black uppercase">
+                  <FileDown className="w-4 h-4 mr-2" /> Export PDF Summary
                 </Button>
               </div>
 
-              {renderRosterTable("Cow Milk Roster", cowRoster, cowTotals, "text-blue-600")}
-              {renderRosterTable("Buffalo Milk Roster", buffaloRoster, buffaloTotals, "text-indigo-600")}
+              {[
+                { label: "Cow Milk Procurement", roster: cowRoster, tot: cowTotals, color: "text-blue-600" },
+                { label: "Buffalo Milk Procurement", roster: buffaloRoster, tot: buffaloTotals, color: "text-indigo-600" }
+              ].map(s => s.roster.length > 0 && (
+                <div key={s.label} className="space-y-4">
+                  <h2 className={cn("text-xl font-black uppercase", s.color)}>{s.label}</h2>
+                  <Card className="rounded-3xl overflow-hidden border-none shadow-lg">
+                    <Table>
+                      <TableHeader className="bg-muted/50">
+                        <TableRow>
+                          <TableHead className="pl-8 font-black text-[10px] uppercase py-4">CAN</TableHead>
+                          <TableHead className="font-black text-[10px] uppercase">Farmer Name</TableHead>
+                          <TableHead className="text-center font-black text-[10px] uppercase">Morning</TableHead>
+                          <TableHead className="text-center font-black text-[10px] uppercase">Evening</TableHead>
+                          <TableHead className="text-center font-black text-[10px] uppercase">Total L</TableHead>
+                          <TableHead className="text-right pr-8 font-black text-[10px] uppercase">Payout Rs</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {s.roster.map(f => (
+                          <TableRow key={f.id}>
+                            <TableCell className="pl-8 font-black text-primary text-lg">{f.canNumber}</TableCell>
+                            <TableCell className="font-bold uppercase text-xs">{f.name}</TableCell>
+                            <TableCell className="text-center">{f.morningQty.toFixed(2)}</TableCell>
+                            <TableCell className="text-center">{f.eveningQty.toFixed(2)}</TableCell>
+                            <TableCell className="text-center font-black">{f.totalQty.toFixed(2)}</TableCell>
+                            <TableCell className="text-right pr-8 font-black text-primary">₹{f.totalAmount.toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                      <tfoot className="bg-muted/30 border-t font-black">
+                        <TableRow>
+                          <TableCell colSpan={2} className="pl-8 uppercase text-xs">Subtotals</TableCell>
+                          <TableCell className="text-center">{s.tot.morning.toFixed(2)}</TableCell>
+                          <TableCell className="text-center">{s.tot.evening.toFixed(2)}</TableCell>
+                          <TableCell className="text-center">{s.tot.total.toFixed(2)} L</TableCell>
+                          <TableCell className="text-right pr-8 text-primary">₹{s.tot.amount.toFixed(2)}</TableCell>
+                        </TableRow>
+                      </tfoot>
+                    </Table>
+                  </Card>
+                </div>
+              ))}
             </TabsContent>
 
-            <TabsContent value="audit" className="animate-in fade-in">
-              <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-2xl bg-card/50 backdrop-blur-sm">
+            <TabsContent value="audit" className="space-y-8">
+              <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-2xl">
                 <Table>
                   <TableHeader className="bg-muted/50">
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="pl-10 font-black text-[10px] text-primary uppercase tracking-widest py-5">Month</TableHead>
-                      <TableHead className="text-center font-black text-[10px] text-primary uppercase tracking-widest py-5">Collection (L)</TableHead>
-                      <TableHead className="text-center font-black text-[10px] text-primary uppercase tracking-widest py-5">Procurement Cost (Rs)</TableHead>
-                      <TableHead className="text-center font-black text-[10px] text-primary uppercase tracking-widest py-5">Sales Revenue (Rs)</TableHead>
-                      <TableHead className="text-right pr-10 font-black text-[10px] text-primary uppercase tracking-widest py-5">Net Profit (Rs)</TableHead>
+                    <TableRow>
+                      <TableHead className="pl-10 font-black text-[10px] uppercase py-5">Month</TableHead>
+                      <TableHead className="text-center font-black text-[10px] uppercase py-5">Volume (L)</TableHead>
+                      <TableHead className="text-center font-black text-[10px] uppercase py-5">Procurement (Rs)</TableHead>
+                      <TableHead className="text-center font-black text-[10px] uppercase py-5">Revenue (Rs)</TableHead>
+                      <TableHead className="text-right pr-10 font-black text-[10px] uppercase py-5">Profit (Rs)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {monthlyAuditSummary.map((m, i) => (
-                      <TableRow key={i} className="border-b last:border-0 hover:bg-muted/5 transition-colors">
+                      <TableRow key={i} className="hover:bg-muted/10 transition-colors">
                         <TableCell className="pl-10 font-black text-primary uppercase text-sm">{m.monthName}</TableCell>
                         <TableCell className="text-center font-bold">{m.collectionL.toFixed(2)}</TableCell>
-                        <TableCell className="text-center text-destructive font-mono">Rs. {m.cost.toFixed(2)}</TableCell>
-                        <TableCell className="text-center text-green-600 font-mono">Rs. {m.revenue.toFixed(2)}</TableCell>
+                        <TableCell className="text-center text-destructive font-bold">₹{m.cost.toFixed(2)}</TableCell>
+                        <TableCell className="text-center text-green-600 font-bold">₹{m.revenue.toFixed(2)}</TableCell>
                         <TableCell className="text-right pr-10 font-black text-lg">
-                          <span className={cn(m.profit >= 0 ? "text-green-600" : "text-destructive")}>
-                            Rs. {m.profit.toFixed(2)}
-                          </span>
+                          <span className={m.profit >= 0 ? "text-green-600" : "text-destructive"}>₹{m.profit.toFixed(2)}</span>
                         </TableCell>
                       </TableRow>
                     ))}

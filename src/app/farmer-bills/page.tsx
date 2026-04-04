@@ -88,7 +88,6 @@ export default function FarmerBillsPage() {
 
     cycleEntries.forEach(e => {
       const fid = e.farmerId;
-      // Robust lookup prioritizes live directory then entry metadata
       const farmerProfile = farmers?.find(f => f.id === fid);
       const name = farmerProfile?.name || e.farmerName || "Farmer " + (e.canNumber || fid);
       const can = farmerProfile?.canNumber || e.canNumber || "---";
@@ -124,7 +123,6 @@ export default function FarmerBillsPage() {
     const periodEndStr = `${currentCycle.end}/${month}/${year.toString().slice(-2)}`;
     const period = `${periodStartStr} to ${periodEndStr}`;
     
-    // Header
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(16);
     pdf.text(company, 105, 20, { align: 'center' });
@@ -132,7 +130,6 @@ export default function FarmerBillsPage() {
     pdf.text("MILK INVOICE", 105, 27, { align: 'center' });
     pdf.line(93, 28, 117, 28); 
 
-    // Info Section with Underlines
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "normal");
     
@@ -156,7 +153,6 @@ export default function FarmerBillsPage() {
     const avgRate = f.totalQty > 0 ? (f.totalAmount / f.totalQty).toFixed(2) : "0.00";
     drawUnderlinedField("RATE (Rs):", avgRate, 110, 65, 190);
 
-    // Table
     const dateObjects = [];
     for (let d = currentCycle.start; d <= currentCycle.end; d++) {
       dateObjects.push(new Date(year, month - 1, d));

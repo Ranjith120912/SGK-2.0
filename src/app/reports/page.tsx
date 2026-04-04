@@ -489,7 +489,7 @@ export default function ReportsPage() {
                 <Table>
                   <TableHeader className="bg-muted/50">
                     <TableRow>
-                      <TableHead className="pl-10 font-black text-[10px] uppercase">CAN</TableHead>
+                      <TableHead className="pl-10 font-black text-[10px] uppercase w-[100px]">CAN</TableHead>
                       <TableHead className="font-black text-[10px] uppercase">Farmer Name</TableHead>
                       <TableHead className="font-black text-[10px] uppercase">Milk Type</TableHead>
                       <TableHead className="text-right font-black text-[10px] uppercase">Volume (L)</TableHead>
@@ -513,7 +513,7 @@ export default function ReportsPage() {
                           <Button variant="ghost" size="sm" onClick={() => {
                             const pdf = new jsPDF();
                             generateProfessionalInvoice(pdf, f);
-                            pdf.save(`Bill_${f.can}_${f.name}.pdf`);
+                            pdf.save(`Bill_${f.can}_${f.name.replace(/\s+/g, '_')}.pdf`);
                           }} className="text-primary font-black uppercase text-[10px] group-hover:bg-primary/10 rounded-full h-8 px-4">
                             PDF Bill
                           </Button>

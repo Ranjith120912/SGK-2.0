@@ -60,7 +60,6 @@ export default function DailyReportsPage() {
     
     filteredEntries.forEach(e => {
       const fid = e.farmerId;
-      // Directory-First Resolution Logic
       const farmerProfile = farmers?.find(f => f.id === fid);
       const name = farmerProfile?.name || e.farmerName || "Farmer " + (e.canNumber || fid);
       const can = farmerProfile?.canNumber || e.canNumber || "---";

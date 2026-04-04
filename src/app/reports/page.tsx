@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -113,10 +112,10 @@ export default function ReportsPage() {
 
     cycleEntries.forEach(e => {
       const fid = e.farmerId;
-      // STRICT DIRECTORY VALIDATION: Only include validated farmers
+      // STRICT DIRECTORY VALIDATION: Only include validated farmers from management tab
       const farmerProfile = farmers.find(f => f.id === fid || f.canNumber === e.canNumber);
       
-      if (!farmerProfile) return; // REMOVE unknown farmers
+      if (!farmerProfile) return; // REMOVE records for farmers not in the directory
 
       const name = farmerProfile.name;
       const can = farmerProfile.canNumber;

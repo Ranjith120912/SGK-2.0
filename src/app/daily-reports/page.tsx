@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -93,7 +92,7 @@ export default function DailyReportsPage() {
       const kg = Number(e.kgWeight) || 0;
       const ltr = kg * CONVERSION_RATE;
       
-      // BUFFALO RATE RESOLUTION
+      // BUFFALO RATE RESOLUTION: Priority is Farmer Custom Rate > Global Rate
       let rate = 0;
       if (milkType === 'BUFFALO') {
         rate = Number(farmerProfile.customRate) > 0 

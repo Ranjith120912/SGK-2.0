@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -90,10 +89,10 @@ export default function FarmerBillsPage() {
 
     cycleEntries.forEach(e => {
       const fid = e.farmerId;
-      // STRICT DIRECTORY LOOKUP
+      // STRICT DIRECTORY VALIDATION: Only include entries for validated farmers in directory
       const farmerProfile = farmers.find(f => f.id === fid || f.canNumber === e.canNumber);
       
-      if (!farmerProfile) return; // REMOVE unknown farmers
+      if (!farmerProfile) return; // SKIP entries for farmers not in the directory
 
       const name = farmerProfile.name;
       const can = farmerProfile.canNumber;
@@ -112,6 +111,7 @@ export default function FarmerBillsPage() {
 
       const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
       
+      // BUFFALO RATE RESOLUTION: Priority is Farmer Custom Rate > Global Rate
       let rate = 0;
       if (milkType === 'BUFFALO') {
         rate = Number(farmerProfile.customRate) > 0 

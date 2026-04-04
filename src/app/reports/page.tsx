@@ -153,11 +153,10 @@ export default function ReportsPage() {
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
-    // Fiscal Year starts in April (index 3).
     const fiscalStartYear = currentMonth < 3 ? currentYear - 1 : currentYear;
     
     return Array.from({ length: 12 }).map((_, i) => {
-      const monthIndex = (3 + i) % 12; // Start from April
+      const monthIndex = (3 + i) % 12;
       const year = fiscalStartYear + (3 + i >= 12 ? 1 : 0);
       const d = new Date(year, monthIndex, 1);
       const monthStr = format(d, 'yyyy-MM');
@@ -182,7 +181,7 @@ export default function ReportsPage() {
 
   const handleDownloadRosterPDF = () => {
     const doc = new jsPDF('l', 'mm', 'a4');
-    const companyName = ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS";
+    const companyName = ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS";
     const cycleLabel = currentCycle?.label || "";
     const monthLabel = monthOptions.find(o => o.value === selectedMonth)?.label || "";
 
@@ -214,85 +213,135 @@ export default function ReportsPage() {
     doc.save(`Master_Roster_${selectedMonth}_${cycleLabel}.pdf`);
   };
 
-  const handleDownloadFarmerBillPDF = (farmerId: string) => {
-    const f = farmers?.find(f => f.id === farmerId);
-    if (!f) return;
-
-    const doc = new jsPDF();
-    const companyName = ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS";
-    const invEntries = filteredCycleEntries.filter(e => e.farmerId === farmerId).sort((a, b) => a.date.localeCompare(b.date));
+  const generateSingleInvoice = (doc: jsPDF, farmer: any) => {
+    const companyName = ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS";
+    const [year, month] = selectedMonth.split('-').map(Number);
     
-    doc.setFontSize(20);
-    doc.text(companyName, 14, 20);
-    doc.setFontSize(10);
-    doc.text(ratesConfig?.address || "", 14, 26);
+    // Period dates
+    const startDate = `${currentCycle.start.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year.toString().slice(-2)}`;
+    const endDate = `${currentCycle.end.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year.toString().slice(-2)}`;
+    
+    // Header
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    const title = companyName.toUpperCase();
+    doc.text(title, (210 - doc.getTextWidth(title)) / 2, 20);
     
     doc.setFontSize(14);
-    doc.text(`Milk Bill: ${f.name} (CAN: ${f.canNumber})`, 14, 40);
-    doc.setFontSize(10);
-    doc.text(`Period: ${currentCycle?.label} - ${monthOptions.find(o => o.value === selectedMonth)?.label}`, 14, 46);
+    const subtitle = "MILK INVOICE";
+    doc.text(subtitle, (210 - doc.getTextWidth(subtitle)) / 2, 28);
 
-    const tableData = invEntries.map(e => [
-      e.date,
-      e.session,
-      e.quantity.toFixed(2),
-      e.rate.toFixed(2),
-      e.totalAmount.toFixed(2)
-    ]);
+    // Farmer Info
+    doc.setFontSize(11);
+    const leftCol = 14;
+    const rightCol = 110;
+    let yPos = 42;
 
-    const totalQty = invEntries.reduce((acc, curr) => acc + curr.quantity, 0);
-    const totalAmt = invEntries.reduce((acc, curr) => acc + curr.totalAmount, 0);
+    const currentRate = farmer.milkType === 'BUFFALO' ? (ratesConfig?.buffaloRate || 0) : (ratesConfig?.cowRate || 0);
 
-    (doc as any).autoTable({
-      startY: 55,
-      head: [['Date', 'Session', 'Qty (L)', 'Rate (Rs/L)', 'Total (Rs)']],
-      body: tableData,
-      theme: 'striped',
-      foot: [['Total', '', totalQty.toFixed(2), '', `Rs. ${totalAmt.toFixed(2)}`]],
-      footStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' }
+    doc.text("Name:", leftCol, yPos);
+    doc.setFont("helvetica", "normal");
+    doc.text(farmer.name.toUpperCase(), leftCol + 35, yPos);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Date:", rightCol, yPos);
+    doc.setFont("helvetica", "normal");
+    doc.text(format(new Date(), 'dd/MM/yyyy'), rightCol + 35, yPos);
+
+    yPos += 7;
+    doc.setFont("helvetica", "bold");
+    doc.text("A/C No:", leftCol, yPos);
+    doc.setFont("helvetica", "normal");
+    doc.text(farmer.bankAccountNumber || "—", leftCol + 35, yPos);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Period:", rightCol, yPos);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${startDate} to ${endDate}`, rightCol + 35, yPos);
+
+    yPos += 7;
+    doc.setFont("helvetica", "bold");
+    doc.text("Can No:", leftCol, yPos);
+    doc.setFont("helvetica", "normal");
+    doc.text(farmer.canNumber, leftCol + 35, yPos);
+
+    yPos += 7;
+    doc.setFont("helvetica", "bold");
+    doc.text("Rate (Rs):", leftCol, yPos);
+    doc.setFont("helvetica", "normal");
+    doc.text(currentRate.toFixed(2), leftCol + 35, yPos);
+
+    // Table Data
+    const invEntries = filteredCycleEntries.filter(e => e.farmerId === farmer.id).sort((a, b) => a.date.localeCompare(b.date));
+    
+    const dateMap: Record<string, { morning: number, evening: number, rate: number }> = {};
+    invEntries.forEach(e => {
+      if (!dateMap[e.date]) {
+        dateMap[e.date] = { morning: 0, evening: 0, rate: e.rate };
+      }
+      if (e.session === 'Morning') dateMap[e.date].morning = Number(e.quantity);
+      else dateMap[e.date].evening = Number(e.quantity);
     });
 
-    doc.save(`Bill_${f.canNumber}_${f.name}_${selectedMonth}.pdf`);
+    const tableData = Object.keys(dateMap).sort().map(date => {
+      const d = dateMap[date];
+      const total = d.morning + d.evening;
+      return [
+        format(new Date(date), 'dd/MM/yy'),
+        d.morning.toFixed(2),
+        d.evening.toFixed(2),
+        total.toFixed(2),
+        d.rate.toFixed(2),
+        (total * d.rate).toFixed(2)
+      ];
+    });
+
+    const totalQty = farmer.totalQty;
+    const totalAmt = farmer.totalAmount;
+
+    (doc as any).autoTable({
+      startY: yPos + 10,
+      head: [['DATE', 'MORNING (L)', 'EVENING (L)', 'TOTAL LITRES', 'RATE (Rs)', 'AMOUNT (Rs)']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', lineWidth: 0.1, lineColor: [0, 0, 0] },
+      bodyStyles: { textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [0, 0, 0] },
+      columnStyles: {
+        0: { halign: 'center' },
+        1: { halign: 'center' },
+        2: { halign: 'center' },
+        3: { halign: 'center' },
+        4: { halign: 'center' },
+        5: { halign: 'center' }
+      },
+      foot: [['TOTAL', '', '', totalQty.toFixed(2), '', totalAmt.toFixed(2)]],
+      footStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', lineWidth: 0.1, lineColor: [0, 0, 0] }
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY + 12;
+    doc.setFont("helvetica", "bold");
+    doc.text("Total Litres:", leftCol, finalY);
+    doc.text(totalQty.toFixed(2), leftCol + 60, finalY, { align: 'right' });
+    
+    doc.text("Total Amount (Rs):", leftCol, finalY + 8);
+    doc.text(totalAmt.toFixed(2), leftCol + 60, finalY + 8, { align: 'right' });
+  };
+
+  const handleDownloadFarmerBillPDF = (farmerId: string) => {
+    const f = masterRoster.find(m => m.id === farmerId);
+    if (!f) return;
+    const doc = new jsPDF();
+    generateSingleInvoice(doc, f);
+    doc.save(`Invoice_${f.canNumber}_${f.name}_${selectedMonth}.pdf`);
   };
 
   const handleDownloadBulkInvoicesPDF = () => {
     if (activeInvoices.length === 0) return;
-
     const doc = new jsPDF();
-    const companyName = ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS";
-
     activeInvoices.forEach((f, idx) => {
       if (idx > 0) doc.addPage();
-      
-      const invEntries = filteredCycleEntries.filter(e => e.farmerId === f.id).sort((a, b) => a.date.localeCompare(b.date));
-      const totalQty = invEntries.reduce((acc, curr) => acc + curr.quantity, 0);
-      const totalAmt = invEntries.reduce((acc, curr) => acc + curr.totalAmount, 0);
-
-      doc.setFontSize(20);
-      doc.text(companyName, 14, 20);
-      doc.setFontSize(14);
-      doc.text(`Farmer Bill: ${f.name} (CAN: ${f.canNumber})`, 14, 35);
-      doc.setFontSize(10);
-      doc.text(`Cycle: ${currentCycle?.label} | ${monthOptions.find(o => o.value === selectedMonth)?.label}`, 14, 42);
-
-      const tableData = invEntries.map(e => [
-        e.date,
-        e.session,
-        e.quantity.toFixed(2),
-        e.rate.toFixed(2),
-        e.totalAmount.toFixed(2)
-      ]);
-
-      (doc as any).autoTable({
-        startY: 50,
-        head: [['Date', 'Session', 'Qty (L)', 'Rate (Rs/L)', 'Total (Rs)']],
-        body: tableData,
-        theme: 'grid',
-        foot: [['Grand Total', '', totalQty.toFixed(2), '', `Rs. ${totalAmt.toFixed(2)}`]],
-        footStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' }
-      });
+      generateSingleInvoice(doc, f);
     });
-
     doc.save(`Bulk_Invoices_${selectedMonth}_${currentCycle?.label}.pdf`);
   };
 
@@ -316,7 +365,7 @@ export default function ReportsPage() {
           <header className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">
-                {ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS"} Reports
+                {ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS"} Reports
               </h1>
               <p className="text-muted-foreground font-medium">Fiscal Year: April - March</p>
             </div>

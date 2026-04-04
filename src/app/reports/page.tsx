@@ -104,22 +104,44 @@ export default function ReportsPage() {
   }, [allEntries, selectedMonth, currentCycle]);
 
   const masterRoster = useMemo(() => {
-    if (!farmers) return [];
+    if (!farmers || !currentCycle) return [];
     return farmers.map(farmer => {
       const fEntries = filteredCycleEntries.filter(e => e.farmerId === farmer.id);
+      
+      // Resolve the effective rate for this farmer for fallback or calculation
+      let resolvedRate = 0;
+      if (farmer.milkType === 'BUFFALO') {
+        resolvedRate = Number(farmer.customRate) > 0 
+          ? Number(farmer.customRate) 
+          : (Number(ratesConfig?.buffaloRate) || 0);
+      } else {
+        resolvedRate = Number(ratesConfig?.cowRate) || 0;
+      }
+
+      const mQty = fEntries.filter(e => e.session === 'Morning').reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
+      const eQty = fEntries.filter(e => e.session === 'Evening').reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
+      const totalQty = mQty + eQty;
+
+      // Calculate amount based on entry rates, falling back to resolved rate if entry rate is 0
+      const totalAmount = fEntries.reduce((acc, curr) => {
+        const qty = Number(curr.quantity) || 0;
+        const rate = Number(curr.rate) > 0 ? Number(curr.rate) : resolvedRate;
+        return acc + (qty * rate);
+      }, 0);
+
       return {
         ...farmer,
-        morningQty: fEntries.filter(e => e.session === 'Morning').reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0),
-        eveningQty: fEntries.filter(e => e.session === 'Evening').reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0),
-        totalQty: fEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0),
-        totalAmount: fEntries.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0)
+        morningQty: mQty,
+        eveningQty: eQty,
+        totalQty: totalQty,
+        totalAmount: totalAmount
       };
     }).sort((a, b) => {
       const aNum = parseInt(a.canNumber);
       const bNum = parseInt(b.canNumber);
       return (isNaN(aNum) || isNaN(bNum)) ? a.canNumber.localeCompare(b.canNumber) : aNum - bNum;
     });
-  }, [farmers, filteredCycleEntries]);
+  }, [farmers, filteredCycleEntries, ratesConfig, currentCycle]);
 
   const cowRoster = masterRoster.filter(f => f.milkType === 'COW' || !f.milkType);
   const buffaloRoster = masterRoster.filter(f => f.milkType === 'BUFFALO');

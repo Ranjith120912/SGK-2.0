@@ -88,18 +88,16 @@ export default function FarmerBillsPage() {
 
     cycleEntries.forEach(e => {
       const fid = e.farmerId;
+      // Precision Match: Only process if the farmer exists in Farmer Management directory
       const farmerProfile = farmers.find(f => f.id === fid);
-      
-      const name = farmerProfile?.name || e.farmerName || "Farmer";
-      const can = farmerProfile?.canNumber || e.canNumber || "---";
-      const milkType = farmerProfile?.milkType || e.milkType || "COW";
+      if (!farmerProfile) return;
 
       if (!map[fid]) {
         map[fid] = {
           id: fid,
-          can,
-          name,
-          milkType,
+          can: farmerProfile.canNumber,
+          name: farmerProfile.name,
+          milkType: farmerProfile.milkType || "COW",
           totalQty: 0,
           totalAmount: 0
         };
@@ -124,6 +122,7 @@ export default function FarmerBillsPage() {
     const periodEndStr = `${currentCycle.end}/${month}/${year.toString().slice(-2)}`;
     const period = `${periodStartStr} to ${periodEndStr}`;
     
+    // Header Formatting
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(16);
     pdf.text(company, 105, 20, { align: 'center' });
@@ -143,6 +142,7 @@ export default function FarmerBillsPage() {
       pdf.setFont("helvetica", "normal");
     };
 
+    // Personal Info Section
     drawUnderlinedField("NAME:", f.name, 20, 45, 100);
     drawUnderlinedField("DATE:", format(new Date(), 'dd/MM/yyyy'), 110, 45, 190);
     
@@ -154,6 +154,7 @@ export default function FarmerBillsPage() {
     const avgRate = f.totalQty > 0 ? (f.totalAmount / f.totalQty).toFixed(2) : "0.00";
     drawUnderlinedField("RATE (Rs):", avgRate, 110, 65, 190);
 
+    // Table Data Resolution
     const dateObjects = [];
     for (let d = currentCycle.start; d <= currentCycle.end; d++) {
       dateObjects.push(new Date(year, month - 1, d));
@@ -191,6 +192,7 @@ export default function FarmerBillsPage() {
 
     const finalY = (pdf as any).lastAutoTable.finalY;
     
+    // Totals
     pdf.setFont("helvetica", "bold");
     pdf.line(20, finalY, 190, finalY);
     pdf.text("TOTAL", 25, finalY + 7);
@@ -198,6 +200,7 @@ export default function FarmerBillsPage() {
     pdf.text(f.totalAmount.toFixed(2), 178, finalY + 7, { align: 'center' });
     pdf.line(20, finalY + 11, 190, finalY + 11);
 
+    // Signature
     const pageHeight = pdf.internal.pageSize.getHeight();
     pdf.text("AUTHORIZED SIGNATURE", 190, pageHeight - 15, { align: 'right' });
     pdf.line(140, pageHeight - 17, 190, pageHeight - 17);
@@ -218,7 +221,7 @@ export default function FarmerBillsPage() {
               </div>
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Farmer Bills</h1>
               <p className="text-muted-foreground font-medium flex items-center gap-2">
-                Generate professional invoices based on collection history.
+                Generate professional invoices based on collection history and directory records.
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4">
@@ -277,7 +280,7 @@ export default function FarmerBillsPage() {
                 {entriesLoading || farmersLoading ? (
                   <TableRow><TableCell colSpan={6} className="text-center py-20"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" /></TableCell></TableRow>
                 ) : masterRoster.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-20 italic text-muted-foreground">No data for this cycle.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center py-20 italic text-muted-foreground">No data found in Farmer Management directory for this cycle.</TableCell></TableRow>
                 ) : (
                   masterRoster.map(f => (
                     <TableRow key={f.id} className="hover:bg-primary/5 transition-colors group">

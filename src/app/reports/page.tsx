@@ -110,56 +110,7 @@ export default function ReportsPage() {
 
   const currentCycle = cycles[activeCycle];
 
-  // IDENTITY RESOLUTION ENGINE: Strictly maps entries to Farmer Directory
-  const dailyData = useMemo(() => {
-    if (!allEntries || !selectedDailyDate || !farmers) return [];
-    const map: Record<string, any> = {};
-    const filteredEntries = allEntries.filter(e => e.date === selectedDailyDate);
-    
-    filteredEntries.forEach(e => {
-      const fid = e.farmerId;
-      const farmerProfile = farmers.find(f => f.id === fid);
-      
-      const name = farmerProfile?.name || e.farmerName || "Farmer";
-      const can = farmerProfile?.canNumber || e.canNumber || "---";
-      const milkType = farmerProfile?.milkType || e.milkType || "COW";
-      
-      if (!map[fid]) {
-        map[fid] = {
-          fid,
-          can,
-          name,
-          milkType,
-          amKg: 0, amLtr: 0,
-          pmKg: 0, pmLtr: 0,
-          totalLtr: 0, totalAmt: 0
-        };
-      }
-      
-      const kg = Number(e.kgWeight) || 0;
-      const ltr = Number(e.quantity) || 0;
-      const amt = Number(e.totalAmount) || 0;
-
-      if (e.session === 'Morning') {
-        map[fid].amKg += kg;
-        map[fid].amLtr += ltr;
-      } else {
-        map[fid].pmKg += kg;
-        map[fid].pmLtr += ltr;
-      }
-      
-      map[fid].totalLtr += ltr;
-      map[fid].totalAmt += amt;
-    });
-
-    return Object.values(map).sort((a: any, b: any) => {
-      const aNum = parseInt(a.can);
-      const bNum = parseInt(b.can);
-      if (isNaN(aNum) || isNaN(bNum)) return a.can.localeCompare(b.can);
-      return aNum - bNum;
-    });
-  }, [allEntries, farmers, selectedDailyDate]);
-
+  // Precision Identity Engine: Strictly joins collection data to Farmer Directory names
   const masterRoster = useMemo(() => {
     if (!allEntries || !selectedMonth || !currentCycle || !farmers) return [];
     
@@ -173,16 +124,16 @@ export default function ReportsPage() {
     cycleEntries.forEach(e => {
       const fid = e.farmerId;
       const farmerProfile = farmers.find(f => f.id === fid);
-      const name = farmerProfile?.name || e.farmerName || "Farmer";
-      const can = farmerProfile?.canNumber || e.canNumber || "---";
-      const milkType = farmerProfile?.milkType || e.milkType || "COW";
+      
+      // Skip records for farmers not in the management directory to ensure 100% accuracy
+      if (!farmerProfile) return;
 
       if (!map[fid]) {
         map[fid] = {
           id: fid,
-          can,
-          name,
-          milkType,
+          can: farmerProfile.canNumber,
+          name: farmerProfile.name,
+          milkType: farmerProfile.milkType || "COW",
           morningQty: 0, eveningQty: 0, totalQty: 0, totalAmount: 0
         };
       }
@@ -225,109 +176,6 @@ export default function ReportsPage() {
     };
   }, [masterRoster, allSales, selectedMonth, currentCycle]);
 
-  const generateProfessionalInvoice = (pdf: jsPDF, f: any) => {
-    const company = (ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS").toUpperCase();
-    const [year, month] = selectedMonth.split('-').map(Number);
-    const periodStartStr = `${currentCycle.start}/${month}/${year.toString().slice(-2)}`;
-    const periodEndStr = `${currentCycle.end}/${month}/${year.toString().slice(-2)}`;
-    const period = `${periodStartStr} to ${periodEndStr}`;
-    
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(16);
-    pdf.text(company, 105, 20, { align: 'center' });
-    pdf.setFontSize(12);
-    pdf.text("MILK INVOICE", 105, 27, { align: 'center' });
-    pdf.line(93, 28, 117, 28); 
-
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "normal");
-    
-    const drawUnderlinedField = (label: string, value: string, x: number, y: number, width: number) => {
-      pdf.text(label, x, y);
-      const labelWidth = pdf.getTextWidth(label);
-      pdf.setFont("helvetica", "bold");
-      pdf.text(value.toUpperCase(), x + labelWidth + 5, y);
-      pdf.line(x + labelWidth + 4, y + 1, x + width, y + 1);
-      pdf.setFont("helvetica", "normal");
-    };
-
-    drawUnderlinedField("NAME:", f.name, 20, 45, 100);
-    drawUnderlinedField("DATE:", format(new Date(), 'dd/MM/yyyy'), 110, 45, 190);
-    
-    const farmerProfile = farmers?.find(item => item.id === f.id);
-    drawUnderlinedField("A/C NO:", farmerProfile?.bankAccountNumber || "---", 20, 55, 100);
-    drawUnderlinedField("PERIOD:", period, 110, 55, 190);
-    
-    drawUnderlinedField("CAN NO:", f.can, 20, 65, 100);
-    const avgRate = f.totalQty > 0 ? (f.totalAmount / f.totalQty).toFixed(2) : "0.00";
-    drawUnderlinedField("RATE (Rs):", avgRate, 110, 65, 190);
-
-    const dateObjects = [];
-    for (let d = currentCycle.start; d <= currentCycle.end; d++) {
-      dateObjects.push(new Date(year, month - 1, d));
-    }
-
-    const rows = dateObjects.map(dateObj => {
-      const dateStr = format(dateObj, 'yyyy-MM-dd');
-      const dayEntries = allEntries!.filter(e => e.farmerId === f.id && e.date === dateStr);
-      const mQty = dayEntries.find(e => e.session === 'Morning')?.quantity || 0;
-      const eQty = dayEntries.find(e => e.session === 'Evening')?.quantity || 0;
-      const tQty = mQty + eQty;
-      const rate = dayEntries[0]?.rate || 0;
-      const amt = tQty * rate;
-
-      return [
-        format(dateObj, 'dd/MM/yy'),
-        mQty.toFixed(2),
-        eQty.toFixed(2),
-        tQty.toFixed(2),
-        rate.toFixed(2),
-        amt.toFixed(2)
-      ];
-    });
-
-    (pdf as any).autoTable({
-      startY: 75,
-      head: [['DATE', 'MORNING (L)', 'EVENING (L)', 'TOTAL LITRES', 'RATE (Rs)', 'AMOUNT (Rs)']],
-      body: rows,
-      theme: 'grid',
-      headStyles: { fillColor: [255, 255, 255], textColor: 0, halign: 'center', fontStyle: 'bold', lineWidth: 0.1 },
-      bodyStyles: { halign: 'center', textColor: 0, lineWidth: 0.1 },
-      styles: { fontSize: 9, cellPadding: 2.5 },
-      margin: { left: 20, right: 20 }
-    });
-
-    const finalY = (pdf as any).lastAutoTable.finalY;
-    pdf.setFont("helvetica", "bold");
-    pdf.line(20, finalY, 190, finalY);
-    pdf.text("TOTAL", 25, finalY + 7);
-    pdf.text(f.totalQty.toFixed(2), 125, finalY + 7, { align: 'center' });
-    pdf.text(f.totalAmount.toFixed(2), 178, finalY + 7, { align: 'center' });
-    pdf.line(20, finalY + 11, 190, finalY + 11);
-
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    pdf.text("AUTHORIZED SIGNATURE", 190, pageHeight - 15, { align: 'right' });
-    pdf.line(140, pageHeight - 17, 190, pageHeight - 17);
-  };
-
-  const handleExportDailyExcel = () => {
-    const data = dailyData.map((p: any) => ({
-      "CAN": p.can,
-      "FARMER NAME": p.name,
-      "MILK TYPE": p.milkType,
-      "AM-KG": p.amKg.toFixed(2),
-      "AM-LITRE": p.amLtr.toFixed(2),
-      "PM-KG": p.pmKg.toFixed(2),
-      "PM-LITRE": p.pmLtr.toFixed(2),
-      "TOTAL LITRES": p.totalLtr.toFixed(2),
-      "PAYOUT (Rs)": p.totalAmt.toFixed(2)
-    }));
-    const ws = utils.json_to_sheet(data);
-    const wb = utils.book_new();
-    utils.book_append_sheet(wb, ws, "Daily Procurement");
-    writeFile(wb, `Daily_Procurement_${selectedDailyDate}.xlsx`);
-  };
-
   const handleMasterReset = async () => {
     if (!firestore) return;
     setIsResetting(true);
@@ -362,7 +210,7 @@ export default function ReportsPage() {
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Reports & Audit</h1>
               <p className="text-muted-foreground font-medium flex items-center gap-2">
                 <Users className="w-4 h-4" /> 
-                Reflecting Farmer Management & Collection Registry
+                Directly synchronized with Farmer Management & Daily Collections
               </p>
             </div>
             <div className="flex gap-4">
@@ -381,13 +229,11 @@ export default function ReportsPage() {
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b pb-4">
               <TabsList className="bg-muted p-1 rounded-full h-auto">
                 <TabsTrigger value="overview" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Overview</TabsTrigger>
-                <TabsTrigger value="daily" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Daily Report</TabsTrigger>
-                <TabsTrigger value="cycle" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Farmer Bills</TabsTrigger>
                 <TabsTrigger value="master" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Master Roster</TabsTrigger>
                 <TabsTrigger value="audit" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Internal Audit</TabsTrigger>
               </TabsList>
 
-              {["overview", "cycle", "master"].includes(activeTab) && (
+              {["overview", "master"].includes(activeTab) && (
                 <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-full border shadow-sm">
                   {cycles.map((c, i) => (
                     <button 
@@ -426,145 +272,6 @@ export default function ReportsPage() {
               </div>
             </TabsContent>
 
-            <TabsContent value="daily" className="space-y-6">
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-card p-6 rounded-3xl border shadow-sm">
-                <div className="flex items-center gap-4">
-                  <Calendar className="text-primary w-5 h-5" />
-                  <Input 
-                    type="date" 
-                    value={selectedDailyDate} 
-                    onChange={(e) => setSelectedDailyDate(e.target.value)} 
-                    className="w-[200px] font-bold h-11 rounded-full px-6 border-primary/10" 
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button onClick={handleExportDailyExcel} variant="outline" className="rounded-full h-11 px-6 font-bold uppercase text-[10px] border-primary/20">
-                    <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Export
-                  </Button>
-                  <Button onClick={() => {
-                    const pdf = new jsPDF('l', 'mm', 'a4');
-                    const company = (ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS").toUpperCase();
-                    pdf.setFontSize(18);
-                    pdf.text(company, 148, 20, { align: 'center' });
-                    pdf.setFontSize(12);
-                    pdf.text(`DAILY PROCUREMENT REPORT - ${format(new Date(selectedDailyDate), 'dd/MM/yyyy')}`, 148, 28, { align: 'center' });
-                    (pdf as any).autoTable({
-                      startY: 35,
-                      head: [['CAN', 'FARMER NAME', 'TYPE', 'AM-KG', 'AM-L', 'PM-KG', 'PM-L', 'TOT-L', 'PAYOUT (Rs)']],
-                      body: dailyData.map(p => [p.can, p.name, p.milkType, p.amKg.toFixed(2), p.amLtr.toFixed(2), p.pmKg.toFixed(2), p.pmLtr.toFixed(2), p.totalLtr.toFixed(2), p.totalAmt.toFixed(2)]),
-                      theme: 'grid',
-                      headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' },
-                      bodyStyles: { halign: 'center' }
-                    });
-                    pdf.save(`Daily_Procurement_${selectedDailyDate}.pdf`);
-                  }} className="rounded-full h-11 px-8 font-bold uppercase text-[10px] shadow-lg">
-                    <Printer className="mr-2 h-4 w-4" /> Print Daily Report
-                  </Button>
-                </div>
-              </div>
-
-              <Card className="rounded-3xl border-none shadow-xl overflow-hidden bg-card/50 backdrop-blur-sm">
-                <Table>
-                  <TableHeader className="bg-muted/50">
-                    <TableRow>
-                      <TableHead className="font-black text-[10px] text-center border-r w-[80px]">CAN</TableHead>
-                      <TableHead className="font-black text-[10px] border-r">Farmer Name</TableHead>
-                      <TableHead className="font-black text-[10px] border-r text-center">Milk Type</TableHead>
-                      <TableHead colSpan={2} className="text-center font-black text-[10px] border-r bg-primary/5 uppercase tracking-widest">AM (Morning)</TableHead>
-                      <TableHead colSpan={2} className="text-center font-black text-[10px] border-r bg-accent/5 uppercase tracking-widest">PM (Evening)</TableHead>
-                      <TableHead className="text-center font-black text-[10px] border-r bg-muted/20">Total L</TableHead>
-                      <TableHead className="text-right font-black text-[10px] pr-6">Amount (Rs)</TableHead>
-                    </TableRow>
-                    <TableRow className="bg-muted/30">
-                      <TableHead className="border-r"></TableHead>
-                      <TableHead className="border-r"></TableHead>
-                      <TableHead className="border-r"></TableHead>
-                      <TableHead className="text-center text-[8px] font-black border-r">KG</TableHead>
-                      <TableHead className="text-center text-[8px] font-black border-r">LTR</TableHead>
-                      <TableHead className="text-center text-[8px] font-black border-r">KG</TableHead>
-                      <TableHead className="text-center text-[8px] font-black border-r">LTR</TableHead>
-                      <TableHead className="border-r bg-muted/20"></TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {dailyData.length === 0 ? (
-                      <TableRow><TableCell colSpan={9} className="text-center py-20 italic text-muted-foreground font-medium uppercase text-[10px] tracking-widest">No procurement records found.</TableCell></TableRow>
-                    ) : (
-                      dailyData.map((p: any, i) => (
-                        <TableRow key={i} className="hover:bg-primary/5 group transition-colors">
-                          <TableCell className="text-center font-black border-r text-primary text-base">{p.can}</TableCell>
-                          <TableCell className="font-bold border-r uppercase text-sm">{p.name}</TableCell>
-                          <TableCell className="text-center border-r">
-                            <Badge variant={p.milkType === 'BUFFALO' ? "secondary" : "outline"} className="text-[8px] rounded-full px-2 font-black uppercase">
-                              {p.milkType}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-center border-r text-xs text-muted-foreground">{p.amKg.toFixed(2)}</TableCell>
-                          <TableCell className="text-center border-r font-black text-primary">{p.amLtr.toFixed(2)}</TableCell>
-                          <TableCell className="text-center border-r text-xs text-muted-foreground">{p.pmKg.toFixed(2)}</TableCell>
-                          <TableCell className="text-center border-r font-black text-accent">{p.pmLtr.toFixed(2)}</TableCell>
-                          <TableCell className="text-center border-r font-black text-primary bg-primary/5">{p.totalLtr.toFixed(2)}</TableCell>
-                          <TableCell className="text-right font-black pr-6 text-foreground/80">₹ {p.totalAmt.toFixed(2)}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="cycle" className="space-y-6">
-              <div className="flex justify-end">
-                <Button onClick={() => {
-                  const pdf = new jsPDF();
-                  const valid = masterRoster.filter(f => f.totalQty > 0);
-                  valid.forEach((f, i) => { if (i > 0) pdf.addPage(); generateProfessionalInvoice(pdf, f); });
-                  pdf.save(`Bills_${selectedMonth}_${currentCycle.label}.pdf`);
-                }} className="rounded-full bg-rose-600 hover:bg-rose-700 h-12 px-10 shadow-lg font-black uppercase text-xs">
-                  <FileDown className="mr-2 h-4 w-4" /> Download All Bills (PDF)
-                </Button>
-              </div>
-              <Card className="rounded-3xl border-none shadow-xl overflow-hidden bg-card/50 backdrop-blur-sm">
-                <Table>
-                  <TableHeader className="bg-muted/50">
-                    <TableRow>
-                      <TableHead className="pl-10 font-black text-[10px] uppercase w-[100px]">CAN</TableHead>
-                      <TableHead className="font-black text-[10px] uppercase">Farmer Name</TableHead>
-                      <TableHead className="font-black text-[10px] uppercase">Milk Type</TableHead>
-                      <TableHead className="text-right font-black text-[10px] uppercase">Volume (L)</TableHead>
-                      <TableHead className="text-right font-black text-[10px] uppercase">Payout (Rs)</TableHead>
-                      <TableHead className="text-right pr-10 font-black text-[10px] uppercase">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {masterRoster.filter(f => f.totalQty > 0).map(f => (
-                      <TableRow key={f.id} className="hover:bg-primary/5 transition-colors group">
-                        <TableCell className="pl-10 font-black text-primary text-lg">{f.can}</TableCell>
-                        <TableCell className="font-bold uppercase text-sm">{f.name}</TableCell>
-                        <TableCell>
-                          <Badge variant={f.milkType === 'BUFFALO' ? "secondary" : "outline"} className="text-[9px] rounded-full px-2 font-black">
-                            {f.milkType}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-bold text-base">{f.totalQty.toFixed(2)}</TableCell>
-                        <TableCell className="text-right font-black text-primary text-base">₹ {f.totalAmount.toFixed(2)}</TableCell>
-                        <TableCell className="text-right pr-10">
-                          <Button variant="ghost" size="sm" onClick={() => {
-                            const pdf = new jsPDF();
-                            generateProfessionalInvoice(pdf, f);
-                            pdf.save(`Bill_${f.can}_${f.name.replace(/\s+/g, '_')}.pdf`);
-                          }} className="text-primary font-black uppercase text-[10px] group-hover:bg-primary/10 rounded-full h-8 px-4">
-                            PDF Bill
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </Card>
-            </TabsContent>
-
             <TabsContent value="master" className="space-y-6">
               <div className="flex justify-between items-center bg-primary p-8 rounded-[2rem] text-white shadow-xl border-none">
                 <div>
@@ -591,6 +298,39 @@ export default function ReportsPage() {
                   <Download className="mr-2 h-4 w-4" /> Export Roster PDF
                 </Button>
               </div>
+
+              <Card className="rounded-3xl border-none shadow-xl overflow-hidden bg-card/50 backdrop-blur-sm">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead className="pl-10 font-black text-[10px] py-4 uppercase w-[100px]">CAN</TableHead>
+                      <TableHead className="font-black text-[10px] uppercase">Farmer Name</TableHead>
+                      <TableHead className="font-black text-[10px] uppercase">Milk Type</TableHead>
+                      <TableHead className="text-right font-black text-[10px] uppercase">Morning (L)</TableHead>
+                      <TableHead className="text-right font-black text-[10px] uppercase">Evening (L)</TableHead>
+                      <TableHead className="text-right font-black text-[10px] uppercase">Total (L)</TableHead>
+                      <TableHead className="text-right pr-10 font-black text-[10px] uppercase">Payout (Rs)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {masterRoster.map(f => (
+                      <TableRow key={f.id} className="hover:bg-primary/5 transition-colors group">
+                        <TableCell className="pl-10 font-black text-primary text-lg">{f.can}</TableCell>
+                        <TableCell className="font-bold uppercase text-sm">{f.name}</TableCell>
+                        <TableCell>
+                          <Badge variant={f.milkType === 'BUFFALO' ? "secondary" : "outline"} className="text-[9px] rounded-full px-2 font-black">
+                            {f.milkType}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-xs text-muted-foreground">{f.morningQty.toFixed(2)}</TableCell>
+                        <TableCell className="text-right text-xs text-muted-foreground">{f.eveningQty.toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-bold text-base">{f.totalQty.toFixed(2)}</TableCell>
+                        <TableCell className="text-right pr-10 font-black text-primary text-base">₹ {f.totalAmount.toFixed(2)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
             </TabsContent>
 
             <TabsContent value="audit" className="space-y-8">
@@ -612,8 +352,11 @@ export default function ReportsPage() {
                        
                        let tCost = 0, tRev = 0, tQty = 0;
                        mEntries.forEach(e => {
-                         tCost += Number(e.totalAmount) || 0;
-                         tQty += Number(e.quantity) || 0;
+                         const f = farmers?.find(item => item.id === e.farmerId);
+                         if (f) {
+                           tCost += Number(e.totalAmount) || 0;
+                           tQty += Number(e.quantity) || 0;
+                         }
                        });
                        mSales.forEach(s => {
                          tRev += Number(s.totalAmount) || 0;
@@ -649,7 +392,7 @@ export default function ReportsPage() {
                     <AlertDialogHeader>
                       <AlertDialogTitle className="font-black text-destructive uppercase">Confirm Full Reset</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will permanently delete ALL collection entries and sales records across all months. This action is irreversible and will result in total loss of historical audit data.
+                        This will permanently delete ALL collection entries and sales records across all months. This action is irreversible.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

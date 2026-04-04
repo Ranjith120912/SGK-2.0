@@ -52,7 +52,7 @@ export default function DailyReportsPage() {
   const { data: farmers, isLoading: farmersLoading } = useCollection(farmersQuery);
   const { data: ratesConfig } = useDoc(settingsRef);
 
-  // GROUPED FINANCIAL ENGINE: Precision-locked identity resolution
+  // Grouping Engine: Pivots AM/PM sessions into a single row per farmer
   const dailyData = useMemo(() => {
     if (!allEntries || !selectedDate || !farmers) return [];
     
@@ -61,19 +61,18 @@ export default function DailyReportsPage() {
     
     filteredEntries.forEach(e => {
       const fid = e.farmerId;
+      // Precision lookup from Farmer Management directory
       const farmerProfile = farmers.find(f => f.id === fid);
       
-      // IDENTITY LOCK: Strictly prioritize Directory name/CAN over record metadata
-      const name = farmerProfile?.name || e.farmerName || "Farmer";
-      const can = farmerProfile?.canNumber || e.canNumber || "---";
-      const milkType = farmerProfile?.milkType || e.milkType || "COW";
-      
+      // Accuracy First: Skip records for non-existent farmers or identify correctly
+      if (!farmerProfile) return;
+
       if (!map[fid]) {
         map[fid] = {
           fid,
-          can,
-          name,
-          milkType,
+          can: farmerProfile.canNumber,
+          name: farmerProfile.name,
+          milkType: farmerProfile.milkType || "COW",
           amKg: 0, amLtr: 0,
           pmKg: 0, pmLtr: 0,
           totalLtr: 0, totalAmt: 0
@@ -168,7 +167,7 @@ export default function DailyReportsPage() {
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Daily Reports</h1>
               <p className="text-muted-foreground font-medium flex items-center gap-2">
                 <Users className="w-4 h-4" /> 
-                Consolidated Procurement Summaries (AM/PM Sessions)
+                Reflecting Farmer Management & Collection Registry (AM/PM Sessions)
               </p>
             </div>
             <div className="flex flex-col sm:flex-row items-center gap-4">

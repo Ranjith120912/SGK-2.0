@@ -95,6 +95,7 @@ export default function ReportsPage() {
 
   const currentCycle = cycles[activeCycle];
 
+  // IDENTITY RESOLUTION ENGINE: Strictly maps entries to Farmer Directory
   const dailyData = useMemo(() => {
     if (!allEntries || !selectedDailyDate || !farmers) return [];
     const map: Record<string, any> = {};
@@ -102,9 +103,10 @@ export default function ReportsPage() {
     
     filteredEntries.forEach(e => {
       const fid = e.farmerId;
-      // Precision Resolution: Prioritize directory lookup
       const farmerProfile = farmers.find(f => f.id === fid);
-      const name = farmerProfile?.name || e.farmerName || "Farmer (CAN: " + (e.canNumber || "---") + ")";
+      
+      // Precision: Display actual name/CAN from directory, fallback to metadata, NEVER Firestore ID
+      const name = farmerProfile?.name || e.farmerName || "Farmer";
       const can = farmerProfile?.canNumber || e.canNumber || "---";
       const milkType = farmerProfile?.milkType || e.milkType || "COW";
       
@@ -156,9 +158,8 @@ export default function ReportsPage() {
 
     cycleEntries.forEach(e => {
       const fid = e.farmerId;
-      // Precision Resolution: Prioritize directory lookup
       const farmerProfile = farmers.find(f => f.id === fid);
-      const name = farmerProfile?.name || e.farmerName || "Farmer (CAN: " + (e.canNumber || "---") + ")";
+      const name = farmerProfile?.name || e.farmerName || "Farmer";
       const can = farmerProfile?.canNumber || e.canNumber || "---";
       const milkType = farmerProfile?.milkType || e.milkType || "COW";
 

@@ -53,6 +53,7 @@ export default function DailyReportsPage() {
   const { data: farmers, isLoading: farmersLoading } = useCollection(farmersQuery);
   const { data: ratesConfig } = useDoc(settingsRef);
 
+  // GROUPED FINANCIAL ENGINE: Correctly maps collection to live directory names
   const dailyData = useMemo(() => {
     if (!allEntries || !selectedDate || !farmers) return [];
     
@@ -61,10 +62,10 @@ export default function DailyReportsPage() {
     
     filteredEntries.forEach(e => {
       const fid = e.farmerId;
-      // Precision Resolution: Prioritize directory lookup to fix "Farmer [ID]" bug
       const farmerProfile = farmers.find(f => f.id === fid);
       
-      const name = farmerProfile?.name || e.farmerName || "Farmer (CAN: " + (e.canNumber || "---") + ")";
+      // IDENTITY LOCK: Use directory name, fallback to record name, NEVER Firestore ID
+      const name = farmerProfile?.name || e.farmerName || "Farmer";
       const can = farmerProfile?.canNumber || e.canNumber || "---";
       const milkType = farmerProfile?.milkType || e.milkType || "COW";
       

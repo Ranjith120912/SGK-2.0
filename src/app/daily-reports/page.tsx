@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -52,19 +53,18 @@ export default function DailyReportsPage() {
   const { data: farmers, isLoading: farmersLoading } = useCollection(farmersQuery);
   const { data: ratesConfig } = useDoc(settingsRef);
 
-  // Grouping Engine: Pivots AM/PM sessions into a single row per farmer
+  const CONVERSION_RATE = 0.96;
+
   const dailyData = useMemo(() => {
-    if (!allEntries || !selectedDate || !farmers) return [];
+    if (!allEntries || !selectedDate || !farmers || !ratesConfig) return [];
     
     const map: Record<string, any> = {};
     const filteredEntries = allEntries.filter(e => e.date === selectedDate);
     
     filteredEntries.forEach(e => {
       const fid = e.farmerId;
-      // Precision lookup from Farmer Management directory
       const farmerProfile = farmers.find(f => f.id === fid);
       
-      // Accuracy First: Skip records for non-existent farmers or identify correctly
       if (!farmerProfile) return;
 
       if (!map[fid]) {
@@ -80,8 +80,19 @@ export default function DailyReportsPage() {
       }
       
       const kg = Number(e.kgWeight) || 0;
-      const ltr = Number(e.quantity) || 0;
-      const amt = Number(e.totalAmount) || 0;
+      const ltr = kg * CONVERSION_RATE;
+      
+      // Buffalo Milk Rate Resolution
+      let rate = 0;
+      if (map[fid].milkType === 'BUFFALO') {
+        rate = Number(farmerProfile.customRate) > 0 
+          ? Number(farmerProfile.customRate) 
+          : (Number(ratesConfig.buffaloRate) || 0);
+      } else {
+        rate = Number(ratesConfig.cowRate) || 0;
+      }
+
+      const amt = ltr * rate;
 
       if (e.session === 'Morning') {
         map[fid].amKg += kg;
@@ -101,7 +112,7 @@ export default function DailyReportsPage() {
       if (isNaN(aNum) || isNaN(bNum)) return a.can.localeCompare(b.can);
       return aNum - bNum;
     });
-  }, [allEntries, farmers, selectedDate]);
+  }, [allEntries, farmers, selectedDate, ratesConfig]);
 
   const handleExportExcel = () => {
     const data = dailyData.map((p: any) => ({
@@ -162,12 +173,12 @@ export default function DailyReportsPage() {
             <div>
               <div className="flex items-center gap-2 text-primary mb-1">
                 <FileBarChart className="w-5 h-5" />
-                <span className="text-xs font-black uppercase tracking-widest">Accuracy Guaranteed</span>
+                <span className="text-xs font-black uppercase tracking-widest">Precision Resolution</span>
               </div>
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Daily Reports</h1>
               <p className="text-muted-foreground font-medium flex items-center gap-2">
                 <Users className="w-4 h-4" /> 
-                Reflecting Farmer Management & Collection Registry (AM/PM Sessions)
+                Derived Strictly from Farmer Management & Collections
               </p>
             </div>
             <div className="flex flex-col sm:flex-row items-center gap-4">

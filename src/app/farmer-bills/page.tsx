@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -74,10 +75,10 @@ export default function FarmerBillsPage() {
   const { data: farmers, isLoading: farmersLoading } = useCollection(farmersQuery);
   const { data: ratesConfig } = useDoc(settingsRef);
 
-  const currentCycle = cycles[activeCycle];
+  const CONVERSION_RATE = 0.96;
 
   const masterRoster = useMemo(() => {
-    if (!allEntries || !selectedMonth || !currentCycle || !farmers) return [];
+    if (!allEntries || !selectedMonth || !currentCycle || !farmers || !ratesConfig) return [];
     
     const map: Record<string, any> = {};
     const cycleEntries = allEntries.filter(e => {
@@ -88,7 +89,6 @@ export default function FarmerBillsPage() {
 
     cycleEntries.forEach(e => {
       const fid = e.farmerId;
-      // Precision Match: Only process if the farmer exists in Farmer Management directory
       const farmerProfile = farmers.find(f => f.id === fid);
       if (!farmerProfile) return;
 
@@ -103,8 +103,20 @@ export default function FarmerBillsPage() {
         };
       }
 
-      map[fid].totalQty += (Number(e.quantity) || 0);
-      map[fid].totalAmount += (Number(e.totalAmount) || 0);
+      const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
+      
+      // Buffalo Milk Rate Resolution
+      let rate = 0;
+      if (map[fid].milkType === 'BUFFALO') {
+        rate = Number(farmerProfile.customRate) > 0 
+          ? Number(farmerProfile.customRate) 
+          : (Number(ratesConfig.buffaloRate) || 0);
+      } else {
+        rate = Number(ratesConfig.cowRate) || 0;
+      }
+
+      map[fid].totalQty += ltr;
+      map[fid].totalAmount += (ltr * rate);
     });
 
     return Object.values(map).sort((a: any, b: any) => {
@@ -113,7 +125,9 @@ export default function FarmerBillsPage() {
       if (isNaN(aNum) || isNaN(bNum)) return a.can.localeCompare(b.can);
       return aNum - bNum;
     });
-  }, [allEntries, farmers, selectedMonth, currentCycle]);
+  }, [allEntries, farmers, selectedMonth, activeCycle, ratesConfig]);
+
+  const currentCycle = cycles[activeCycle];
 
   const generateProfessionalInvoice = (pdf: jsPDF, f: any) => {
     const company = (ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS").toUpperCase();
@@ -122,7 +136,6 @@ export default function FarmerBillsPage() {
     const periodEndStr = `${currentCycle.end}/${month}/${year.toString().slice(-2)}`;
     const period = `${periodStartStr} to ${periodEndStr}`;
     
-    // Header Formatting
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(16);
     pdf.text(company, 105, 20, { align: 'center' });
@@ -142,7 +155,6 @@ export default function FarmerBillsPage() {
       pdf.setFont("helvetica", "normal");
     };
 
-    // Personal Info Section
     drawUnderlinedField("NAME:", f.name, 20, 45, 100);
     drawUnderlinedField("DATE:", format(new Date(), 'dd/MM/yyyy'), 110, 45, 190);
     
@@ -154,7 +166,6 @@ export default function FarmerBillsPage() {
     const avgRate = f.totalQty > 0 ? (f.totalAmount / f.totalQty).toFixed(2) : "0.00";
     drawUnderlinedField("RATE (Rs):", avgRate, 110, 65, 190);
 
-    // Table Data Resolution
     const dateObjects = [];
     for (let d = currentCycle.start; d <= currentCycle.end; d++) {
       dateObjects.push(new Date(year, month - 1, d));
@@ -163,10 +174,23 @@ export default function FarmerBillsPage() {
     const rows = dateObjects.map(dateObj => {
       const dateStr = format(dateObj, 'yyyy-MM-dd');
       const dayEntries = allEntries!.filter(e => e.farmerId === f.id && e.date === dateStr);
-      const mQty = dayEntries.find(e => e.session === 'Morning')?.quantity || 0;
-      const eQty = dayEntries.find(e => e.session === 'Evening')?.quantity || 0;
+      
+      const mKg = dayEntries.find(e => e.session === 'Morning')?.kgWeight || 0;
+      const eKg = dayEntries.find(e => e.session === 'Evening')?.kgWeight || 0;
+      
+      const mQty = Number(mKg) * CONVERSION_RATE;
+      const eQty = Number(eKg) * CONVERSION_RATE;
       const tQty = mQty + eQty;
-      const rate = dayEntries[0]?.rate || 0;
+
+      let rate = 0;
+      if (f.milkType === 'BUFFALO') {
+        rate = Number(farmerProfile?.customRate) > 0 
+          ? Number(farmerProfile?.customRate) 
+          : (Number(ratesConfig?.buffaloRate) || 0);
+      } else {
+        rate = Number(ratesConfig?.cowRate) || 0;
+      }
+
       const amt = tQty * rate;
 
       return [
@@ -192,15 +216,13 @@ export default function FarmerBillsPage() {
 
     const finalY = (pdf as any).lastAutoTable.finalY;
     
-    // Totals
     pdf.setFont("helvetica", "bold");
     pdf.line(20, finalY, 190, finalY);
     pdf.text("TOTAL", 25, finalY + 7);
-    pdf.text(f.totalQty.toFixed(2), 125, finalY + 7, { align: 'center' });
+    pdf.text(f.totalQty.toFixed(2), 115, finalY + 7, { align: 'center' });
     pdf.text(f.totalAmount.toFixed(2), 178, finalY + 7, { align: 'center' });
     pdf.line(20, finalY + 11, 190, finalY + 11);
 
-    // Signature
     const pageHeight = pdf.internal.pageSize.getHeight();
     pdf.text("AUTHORIZED SIGNATURE", 190, pageHeight - 15, { align: 'right' });
     pdf.line(140, pageHeight - 17, 190, pageHeight - 17);

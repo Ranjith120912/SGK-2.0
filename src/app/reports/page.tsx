@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -49,7 +50,6 @@ export default function ReportsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [selectedMonth, setSelectedMonth] = useState<string>("");
-  const [selectedDailyDate, setSelectedDailyDate] = useState<string>("");
   const [activeCycle, setActiveCycle] = useState<number>(0);
   const [activeTab, setActiveTab] = useState<string>("overview");
   const [isClient, setIsClient] = useState(false);
@@ -59,7 +59,6 @@ export default function ReportsPage() {
     setIsClient(true);
     const now = new Date();
     setSelectedMonth(format(now, 'yyyy-MM'));
-    setSelectedDailyDate(format(now, 'yyyy-MM-dd'));
   }, []);
 
   const monthOptions = useMemo(() => {
@@ -108,11 +107,12 @@ export default function ReportsPage() {
   const { data: allSales } = useCollection(salesQuery);
   const { data: ratesConfig } = useDoc(settingsRef);
 
+  const CONVERSION_RATE = 0.96;
+
   const currentCycle = cycles[activeCycle];
 
-  // Precision Identity Engine: Strictly joins collection data to Farmer Directory names
   const masterRoster = useMemo(() => {
-    if (!allEntries || !selectedMonth || !currentCycle || !farmers) return [];
+    if (!allEntries || !selectedMonth || !currentCycle || !farmers || !ratesConfig) return [];
     
     const map: Record<string, any> = {};
     const cycleEntries = allEntries.filter(e => {
@@ -125,7 +125,6 @@ export default function ReportsPage() {
       const fid = e.farmerId;
       const farmerProfile = farmers.find(f => f.id === fid);
       
-      // Skip records for farmers not in the management directory to ensure 100% accuracy
       if (!farmerProfile) return;
 
       if (!map[fid]) {
@@ -138,8 +137,19 @@ export default function ReportsPage() {
         };
       }
 
-      const ltr = Number(e.quantity) || 0;
-      const amt = Number(e.totalAmount) || 0;
+      const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
+      
+      // Buffalo Milk Rate Resolution
+      let rate = 0;
+      if (map[fid].milkType === 'BUFFALO') {
+        rate = Number(farmerProfile.customRate) > 0 
+          ? Number(farmerProfile.customRate) 
+          : (Number(ratesConfig.buffaloRate) || 0);
+      } else {
+        rate = Number(ratesConfig.cowRate) || 0;
+      }
+
+      const amt = ltr * rate;
 
       if (e.session === 'Morning') map[fid].morningQty += ltr;
       else map[fid].eveningQty += ltr;
@@ -154,7 +164,7 @@ export default function ReportsPage() {
       if (isNaN(aNum) || isNaN(bNum)) return a.can.localeCompare(b.can);
       return aNum - bNum;
     });
-  }, [allEntries, farmers, selectedMonth, currentCycle]);
+  }, [allEntries, farmers, selectedMonth, activeCycle, ratesConfig]);
 
   const cycleStats = useMemo(() => {
     const totalProcAmt = masterRoster.reduce((acc, c) => acc + c.totalAmount, 0);
@@ -354,8 +364,15 @@ export default function ReportsPage() {
                        mEntries.forEach(e => {
                          const f = farmers?.find(item => item.id === e.farmerId);
                          if (f) {
-                           tCost += Number(e.totalAmount) || 0;
-                           tQty += Number(e.quantity) || 0;
+                           const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
+                           let rate = 0;
+                           if (f.milkType === 'BUFFALO') {
+                             rate = Number(f.customRate) > 0 ? Number(f.customRate) : (Number(ratesConfig?.buffaloRate) || 0);
+                           } else {
+                             rate = Number(ratesConfig?.cowRate) || 0;
+                           }
+                           tCost += (ltr * rate);
+                           tQty += ltr;
                          }
                        });
                        mSales.forEach(s => {

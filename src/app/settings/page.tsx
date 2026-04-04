@@ -54,7 +54,7 @@ export default function SettingsPage() {
     buffaloRate: "", 
     cowSellingRate: "",
     buffaloSellingRate: "",
-    kgToLitreRate: "0.97"
+    kgToLitreRate: "0.96"
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
@@ -94,7 +94,7 @@ export default function SettingsPage() {
         buffaloRate: currentSettings.buffaloRate?.toString() || "",
         cowSellingRate: currentSettings.cowSellingRate?.toString() || "",
         buffaloSellingRate: currentSettings.buffaloSellingRate?.toString() || "",
-        kgToLitreRate: currentSettings.kgToLitreRate?.toString() || "0.97"
+        kgToLitreRate: currentSettings.kgToLitreRate?.toString() || "0.96"
       });
     }
   }, [currentSettings]);
@@ -117,7 +117,7 @@ export default function SettingsPage() {
       buffaloRate: parseFloat(config.buffaloRate) || 0,
       cowSellingRate: parseFloat(config.cowSellingRate) || 0,
       buffaloSellingRate: parseFloat(config.buffaloSellingRate) || 0,
-      kgToLitreRate: parseFloat(config.kgToLitreRate) || 0.97,
+      kgToLitreRate: parseFloat(config.kgToLitreRate) || 0.96,
       updatedAt: serverTimestamp()
     }, { merge: true });
     setTimeout(() => {
@@ -130,10 +130,6 @@ export default function SettingsPage() {
     if (!firestore) return;
     setIsResetting(true);
     
-    const entryCount = allEntries?.length || 0;
-    const saleCount = allSales?.length || 0;
-    const farmerCount = allFarmers?.length || 0;
-
     allEntries?.forEach(e => deleteDocumentNonBlocking(doc(firestore, 'entries', e.id)));
     allSales?.forEach(s => deleteDocumentNonBlocking(doc(firestore, 'sales', s.id)));
     allFarmers?.forEach(f => deleteDocumentNonBlocking(doc(firestore, 'farmers', f.id)));

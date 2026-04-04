@@ -54,8 +54,8 @@ export default function EntriesPage() {
   const { data: entries } = useCollection(entriesQuery);
   const { data: ratesConfig } = useDoc(settingsRef);
 
-  // Conversion factor (1 kg = 0.97 Litre as per requirement)
-  const conversionRate = Number(ratesConfig?.kgToLitreRate) || 0.97;
+  // Conversion factor (Default to 0.96 as per requirement)
+  const conversionRate = Number(ratesConfig?.kgToLitreRate) || 0.96;
 
   const filteredFarmers = farmers?.filter(f => 
     f.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -78,7 +78,7 @@ export default function EntriesPage() {
     if (!farmer || !firestore) return;
 
     const existingEntry = entries?.find(e => e.farmerId === farmerId);
-    const kgValue = kgStr !== undefined ? parseFloat(kgStr) : (existingEntry ? Number(existingEntry.kgWeight) : 0);
+    const kgValue = kgStr !== undefined && kgStr !== "" ? parseFloat(kgStr) : (existingEntry ? Number(existingEntry.kgWeight) : 0);
     
     // Rate Prioritization Logic
     let managedRate = 0;
@@ -138,7 +138,7 @@ export default function EntriesPage() {
           <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
             <div>
               <h1 className="text-3xl font-black text-primary tracking-tight">Daily Collection</h1>
-              <p className="text-muted-foreground">Auto-saving entries for {format(new Date(date), 'MMMM dd, yyyy')}</p>
+              <p className="text-muted-foreground font-medium">Auto-saving entries for {format(new Date(date), 'MMMM dd, yyyy')}</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
               <div className="flex items-center gap-2 bg-card p-1 rounded-full border shadow-sm">
@@ -287,7 +287,7 @@ export default function EntriesPage() {
               </TableBody>
             </Table>
             <div className="p-4 bg-muted/20 text-center text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] border-t">
-              Buffalo pricing prioritizes profile-specific custom rates set in Farmer Management.
+              System using standard conversion: 1 Kg = {conversionRate} Litres.
             </div>
           </Card>
         </div>

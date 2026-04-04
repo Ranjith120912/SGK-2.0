@@ -97,16 +97,14 @@ export default function ReportsPage() {
 
   const currentCycle = cycles[activeCycle];
 
-  // Standard Conversion Factor (Strictly 0.96 as requested)
+  // Global Conversion Standard (Strictly 0.96)
   const conversionRate = Number(ratesConfig?.kgToLitreRate) || 0.96;
 
   /**
-   * Unified Financial & Volume Resolution Engine
-   * Derives all numbers from the base weight (Kg) to ensure 100% accuracy and synchronization.
+   * Unified Financial Resolution Engine
    */
   const resolveEntryFinancials = (entry: any, farmersList: any[], config: any) => {
     const kg = Number(entry.kgWeight) || 0;
-    // Strictly recalculate volume from weight using current settings
     const qtyLitre = parseFloat((kg * conversionRate).toFixed(2));
     
     const farmer = farmersList?.find(f => f.id === entry.farmerId);
@@ -128,6 +126,20 @@ export default function ReportsPage() {
     return { qtyLitre, cost, resolvedRate };
   };
 
+  const resolveSaleFinancials = (sale: any, config: any) => {
+    const qty = Number(sale.quantity) || 0;
+    let rate = Number(sale.rate);
+    
+    if (!rate || rate === 0) {
+      rate = sale.milkType === 'BUFFALO' 
+        ? (Number(config?.buffaloSellingRate) || 0) 
+        : (Number(config?.cowSellingRate) || 0);
+    }
+    
+    const revenue = parseFloat((qty * rate).toFixed(2));
+    return { qty, revenue, rate };
+  };
+
   const filteredCycleEntries = useMemo(() => {
     if (!allEntries || !selectedMonth || !currentCycle) return [];
     return allEntries.filter(entry => {
@@ -146,9 +158,6 @@ export default function ReportsPage() {
     });
   }, [allSales, selectedMonth, currentCycle]);
 
-  /**
-   * Master Roster Calculation (Primary Source of Truth)
-   */
   const masterRoster = useMemo(() => {
     if (!farmers || !currentCycle || !ratesConfig) return [];
     return farmers.map(farmer => {
@@ -182,28 +191,28 @@ export default function ReportsPage() {
   const cowRoster = masterRoster.filter(f => f.milkType === 'COW' || !f.milkType);
   const buffaloRoster = masterRoster.filter(f => f.milkType === 'BUFFALO');
 
-  // Grand Totals derived directly from the roster to guarantee absolute synchronization
   const grandTotalAmt = parseFloat(masterRoster.reduce((acc, curr) => acc + curr.totalAmount, 0).toFixed(2));
   const grandTotalQty = parseFloat(masterRoster.reduce((acc, curr) => acc + curr.totalQty, 0).toFixed(2));
 
-  /**
-   * Cycle Stats (Perfectly synchronized with Master Roster)
-   */
   const cycleStats = useMemo(() => {
-    const totalSaleAmt = filteredCycleSales.reduce((acc, curr) => acc + parseFloat((Number(curr.totalAmount) || 0).toFixed(2)), 0);
+    let totalSaleAmt = 0;
+    let totalSaleQty = 0;
+
+    filteredCycleSales.forEach(sale => {
+      const { revenue, qty } = resolveSaleFinancials(sale, ratesConfig);
+      totalSaleAmt += revenue;
+      totalSaleQty += qty;
+    });
 
     return {
       totalEntryQty: grandTotalQty,
-      totalSaleQty: filteredCycleSales.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0),
+      totalSaleQty: parseFloat(totalSaleQty.toFixed(2)),
       totalEntryAmt: grandTotalAmt,
-      totalSaleAmt,
+      totalSaleAmt: parseFloat(totalSaleAmt.toFixed(2)),
       profit: parseFloat((totalSaleAmt - grandTotalAmt).toFixed(2))
     };
-  }, [grandTotalQty, grandTotalAmt, filteredCycleSales]);
+  }, [grandTotalQty, grandTotalAmt, filteredCycleSales, ratesConfig]);
 
-  /**
-   * Monthly Stats (Unified Aggregation)
-   */
   const monthStats = useMemo(() => {
     if (!allEntries || !allSales || !selectedMonth || !farmers || !ratesConfig) return {
       totalEntryQty: 0,
@@ -218,6 +227,8 @@ export default function ReportsPage() {
 
     let totalEntryQty = 0;
     let totalEntryAmt = 0;
+    let totalSaleQty = 0;
+    let totalSaleAmt = 0;
 
     mEntries.forEach(entry => {
       const { qtyLitre, cost } = resolveEntryFinancials(entry, farmers, ratesConfig);
@@ -225,30 +236,26 @@ export default function ReportsPage() {
       totalEntryAmt += cost;
     });
 
-    const totalSaleAmt = mSales.reduce((acc, curr) => acc + parseFloat((Number(curr.totalAmount) || 0).toFixed(2)), 0);
+    mSales.forEach(sale => {
+      const { revenue, qty } = resolveSaleFinancials(sale, ratesConfig);
+      totalSaleAmt += revenue;
+      totalSaleQty += qty;
+    });
 
     return {
       totalEntryQty: parseFloat(totalEntryQty.toFixed(2)),
-      totalSaleQty: mSales.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0),
+      totalSaleQty: parseFloat(totalSaleQty.toFixed(2)),
       totalEntryAmt: parseFloat(totalEntryAmt.toFixed(2)),
       totalSaleAmt: parseFloat(totalSaleAmt.toFixed(2)),
       profit: parseFloat((totalSaleAmt - totalEntryAmt).toFixed(2))
     };
   }, [allEntries, allSales, selectedMonth, farmers, ratesConfig, conversionRate]);
 
-  /**
-   * Monthly Audit Summary (Synchronized Fiscal Year)
-   * Calculates April - March based on the year of the selectedMonth.
-   */
   const monthlyAuditSummary = useMemo(() => {
     if (!allEntries || !allSales || !isClient || !farmers || !ratesConfig || !selectedMonth) return [];
     
     const [yearPart] = selectedMonth.split('-').map(Number);
-    const selectedDate = new Date(yearPart, 0, 1);
     const monthOfSelection = parseInt(selectedMonth.split('-')[1]);
-    
-    // Fiscal Year starts April (Month index 3)
-    // If monthOfSelection is Jan, Feb, Mar (1, 2, 3), fiscal start is prev year
     const fiscalYearStart = monthOfSelection <= 3 ? yearPart - 1 : yearPart;
     
     return Array.from({ length: 12 }).map((_, i) => {
@@ -263,6 +270,7 @@ export default function ReportsPage() {
       
       let collectionL = 0;
       let cost = 0;
+      let revenue = 0;
 
       mEntries.forEach(entry => {
         const res = resolveEntryFinancials(entry, farmers, ratesConfig);
@@ -270,7 +278,10 @@ export default function ReportsPage() {
         cost += res.cost;
       });
 
-      const revenue = mSales.reduce((acc, curr) => acc + parseFloat((Number(curr.totalAmount) || 0).toFixed(2)), 0);
+      mSales.forEach(sale => {
+        const res = resolveSaleFinancials(sale, ratesConfig);
+        revenue += res.revenue;
+      });
       
       return { 
         monthName, 

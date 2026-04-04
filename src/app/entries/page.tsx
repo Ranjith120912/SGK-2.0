@@ -101,8 +101,11 @@ export default function EntriesPage() {
     const entryId = `${farmerId}_${date}_${session}`;
     const docRef = doc(firestore, 'entries', entryId);
 
+    // Save with metadata persistence (Denormalization for historical accuracy)
     setDocumentNonBlocking(docRef, {
       farmerId,
+      farmerName: farmer.name,
+      canNumber: farmer.canNumber,
       date,
       session,
       kgWeight: kgValue,

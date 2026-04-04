@@ -44,6 +44,14 @@
         "farmerId": {
           "type": "string"
         },
+        "farmerName": {
+          "type": "string",
+          "description": "Persisted name at time of entry"
+        },
+        "canNumber": {
+          "type": "string",
+          "description": "Persisted CAN at time of entry"
+        },
         "date": {
           "type": "string",
           "format": "date"

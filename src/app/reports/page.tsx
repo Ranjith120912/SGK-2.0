@@ -111,17 +111,26 @@ export default function ReportsPage() {
   /**
    * UNIFIED FINANCIAL RESOLUTION ENGINE
    * Strictly 0.96 Conversion Standard
+   * Uses historical persistence fields if available.
    */
   const resolveEntryFinancials = (entry: any, farmersList: any[], config: any) => {
     const kg = Number(entry.kgWeight) || 0;
     const quantity = Number(entry.quantity) || parseFloat((kg * 0.96).toFixed(2));
     
-    const farmer = farmersList?.find(f => f.id === entry.farmerId);
+    // Identity Persistence Lookup
+    // Priority 1: Saved in transaction (historical accuracy)
+    // Priority 2: Directory lookup (live data)
+    // Priority 3: Fallback (placeholder)
+    const farmerDirectoryInfo = farmersList?.find(f => f.id === entry.farmerId);
+    const farmerName = entry.farmerName || farmerDirectoryInfo?.name || "Deleted Supplier";
+    const canNumber = entry.canNumber || farmerDirectoryInfo?.canNumber || "???";
+
     let rate = Number(entry.rate) || 0;
     
-    if (rate === 0 && farmer) {
-      if (farmer.milkType === 'BUFFALO') {
-        rate = Number(farmer.customRate) > 0 ? Number(farmer.customRate) : (Number(config?.buffaloRate) || 0);
+    // If rate is 0 in entry, try to infer it from live config (should be rare with new persistence)
+    if (rate === 0 && farmerDirectoryInfo) {
+      if (farmerDirectoryInfo.milkType === 'BUFFALO') {
+        rate = Number(farmerDirectoryInfo.customRate) > 0 ? Number(farmerDirectoryInfo.customRate) : (Number(config?.buffaloRate) || 0);
       } else {
         rate = Number(config?.cowRate) || 0;
       }
@@ -134,8 +143,8 @@ export default function ReportsPage() {
       qtyLitre: parseFloat(quantity.toFixed(2)), 
       cost: parseFloat(amount.toFixed(2)), 
       appliedRate: rate,
-      farmerName: farmer?.name || "Unknown",
-      canNumber: farmer?.canNumber || "???",
+      farmerName: farmerName,
+      canNumber: canNumber,
       session: entry.session || "Morning"
     };
   };
@@ -165,7 +174,6 @@ export default function ReportsPage() {
       return { procurement: [], sales: [], totalProc: 0, totalSale: 0 };
     }
 
-    // Grouping Procurement by Farmer (Horizontal AM/PM)
     const procMap: Record<string, any> = {};
     const filteredEntries = allEntries.filter(e => e.date === selectedDailyDate);
     
@@ -229,21 +237,18 @@ export default function ReportsPage() {
     const farmerMap: Record<string, any> = {};
 
     cycleEntries.forEach(entry => {
+      const res = resolveEntryFinancials(entry, farmers, ratesConfig);
       const fId = entry.farmerId;
+      
       if (!farmerMap[fId]) {
-        const info = farmers.find(f => f.id === fId);
         farmerMap[fId] = {
           id: fId,
-          name: info?.name || "Deleted Supplier",
-          canNumber: info?.canNumber || "???",
-          bankAccountNumber: info?.bankAccountNumber || "",
-          milkType: info?.milkType || "COW",
-          customRate: info?.customRate || 0,
+          name: res.farmerName,
+          canNumber: res.canNumber,
           morningQty: 0, eveningQty: 0, totalQty: 0, totalAmount: 0
         };
       }
 
-      const res = resolveEntryFinancials(entry, farmers, ratesConfig);
       if (entry.session === 'Morning') farmerMap[fId].morningQty += res.qtyLitre;
       else farmerMap[fId].eveningQty += res.qtyLitre;
       farmerMap[fId].totalAmount += res.cost;
@@ -305,7 +310,6 @@ export default function ReportsPage() {
     pdf.setFontSize(10);
     pdf.text(`REPORT DATE: ${dateStr}`, 148, 35, { align: 'center' });
 
-    // Procurement Section
     pdf.setFontSize(11);
     pdf.text("I. PROCUREMENT SUMMARY (HORIZONTAL AM/PM)", 14, 45);
     const procRows = dailyData.procurement.map((p: any) => [
@@ -331,7 +335,6 @@ export default function ReportsPage() {
 
     let nextY = (pdf as any).lastAutoTable.finalY + 15;
 
-    // Sales Section
     pdf.setFontSize(11);
     pdf.text("II. DISTRIBUTION / SALES SUMMARY", 14, nextY);
     const saleRows = dailyData.sales.map(s => [
@@ -354,7 +357,6 @@ export default function ReportsPage() {
 
     nextY = (pdf as any).lastAutoTable.finalY + 15;
 
-    // Final Summary Box
     if (nextY > 150) { pdf.addPage(); nextY = 20; }
     pdf.setDrawColor(200);
     pdf.rect(14, nextY, 270, 35);
@@ -419,7 +421,9 @@ export default function ReportsPage() {
     pdf.setFont("helvetica", "normal");
     pdf.text("A/C NO:", labelX1, y);
     pdf.setFont("helvetica", "bold");
-    pdf.text(f.bankAccountNumber || "—", valueX1, y);
+    // Look up live bank details if possible
+    const farmerInfo = farmers?.find(item => item.id === f.id);
+    pdf.text(farmerInfo?.bankAccountNumber || "—", valueX1, y);
     pdf.line(valueX1, y+1, valueX1 + lineW, y+1);
 
     pdf.setFont("helvetica", "normal");
@@ -438,7 +442,7 @@ export default function ReportsPage() {
     pdf.setFont("helvetica", "normal");
     pdf.text("RATE (Rs):", labelX2, y);
     pdf.setFont("helvetica", "bold");
-    const effectiveRate = f.customRate > 0 ? f.customRate : (f.milkType === 'BUFFALO' ? ratesConfig?.buffaloRate : ratesConfig?.cowRate);
+    const effectiveRate = farmerInfo?.customRate > 0 ? farmerInfo.customRate : (farmerInfo?.milkType === 'BUFFALO' ? ratesConfig?.buffaloRate : ratesConfig?.cowRate);
     pdf.text(Number(effectiveRate || 0).toFixed(2), valueX2, y);
     pdf.line(valueX2, y+1, valueX2 + lineW, y+1);
 
@@ -611,45 +615,6 @@ export default function ReportsPage() {
                             <TableCell className="text-center border-r font-bold text-blue-600">{p.pmLtr > 0 ? p.pmLtr.toFixed(2) : "—"}</TableCell>
                             <TableCell className="text-center border-r font-black text-primary">{p.totalLtr.toFixed(2)}</TableCell>
                             <TableCell className="text-right font-mono font-bold pr-6 text-primary">₹ {p.totalAmt.toFixed(2)}</TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </Card>
-
-                <Card className="rounded-3xl border-none shadow-xl overflow-hidden">
-                  <div className="p-6 bg-accent/5 border-b flex items-center justify-between">
-                    <h3 className="font-black text-accent uppercase text-xs tracking-widest flex items-center gap-2">
-                      <ShoppingCart className="w-4 h-4" /> Daily Distribution (Sales)
-                    </h3>
-                    <Badge variant="secondary" className="rounded-full font-black">Rs. {dailyData.totalSale.toFixed(2)}</Badge>
-                  </div>
-                  <Table>
-                    <TableHeader className="bg-muted/50">
-                      <TableRow>
-                        <TableHead className="font-black text-[10px] uppercase">Buyer Name</TableHead>
-                        <TableHead className="font-black text-[10px] uppercase text-center">Session</TableHead>
-                        <TableHead className="font-black text-[10px] uppercase text-center">Milk Type</TableHead>
-                        <TableHead className="text-right font-black text-[10px] uppercase">Litre</TableHead>
-                        <TableHead className="text-right font-black text-[10px] uppercase">Rate (Rs)</TableHead>
-                        <TableHead className="text-right font-black text-[10px] uppercase pr-6">Amount (Rs)</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {dailyData.sales.length === 0 ? (
-                        <TableRow><TableCell colSpan={6} className="text-center py-10 text-muted-foreground italic">No sales recorded.</TableCell></TableRow>
-                      ) : (
-                        dailyData.sales.map((s, i) => (
-                          <TableRow key={i} className="hover:bg-accent/5 transition-colors">
-                            <TableCell className="font-bold uppercase text-xs">{s.buyerName}</TableCell>
-                            <TableCell className="text-center">
-                              {s.session === 'Morning' ? <Badge className="bg-orange-500 text-white border-none rounded-full h-5 text-[8px]">Morning</Badge> : <Badge className="bg-blue-500 text-white border-none rounded-full h-5 text-[8px]">Evening</Badge>}
-                            </TableCell>
-                            <TableCell className="text-center"><Badge variant="outline" className="text-[9px] font-black rounded-full h-5">{s.milkType}</Badge></TableCell>
-                            <TableCell className="text-right font-black">{s.qty.toFixed(2)}</TableCell>
-                            <TableCell className="text-right font-mono text-xs">₹ {s.appliedRate.toFixed(2)}</TableCell>
-                            <TableCell className="text-right font-mono font-bold pr-6 text-accent">₹ {s.cost.toFixed(2)}</TableCell>
                           </TableRow>
                         ))
                       )}

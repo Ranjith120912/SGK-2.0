@@ -13,7 +13,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { format } from "date-fns";
-import { Sun, Moon, Search, Scale, Droplets, CheckCircle2, Loader2, IndianRupee } from "lucide-react";
+import { Sun, Moon, Search, Scale, Droplets, CheckCircle2, Loader2, IndianRupee, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +25,6 @@ export default function EntriesPage() {
   const [session, setSession] = useState<'Morning' | 'Evening'>('Morning');
   const [searchTerm, setSearchTerm] = useState("");
   const [kgValues, setKgValues] = useState<Record<string, string>>({});
-  const [rateValues, setRateValues] = useState<Record<string, string>>({});
   const [savingStatus, setSavingStatus] = useState<Record<string, 'idle' | 'saving' | 'saved'>>({});
 
   useEffect(() => {
@@ -73,11 +72,6 @@ export default function EntriesPage() {
     setSavingStatus(prev => ({ ...prev, [farmerId]: 'idle' }));
   };
 
-  const handleRateChange = (farmerId: string, value: string) => {
-    setRateValues(prev => ({ ...prev, [farmerId]: value }));
-    setSavingStatus(prev => ({ ...prev, [farmerId]: 'idle' }));
-  };
-
   const handleAutoSave = (farmerId: string) => {
     const kgStr = kgValues[farmerId];
     const farmer = farmers?.find(f => f.id === farmerId);
@@ -88,20 +82,17 @@ export default function EntriesPage() {
     // Determine the value to save: current input or existing value
     const kgValue = kgStr !== undefined ? parseFloat(kgStr) : (existingEntry ? existingEntry.kgWeight : 0);
     
-    // Determine the rate to save: current input override, or farmer specific, or setting default
-    const manualRate = rateValues[farmerId];
-    const defaultRate = farmer.milkType === 'BUFFALO' 
+    // Rate is managed centrally (Farmer Management for Buffalo, or Global Settings)
+    const managedRate = farmer.milkType === 'BUFFALO' 
       ? (farmer.customRate || ratesConfig?.buffaloRate || 0) 
       : (ratesConfig?.cowRate || 0);
-    
-    const finalRate = manualRate !== undefined && manualRate !== "" ? parseFloat(manualRate) : (existingEntry ? existingEntry.rate : defaultRate);
 
-    if (isNaN(kgValue) || kgValue < 0 || isNaN(finalRate)) return;
+    if (isNaN(kgValue) || kgValue < 0) return;
 
     setSavingStatus(prev => ({ ...prev, [farmerId]: 'saving' }));
 
     const quantityLitre = kgValue * conversionRate;
-    const totalAmount = quantityLitre * finalRate;
+    const totalAmount = quantityLitre * managedRate;
 
     const entryId = `${farmerId}_${date}_${session}`;
     const docRef = doc(firestore, 'entries', entryId);
@@ -113,9 +104,7 @@ export default function EntriesPage() {
       kgWeight: kgValue,
       quantity: quantityLitre,
       conversionRate: conversionRate,
-      fat: 0,
-      snf: 0,
-      rate: finalRate,
+      rate: managedRate,
       totalAmount: totalAmount,
       updatedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
@@ -203,8 +192,8 @@ export default function EntriesPage() {
                   <TableHead className="w-[80px] font-bold py-4 pl-6">CAN</TableHead>
                   <TableHead className="font-bold">Farmer Details</TableHead>
                   <TableHead className="w-[120px] font-bold">Calculation</TableHead>
-                  <TableHead className="w-[150px] font-bold">Entry (Kg)</TableHead>
-                  <TableHead className="w-[120px] font-bold">Rate (₹/L)</TableHead>
+                  <TableHead className="w-[180px] font-bold">Entry (Kg)</TableHead>
+                  <TableHead className="w-[150px] font-bold">Rate (₹/L)</TableHead>
                   <TableHead className="w-[120px] font-bold">Amount (₹)</TableHead>
                   <TableHead className="w-[80px] text-right pr-6 font-bold">Status</TableHead>
                 </TableRow>
@@ -219,16 +208,12 @@ export default function EntriesPage() {
                   const kgNum = parseFloat(currentKgStr);
                   const previewLitre = !isNaN(kgNum) ? (kgNum * conversionRate).toFixed(2) : "0.00";
                   
-                  const defaultRate = farmer.milkType === 'BUFFALO' 
+                  // Rate is managed in Farmer Management or Global Settings
+                  const managedRate = farmer.milkType === 'BUFFALO' 
                     ? (farmer.customRate || ratesConfig?.buffaloRate || 0) 
                     : (ratesConfig?.cowRate || 0);
                   
-                  const currentRateStr = rateValues[farmer.id] !== undefined
-                    ? rateValues[farmer.id]
-                    : (existingEntry ? existingEntry.rate.toString() : defaultRate.toString());
-                  
-                  const currentRateNum = parseFloat(currentRateStr) || 0;
-                  const previewAmount = !isNaN(kgNum) ? (parseFloat(previewLitre) * currentRateNum).toFixed(2) : "0.00";
+                  const previewAmount = !isNaN(kgNum) ? (parseFloat(previewLitre) * managedRate).toFixed(2) : "0.00";
                   
                   const status = savingStatus[farmer.id] || (existingEntry ? 'saved' : 'idle');
 
@@ -266,20 +251,12 @@ export default function EntriesPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="relative">
-                          <Input 
-                            type="number" 
-                            placeholder={defaultRate.toString()}
-                            step="0.1"
-                            className={cn(
-                              "h-11 rounded-xl pr-6 font-medium text-sm border-primary/10 focus:border-primary",
-                              farmer.milkType === 'BUFFALO' && farmer.customRate && "border-accent/40 bg-accent/5 text-accent font-black"
-                            )}
-                            value={currentRateStr}
-                            onChange={(e) => handleRateChange(farmer.id, e.target.value)}
-                            onBlur={() => handleAutoSave(farmer.id)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAutoSave(farmer.id)}
-                          />
+                        <div className={cn(
+                          "h-11 flex items-center justify-between px-4 rounded-xl border border-transparent font-bold text-sm bg-muted/30 text-muted-foreground",
+                          farmer.milkType === 'BUFFALO' && farmer.customRate && "bg-accent/5 text-accent border-accent/20"
+                        )}>
+                          <span>₹ {managedRate.toFixed(2)}</span>
+                          <Lock className="w-3 h-3 opacity-30" />
                           {farmer.milkType === 'BUFFALO' && farmer.customRate && (
                             <div className="absolute -top-3 left-2 bg-accent text-[8px] font-black text-white px-1.5 rounded-full uppercase tracking-widest">Fixed</div>
                           )}
@@ -302,7 +279,7 @@ export default function EntriesPage() {
               </TableBody>
             </Table>
             <div className="p-4 bg-muted/20 text-center text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] border-t">
-              Buffalo milk rates and weights are editable per entry. System prioritizes farmer-specific fixed rates.
+              Milk rates are managed in Settings and Farmer Management. Rates are locked here to ensure procurement accuracy.
             </div>
           </Card>
         </div>

@@ -4,9 +4,9 @@
 import { useState, useEffect, useRef } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import { useDoc, useMemoFirebase, useFirestore, useCollection } from "@/firebase";
-import { doc, serverTimestamp, collection } from "firebase/firestore";
-import { setDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { useDoc, useMemoFirebase, useFirestore } from "@/firebase";
+import { doc, serverTimestamp } from "firebase/firestore";
+import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,24 +19,11 @@ import {
   Upload, 
   X, 
   Scale,
-  RefreshCcw,
-  DatabaseZap,
-  AlertTriangle,
   Loader2,
-  ShoppingBag
+  ShoppingBag,
+  Save
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 
 export default function SettingsPage() {
   const firestore = useFirestore();
@@ -53,7 +40,6 @@ export default function SettingsPage() {
     buffaloSellingRate: ""
   });
   const [isSaving, setIsSaving] = useState(false);
-  const [isResetting, setIsResetting] = useState(false);
 
   const settingsRef = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -179,7 +165,7 @@ export default function SettingsPage() {
 
             <div className="flex justify-end pt-4">
               <Button onClick={handleSave} disabled={isSaving} className="rounded-full px-12 h-14 font-black uppercase tracking-widest shadow-xl">
-                {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />} Apply Configuration
+                {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-4 w-4" />} Apply Configuration
               </Button>
             </div>
           </div>

@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { useCollection, useDoc, useMemoFirebase, useFirestore } from "@/firebase";
-import { collection, doc } from "firebase/firestore";
+import { collection, doc, deleteDoc } from "firebase/firestore";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,7 +21,9 @@ import {
   FileSpreadsheet,
   Users,
   Milk,
-  FileDown
+  FileDown,
+  Trash2,
+  AlertTriangle
 } from "lucide-react";
 import { format, endOfMonth, subMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -31,14 +33,28 @@ import { Badge } from "@/components/ui/badge";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import { utils, writeFile } from "xlsx";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function ReportsPage() {
   const firestore = useFirestore();
+  const { toast } = useToast();
   const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [selectedDailyDate, setSelectedDailyDate] = useState<string>("");
   const [activeCycle, setActiveCycle] = useState<number>(0);
   const [activeTab, setActiveTab] = useState<string>("overview");
   const [isClient, setIsClient] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
@@ -313,6 +329,28 @@ export default function ReportsPage() {
     writeFile(wb, `Daily_Procurement_${selectedDailyDate}.xlsx`);
   };
 
+  const handleMasterReset = async () => {
+    if (!firestore) return;
+    setIsResetting(true);
+    try {
+      if (allEntries) {
+        for (const entry of allEntries) {
+          await deleteDoc(doc(firestore, 'entries', entry.id));
+        }
+      }
+      if (allSales) {
+        for (const sale of allSales) {
+          await deleteDoc(doc(firestore, 'sales', sale.id));
+        }
+      }
+      toast({ title: "Master Reset Successful", description: "All collection and sales records have been cleared." });
+    } catch (e: any) {
+      toast({ title: "Reset Failed", description: e.message, variant: "destructive" });
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   if (!isClient) return null;
 
   return (
@@ -556,7 +594,7 @@ export default function ReportsPage() {
               </div>
             </TabsContent>
 
-            <TabsContent value="audit" className="space-y-6">
+            <TabsContent value="audit" className="space-y-8">
               <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-2xl bg-card/50 backdrop-blur-sm">
                 <Table>
                   <TableHeader className="bg-muted/50">
@@ -597,6 +635,33 @@ export default function ReportsPage() {
                   </TableBody>
                 </Table>
               </Card>
+
+              <div className="pt-10 border-t">
+                <h3 className="text-xs font-black text-destructive uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" /> Dangerous Operations
+                </h3>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" className="rounded-full px-8 h-12 shadow-lg">
+                      <Trash2 className="w-4 h-4 mr-2" /> Master Data Reset
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="rounded-3xl">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="font-black text-destructive uppercase">Confirm Full Reset</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete ALL collection entries and sales records across all months. This action is irreversible and will result in total loss of historical audit data.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleMasterReset} className="rounded-full bg-destructive hover:bg-destructive/90">
+                        {isResetting ? <Loader2 className="animate-spin" /> : "Confirm Full Wipe"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             </TabsContent>
           </Tabs>
         </div>

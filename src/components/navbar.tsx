@@ -1,3 +1,4 @@
+
 import Link from "next/link";
 import { Droplets, ClipboardList, BarChart3, Settings, ShoppingCart, FileText, Users, FileBarChart, Contact } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -17,40 +18,37 @@ export function Navbar() {
           </Link>
           
           <div className="flex items-center gap-2 sm:gap-4">
-            <div className="hidden xl:flex items-center gap-6">
-              <Link href="/" className="text-sm font-bold text-muted-foreground hover:text-primary transition-colors">
-                Dashboard
-              </Link>
-              <Link href="/farmers" className="text-sm font-bold text-muted-foreground hover:text-primary transition-colors flex items-center gap-1.5">
-                <Users className="w-4 h-4" />
+            <div className="hidden lg:flex items-center gap-4">
+              <Link href="/farmers" className="text-[10px] font-black text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 uppercase tracking-widest">
+                <Users className="w-3 h-3" />
                 Farmers
               </Link>
-              <Link href="/buyers" className="text-sm font-bold text-muted-foreground hover:text-primary transition-colors flex items-center gap-1.5">
-                <Contact className="w-4 h-4" />
+              <Link href="/buyers" className="text-[10px] font-black text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 uppercase tracking-widest">
+                <Contact className="w-3 h-3" />
                 Buyers
               </Link>
-              <Link href="/entries" className="text-sm font-bold text-muted-foreground hover:text-primary transition-colors flex items-center gap-1.5">
-                <ClipboardList className="w-4 h-4" />
+              <Link href="/entries" className="text-[10px] font-black text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 uppercase tracking-widest">
+                <ClipboardList className="w-3 h-3" />
                 Collection
               </Link>
-              <Link href="/sales" className="text-sm font-bold text-muted-foreground hover:text-primary transition-colors flex items-center gap-1.5">
-                <ShoppingCart className="w-4 h-4" />
+              <Link href="/sales" className="text-[10px] font-black text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 uppercase tracking-widest">
+                <ShoppingCart className="w-3 h-3" />
                 Sales
               </Link>
-              <Link href="/daily-reports" className="text-sm font-bold text-muted-foreground hover:text-primary transition-colors flex items-center gap-1.5">
-                <FileBarChart className="w-4 h-4" />
-                Daily Reports
+              <Link href="/daily-reports" className="text-[10px] font-black text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 uppercase tracking-widest">
+                <FileBarChart className="w-3 h-3" />
+                Reports
               </Link>
-              <Link href="/farmer-bills" className="text-sm font-bold text-muted-foreground hover:text-primary transition-colors flex items-center gap-1.5">
-                <FileText className="w-4 h-4" />
-                Farmer Bills
+              <Link href="/farmer-bills" className="text-[10px] font-black text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 uppercase tracking-widest">
+                <FileText className="w-3 h-3" />
+                Bills
               </Link>
-              <Link href="/reports" className="text-sm font-bold text-muted-foreground hover:text-primary transition-colors flex items-center gap-1.5">
-                <BarChart3 className="w-4 h-4" />
+              <Link href="/reports" className="text-[10px] font-black text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 uppercase tracking-widest">
+                <BarChart3 className="w-3 h-3" />
                 Audit
               </Link>
-              <Link href="/settings" className="text-sm font-bold text-muted-foreground hover:text-primary transition-colors flex items-center gap-1.5">
-                <Settings className="w-4 h-4" />
+              <Link href="/settings" className="text-[10px] font-black text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 uppercase tracking-widest">
+                <Settings className="w-3 h-3" />
                 Settings
               </Link>
             </div>

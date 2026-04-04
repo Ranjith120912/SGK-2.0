@@ -95,7 +95,8 @@ export default function SalesPage() {
     if (isNaN(qty) || qty < 0 || isNaN(finalRate)) return;
 
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
-    const totalAmount = qty * finalRate;
+    // Precision locked total amount
+    const totalAmount = parseFloat((qty * finalRate).toFixed(2));
 
     const saleId = `${buyerId}_${date}_${session}_${milkType}`;
     const docRef = doc(firestore, 'sales', saleId);

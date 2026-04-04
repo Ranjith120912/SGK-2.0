@@ -36,6 +36,7 @@ export default function ReportsPage() {
   const firestore = useFirestore();
   const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [activeCycle, setActiveCycle] = useState<number>(0);
+  const [activeTab, setActiveTab] = useState<string>("overview");
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -96,12 +97,12 @@ export default function ReportsPage() {
 
   const currentCycle = cycles[activeCycle];
 
-  // Standard Conversion Factor (Synchronized with user configuration)
+  // Standard Conversion Factor (Strictly 0.96 as requested)
   const conversionRate = Number(ratesConfig?.kgToLitreRate) || 0.96;
 
   /**
    * Unified Financial & Volume Resolution Engine
-   * Derives all numbers from the base weight (Kg) to ensure 100% accuracy.
+   * Derives all numbers from the base weight (Kg) to ensure 100% accuracy and synchronization.
    */
   const resolveEntryFinancials = (entry: any, farmersList: any[], config: any) => {
     const kg = Number(entry.kgWeight) || 0;
@@ -181,7 +182,7 @@ export default function ReportsPage() {
   const cowRoster = masterRoster.filter(f => f.milkType === 'COW' || !f.milkType);
   const buffaloRoster = masterRoster.filter(f => f.milkType === 'BUFFALO');
 
-  // Grand Total derived from roster to guarantee synchronization
+  // Grand Totals derived directly from the roster to guarantee absolute synchronization
   const grandTotalAmt = parseFloat(masterRoster.reduce((acc, curr) => acc + curr.totalAmount, 0).toFixed(2));
   const grandTotalQty = parseFloat(masterRoster.reduce((acc, curr) => acc + curr.totalQty, 0).toFixed(2));
 
@@ -189,19 +190,19 @@ export default function ReportsPage() {
    * Cycle Stats (Perfectly synchronized with Master Roster)
    */
   const cycleStats = useMemo(() => {
-    const totalSaleAmt = filteredCycleSales.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
+    const totalSaleAmt = filteredCycleSales.reduce((acc, curr) => acc + parseFloat((Number(curr.totalAmount) || 0).toFixed(2)), 0);
 
     return {
       totalEntryQty: grandTotalQty,
       totalSaleQty: filteredCycleSales.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0),
       totalEntryAmt: grandTotalAmt,
       totalSaleAmt,
-      profit: totalSaleAmt - grandTotalAmt
+      profit: parseFloat((totalSaleAmt - grandTotalAmt).toFixed(2))
     };
   }, [grandTotalQty, grandTotalAmt, filteredCycleSales]);
 
   /**
-   * Monthly Stats (Aggregation pass using Unified Engine)
+   * Monthly Stats (Unified Aggregation)
    */
   const monthStats = useMemo(() => {
     if (!allEntries || !allSales || !selectedMonth || !farmers || !ratesConfig) return {
@@ -224,24 +225,31 @@ export default function ReportsPage() {
       totalEntryAmt += cost;
     });
 
-    const totalSaleAmt = mSales.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
+    const totalSaleAmt = mSales.reduce((acc, curr) => acc + parseFloat((Number(curr.totalAmount) || 0).toFixed(2)), 0);
 
     return {
       totalEntryQty: parseFloat(totalEntryQty.toFixed(2)),
       totalSaleQty: mSales.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0),
       totalEntryAmt: parseFloat(totalEntryAmt.toFixed(2)),
-      totalSaleAmt,
-      profit: totalSaleAmt - totalEntryAmt
+      totalSaleAmt: parseFloat(totalSaleAmt.toFixed(2)),
+      profit: parseFloat((totalSaleAmt - totalEntryAmt).toFixed(2))
     };
   }, [allEntries, allSales, selectedMonth, farmers, ratesConfig, conversionRate]);
 
+  /**
+   * Monthly Audit Summary (Synchronized Fiscal Year)
+   * Calculates April - March based on the year of the selectedMonth.
+   */
   const monthlyAuditSummary = useMemo(() => {
-    if (!allEntries || !allSales || !isClient || !farmers || !ratesConfig) return [];
+    if (!allEntries || !allSales || !isClient || !farmers || !ratesConfig || !selectedMonth) return [];
     
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-    const fiscalYearStart = currentMonth < 3 ? currentYear - 1 : currentYear;
+    const [yearPart] = selectedMonth.split('-').map(Number);
+    const selectedDate = new Date(yearPart, 0, 1);
+    const monthOfSelection = parseInt(selectedMonth.split('-')[1]);
+    
+    // Fiscal Year starts April (Month index 3)
+    // If monthOfSelection is Jan, Feb, Mar (1, 2, 3), fiscal start is prev year
+    const fiscalYearStart = monthOfSelection <= 3 ? yearPart - 1 : yearPart;
     
     return Array.from({ length: 12 }).map((_, i) => {
       const monthIdx = (3 + i) % 12; 
@@ -262,7 +270,7 @@ export default function ReportsPage() {
         cost += res.cost;
       });
 
-      const revenue = mSales.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
+      const revenue = mSales.reduce((acc, curr) => acc + parseFloat((Number(curr.totalAmount) || 0).toFixed(2)), 0);
       
       return { 
         monthName, 
@@ -272,7 +280,7 @@ export default function ReportsPage() {
         profit: parseFloat((revenue - cost).toFixed(2)) 
       };
     });
-  }, [allEntries, allSales, isClient, farmers, ratesConfig, conversionRate]);
+  }, [allEntries, allSales, isClient, farmers, ratesConfig, conversionRate, selectedMonth]);
 
   const activeInvoices = masterRoster.filter(f => f.totalQty > 0);
 
@@ -549,7 +557,7 @@ export default function ReportsPage() {
             </div>
           </header>
 
-          <Tabs defaultValue="overview" className="space-y-8">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
               <TabsList className="bg-muted p-1 rounded-full h-auto">
                 <TabsTrigger value="overview" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Overview</TabsTrigger>
@@ -558,20 +566,22 @@ export default function ReportsPage() {
                 <TabsTrigger value="audit" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Audit</TabsTrigger>
               </TabsList>
 
-              <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-full border">
-                {cycles.map((c, i) => (
-                  <button 
-                    key={i} 
-                    onClick={() => setActiveCycle(i)} 
-                    className={cn(
-                      "rounded-full text-[10px] font-black px-4 h-8 transition-all", 
-                      activeCycle === i ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:bg-muted"
-                    )}
-                  >
-                    {c.label}
-                  </button>
-                ))}
-              </div>
+              {activeTab !== "audit" && (
+                <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-full border animate-in fade-in zoom-in duration-300">
+                  {cycles.map((c, i) => (
+                    <button 
+                      key={i} 
+                      onClick={() => setActiveCycle(i)} 
+                      className={cn(
+                        "rounded-full text-[10px] font-black px-4 h-8 transition-all", 
+                        activeCycle === i ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:bg-muted"
+                      )}
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <TabsContent value="overview" className="animate-in fade-in duration-500 space-y-12">

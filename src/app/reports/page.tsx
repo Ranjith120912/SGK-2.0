@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -112,9 +113,10 @@ export default function ReportsPage() {
 
     cycleEntries.forEach(e => {
       const fid = e.farmerId;
-      const farmerProfile = farmers.find(f => f.id === fid);
+      // PRECISION IDENTITY RESOLUTION: Prioritize Directory
+      const farmerProfile = farmers.find(f => f.id === fid || f.canNumber === e.canNumber);
       
-      const name = farmerProfile?.name || e.farmerName || "Farmer";
+      const name = farmerProfile?.name || e.farmerName || "Unknown Farmer";
       const can = farmerProfile?.canNumber || e.canNumber || "---";
       const milkType = farmerProfile?.milkType || e.milkType || "COW";
 
@@ -352,7 +354,7 @@ export default function ReportsPage() {
                        
                        let tCost = 0, tRev = 0, tQty = 0;
                        mEntries.forEach(e => {
-                         const f = farmers?.find(item => item.id === e.farmerId);
+                         const f = farmers?.find(item => item.id === e.farmerId || item.canNumber === e.canNumber);
                          const milkType = f?.milkType || e.milkType || "COW";
                          const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
                          

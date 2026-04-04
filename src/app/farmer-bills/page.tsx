@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -89,9 +90,10 @@ export default function FarmerBillsPage() {
 
     cycleEntries.forEach(e => {
       const fid = e.farmerId;
-      const farmerProfile = farmers.find(f => f.id === fid);
+      // PRECISION IDENTITY RESOLUTION
+      const farmerProfile = farmers.find(f => f.id === fid || f.canNumber === e.canNumber);
       
-      const name = farmerProfile?.name || e.farmerName || "Farmer";
+      const name = farmerProfile?.name || e.farmerName || "Unknown Farmer";
       const can = farmerProfile?.canNumber || e.canNumber || "---";
       const milkType = farmerProfile?.milkType || e.milkType || "COW";
 
@@ -173,7 +175,7 @@ export default function FarmerBillsPage() {
 
     const rows = dateObjects.map(dateObj => {
       const dateStr = format(dateObj, 'yyyy-MM-dd');
-      const dayEntries = allEntries!.filter(e => e.farmerId === f.id && e.date === dateStr);
+      const dayEntries = allEntries!.filter(e => (e.farmerId === f.id || e.canNumber === f.can) && e.date === dateStr);
       
       const mKg = dayEntries.find(e => e.session === 'Morning')?.kgWeight || 0;
       const eKg = dayEntries.find(e => e.session === 'Evening')?.kgWeight || 0;

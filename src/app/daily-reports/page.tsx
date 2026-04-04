@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -68,10 +69,10 @@ export default function DailyReportsPage() {
     
     filteredEntries.forEach(e => {
       const fid = e.farmerId;
-      const farmerProfile = farmers.find(f => f.id === fid);
+      // PRECISION LOOKUP: Prioritize live Directory to fix "Farmer [ID]" issue
+      const farmerProfile = farmers.find(f => f.id === fid || f.canNumber === e.canNumber);
       
-      // IDENTITY RESOLUTION: Prioritize Directory > Transaction Metadata
-      const name = farmerProfile?.name || e.farmerName || "Farmer";
+      const name = farmerProfile?.name || e.farmerName || "Unknown Farmer";
       const can = farmerProfile?.canNumber || e.canNumber || "---";
       const milkType = farmerProfile?.milkType || e.milkType || "COW";
 

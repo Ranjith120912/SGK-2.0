@@ -2,7 +2,7 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { DashboardStats } from "@/components/dashboard-stats";
 import Link from "next/link";
-import { PlusCircle, Settings, ShoppingCart, BarChart3, FileText, UserCheck, Users, FileBarChart } from "lucide-react";
+import { PlusCircle, ShoppingCart, BarChart3, FileText, UserCheck, Users, FileBarChart } from "lucide-react";
 
 export default function Home() {
   const quickActions = [

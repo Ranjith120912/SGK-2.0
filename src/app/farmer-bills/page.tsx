@@ -88,8 +88,9 @@ export default function FarmerBillsPage() {
 
     cycleEntries.forEach(e => {
       const fid = e.farmerId;
+      // Robust lookup prioritizes live directory then entry metadata
       const farmerProfile = farmers?.find(f => f.id === fid);
-      const name = farmerProfile?.name || e.farmerName || "Unknown Farmer";
+      const name = farmerProfile?.name || e.farmerName || "Farmer " + (e.canNumber || fid);
       const can = farmerProfile?.canNumber || e.canNumber || "---";
       const milkType = farmerProfile?.milkType || e.milkType || "COW";
 

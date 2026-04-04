@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -20,13 +19,10 @@ import {
   Calendar,
   FileSpreadsheet,
   Users,
-  CheckCircle2,
-  Lock,
-  ChevronRight,
   Milk,
   FileDown
 } from "lucide-react";
-import { format, endOfMonth, subMonths, startOfMonth, addDays, isSameDay } from "date-fns";
+import { format, endOfMonth, subMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -98,7 +94,6 @@ export default function ReportsPage() {
 
   const currentCycle = cycles[activeCycle];
 
-  // Helper to get formatted Daily Data (Horizontal AM/PM)
   const dailyData = useMemo(() => {
     if (!allEntries || !selectedDailyDate) return [];
     const map: Record<string, any> = {};
@@ -107,7 +102,7 @@ export default function ReportsPage() {
     filteredEntries.forEach(e => {
       const fid = e.farmerId;
       const farmerProfile = farmers?.find(f => f.id === fid);
-      const name = farmerProfile?.name || e.farmerName || "Unknown Farmer";
+      const name = farmerProfile?.name || e.farmerName || "Farmer " + (e.canNumber || fid);
       const can = farmerProfile?.canNumber || e.canNumber || "---";
       const milkType = farmerProfile?.milkType || e.milkType || "COW";
       
@@ -147,7 +142,6 @@ export default function ReportsPage() {
     });
   }, [allEntries, farmers, selectedDailyDate]);
 
-  // Helper for Cycle Master Roster
   const masterRoster = useMemo(() => {
     if (!allEntries || !selectedMonth || !currentCycle) return [];
     
@@ -161,7 +155,7 @@ export default function ReportsPage() {
     cycleEntries.forEach(e => {
       const fid = e.farmerId;
       const farmerProfile = farmers?.find(f => f.id === fid);
-      const name = farmerProfile?.name || e.farmerName || "Unknown Farmer";
+      const name = farmerProfile?.name || e.farmerName || "Farmer " + (e.canNumber || fid);
       const can = farmerProfile?.canNumber || e.canNumber || "---";
       const milkType = farmerProfile?.milkType || e.milkType || "COW";
 
@@ -213,23 +207,20 @@ export default function ReportsPage() {
     };
   }, [masterRoster, allSales, selectedMonth, currentCycle]);
 
-  // Professional Farmer Bill Generation (Exact Match)
   const generateProfessionalInvoice = (pdf: jsPDF, f: any) => {
     const company = (ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS").toUpperCase();
     const [year, month] = selectedMonth.split('-').map(Number);
-    const periodStartStr = `01/${month}/${year.toString().slice(-2)}`;
+    const periodStartStr = `${currentCycle.start}/${month}/${year.toString().slice(-2)}`;
     const periodEndStr = `${currentCycle.end}/${month}/${year.toString().slice(-2)}`;
     const period = `${periodStartStr} to ${periodEndStr}`;
     
-    // Header
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(16);
     pdf.text(company, 105, 20, { align: 'center' });
     pdf.setFontSize(12);
     pdf.text("MILK INVOICE", 105, 27, { align: 'center' });
-    pdf.line(93, 28, 117, 28); // Title Underline
+    pdf.line(93, 28, 117, 28); 
 
-    // Info Section with Underlines
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "normal");
     
@@ -250,11 +241,9 @@ export default function ReportsPage() {
     drawUnderlinedField("PERIOD:", period, 110, 55, 190);
     
     drawUnderlinedField("CAN NO:", f.can, 20, 65, 100);
-    
     const avgRate = f.totalQty > 0 ? (f.totalAmount / f.totalQty).toFixed(2) : "0.00";
     drawUnderlinedField("RATE (Rs):", avgRate, 110, 65, 190);
 
-    // Table
     const dateObjects = [];
     for (let d = currentCycle.start; d <= currentCycle.end; d++) {
       dateObjects.push(new Date(year, month - 1, d));
@@ -291,8 +280,6 @@ export default function ReportsPage() {
     });
 
     const finalY = (pdf as any).lastAutoTable.finalY;
-    
-    // Total Summary
     pdf.setFont("helvetica", "bold");
     pdf.line(20, finalY, 190, finalY);
     pdf.text("TOTAL", 25, finalY + 7);
@@ -300,23 +287,7 @@ export default function ReportsPage() {
     pdf.text(f.totalAmount.toFixed(2), 178, finalY + 7, { align: 'center' });
     pdf.line(20, finalY + 11, 190, finalY + 11);
 
-    // Right-aligned summary labels
-    let summaryY = finalY + 25;
-    pdf.setFont("helvetica", "normal");
-    pdf.text("Total Litres:", 145, summaryY);
-    pdf.setFont("helvetica", "bold");
-    pdf.text(f.totalQty.toFixed(2), 185, summaryY, { align: 'right' });
-    
-    summaryY += 8;
-    pdf.setFont("helvetica", "normal");
-    pdf.text("Total Amount (Rs):", 145, summaryY);
-    pdf.setFont("helvetica", "bold");
-    pdf.text(f.totalAmount.toFixed(2), 185, summaryY, { align: 'right' });
-
-    // Signature Footer
     const pageHeight = pdf.internal.pageSize.getHeight();
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(10);
     pdf.text("AUTHORIZED SIGNATURE", 190, pageHeight - 15, { align: 'right' });
     pdf.line(140, pageHeight - 17, 190, pageHeight - 17);
   };

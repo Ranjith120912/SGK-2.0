@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
   FileBarChart, 
-  Download, 
   Printer, 
   Calendar, 
   FileSpreadsheet, 
@@ -61,8 +60,9 @@ export default function DailyReportsPage() {
     
     filteredEntries.forEach(e => {
       const fid = e.farmerId;
+      // Directory-First Resolution Logic
       const farmerProfile = farmers?.find(f => f.id === fid);
-      const name = farmerProfile?.name || e.farmerName || "Unknown Farmer";
+      const name = farmerProfile?.name || e.farmerName || "Farmer " + (e.canNumber || fid);
       const can = farmerProfile?.canNumber || e.canNumber || "---";
       const milkType = farmerProfile?.milkType || e.milkType || "COW";
       

@@ -1,9 +1,8 @@
-
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { DashboardStats } from "@/components/dashboard-stats";
 import Link from "next/link";
-import { PlusCircle, ShoppingCart, BarChart3, FileText, UserCheck, Users, FileBarChart } from "lucide-react";
+import { PlusCircle, ShoppingCart, BarChart3, FileText, Users, FileBarChart } from "lucide-react";
 
 export default function Home() {
   const quickActions = [
@@ -12,7 +11,6 @@ export default function Home() {
     { href: "/sales", label: "Sales", icon: ShoppingCart, color: "text-secondary", bg: "bg-secondary/10" },
     { href: "/daily-reports", label: "Daily Report", icon: FileBarChart, color: "text-amber-600", bg: "bg-amber-600/10" },
     { href: "/farmer-bills", label: "Farmer Bills", icon: FileText, color: "text-rose-600", bg: "bg-rose-600/10" },
-    { href: "/buyers", label: "Buyers", icon: UserCheck, color: "text-indigo-600", bg: "bg-indigo-600/10" },
     { href: "/reports", label: "Audit", icon: BarChart3, color: "text-emerald-600", bg: "bg-emerald-600/10" },
   ];
 
@@ -31,7 +29,7 @@ export default function Home() {
             </p>
           </header>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4 mb-12">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-12">
             {quickActions.map((action) => (
               <Link key={action.href} href={action.href}>
                 <div className="group p-5 bg-card border border-primary/5 rounded-3xl hover:border-primary/40 transition-all duration-500 shadow-sm hover:shadow-xl hover:shadow-primary/5 cursor-pointer flex flex-col items-center text-center space-y-3">

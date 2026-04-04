@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -53,7 +52,7 @@ export default function DailyReportsPage() {
   const { data: farmers, isLoading: farmersLoading } = useCollection(farmersQuery);
   const { data: ratesConfig } = useDoc(settingsRef);
 
-  // GROUPED FINANCIAL ENGINE: Correctly maps collection to live directory names
+  // GROUPED FINANCIAL ENGINE: Precision-locked identity resolution
   const dailyData = useMemo(() => {
     if (!allEntries || !selectedDate || !farmers) return [];
     
@@ -64,7 +63,7 @@ export default function DailyReportsPage() {
       const fid = e.farmerId;
       const farmerProfile = farmers.find(f => f.id === fid);
       
-      // IDENTITY LOCK: Use directory name, fallback to record name
+      // IDENTITY LOCK: Strictly prioritize Directory name/CAN over record metadata
       const name = farmerProfile?.name || e.farmerName || "Farmer";
       const can = farmerProfile?.canNumber || e.canNumber || "---";
       const milkType = farmerProfile?.milkType || e.milkType || "COW";

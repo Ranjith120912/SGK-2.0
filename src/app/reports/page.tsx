@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -522,7 +521,7 @@ export default function ReportsPage() {
                   const valid = masterRoster.filter(f => f.totalQty > 0);
                   valid.forEach((f, i) => { if (i > 0) pdf.addPage(); generateProfessionalInvoice(pdf, f); });
                   pdf.save(`Bills_${selectedMonth}_${currentCycle.label}.pdf`);
-                }} className="rounded-full bg-destructive hover:bg-destructive/90 h-12 px-10 shadow-lg font-black uppercase text-xs">
+                }} className="rounded-full bg-rose-600 hover:bg-rose-700 h-12 px-10 shadow-lg font-black uppercase text-xs">
                   <FileDown className="mr-2 h-4 w-4" /> Download All Bills (PDF)
                 </Button>
               </div>
@@ -624,10 +623,10 @@ export default function ReportsPage() {
                         <TableRow key={i} className="hover:bg-muted/10 group transition-colors border-b last:border-0">
                           <TableCell className="pl-10 font-black text-primary uppercase text-sm py-6">{opt.label}</TableCell>
                           <TableCell className="text-center font-bold text-base">{tQty.toFixed(2)} L</TableCell>
-                          <TableCell className="text-center text-destructive font-black">₹ {tCost.toFixed(2)}</TableCell>
+                          <TableCell className="text-center text-rose-600 font-black">₹ {tCost.toFixed(2)}</TableCell>
                           <TableCell className="text-center text-green-600 font-black">₹ {tRev.toFixed(2)}</TableCell>
                           <TableCell className="text-right pr-10 font-black text-xl">
-                            <span className={(tRev - tCost) >= 0 ? "text-green-600" : "text-destructive"}>₹ {(tRev - tCost).toFixed(2)}</span>
+                            <span className={(tRev - tCost) >= 0 ? "text-green-600" : "text-rose-600"}>₹ {(tRev - tCost).toFixed(2)}</span>
                           </TableCell>
                         </TableRow>
                        );

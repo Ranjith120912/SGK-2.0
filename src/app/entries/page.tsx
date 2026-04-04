@@ -54,7 +54,7 @@ export default function EntriesPage() {
   const { data: entries } = useCollection(entriesQuery);
   const { data: ratesConfig } = useDoc(settingsRef);
 
-  // Conversion factor (Strictly 0.96 as requested)
+  // Conversion factor (Strictly 0.96 Standard)
   const conversionRate = Number(ratesConfig?.kgToLitreRate) || 0.96;
 
   const filteredFarmers = farmers?.filter(f => 

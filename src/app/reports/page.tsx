@@ -97,15 +97,25 @@ export default function ReportsPage() {
 
   const currentCycle = cycles[activeCycle];
 
-  // Global Conversion Standard (Strictly 0.96)
-  const conversionRate = Number(ratesConfig?.kgToLitreRate) || 0.96;
+  // Global Standard Conversion Rate
+  const globalConversionRate = Number(ratesConfig?.kgToLitreRate) || 0.96;
 
   /**
-   * Unified Financial Resolution Engine
+   * Database-First Financial Resolution Engine
+   * Ensures 100% synchronization by preferring saved values over recalculation.
    */
   const resolveEntryFinancials = (entry: any, farmersList: any[], config: any) => {
+    // 1. Prefer saved values from database for volume and cost
+    const savedQty = Number(entry.quantity);
+    const savedCost = Number(entry.totalAmount);
+    
+    if (savedQty > 0 && savedCost > 0) {
+      return { qtyLitre: savedQty, cost: savedCost, resolvedRate: Number(entry.rate) || 0 };
+    }
+
+    // 2. Fallback to calculation if values are missing (legacy or uninitialized data)
     const kg = Number(entry.kgWeight) || 0;
-    const qtyLitre = parseFloat((kg * conversionRate).toFixed(2));
+    const qtyLitre = parseFloat((kg * globalConversionRate).toFixed(2));
     
     const farmer = farmersList?.find(f => f.id === entry.farmerId);
     let resolvedRate = 0;
@@ -127,6 +137,14 @@ export default function ReportsPage() {
   };
 
   const resolveSaleFinancials = (sale: any, config: any) => {
+    // Prefer saved values
+    const savedQty = Number(sale.quantity);
+    const savedRevenue = Number(sale.totalAmount);
+
+    if (savedQty > 0 && savedRevenue > 0) {
+      return { qty: savedQty, revenue: savedRevenue, rate: Number(sale.rate) || 0 };
+    }
+
     const qty = Number(sale.quantity) || 0;
     let rate = Number(sale.rate);
     
@@ -186,7 +204,7 @@ export default function ReportsPage() {
       const bNum = parseInt(b.canNumber);
       return (isNaN(aNum) || isNaN(bNum)) ? a.canNumber.localeCompare(b.canNumber) : aNum - bNum;
     });
-  }, [farmers, filteredCycleEntries, ratesConfig, currentCycle, conversionRate]);
+  }, [farmers, filteredCycleEntries, ratesConfig, currentCycle]);
 
   const cowRoster = masterRoster.filter(f => f.milkType === 'COW' || !f.milkType);
   const buffaloRoster = masterRoster.filter(f => f.milkType === 'BUFFALO');
@@ -249,17 +267,18 @@ export default function ReportsPage() {
       totalSaleAmt: parseFloat(totalSaleAmt.toFixed(2)),
       profit: parseFloat((totalSaleAmt - totalEntryAmt).toFixed(2))
     };
-  }, [allEntries, allSales, selectedMonth, farmers, ratesConfig, conversionRate]);
+  }, [allEntries, allSales, selectedMonth, farmers, ratesConfig]);
 
   const monthlyAuditSummary = useMemo(() => {
     if (!allEntries || !allSales || !isClient || !farmers || !ratesConfig || !selectedMonth) return [];
     
     const [yearPart] = selectedMonth.split('-').map(Number);
     const monthOfSelection = parseInt(selectedMonth.split('-')[1]);
+    // Fiscal year logic (April to March)
     const fiscalYearStart = monthOfSelection <= 3 ? yearPart - 1 : yearPart;
     
     return Array.from({ length: 12 }).map((_, i) => {
-      const monthIdx = (3 + i) % 12; 
+      const monthIdx = (3 + i) % 12; // Start from April (idx 3)
       const year = fiscalYearStart + (3 + i >= 12 ? 1 : 0);
       const d = new Date(year, monthIdx, 1);
       const monthStr = format(d, 'yyyy-MM');
@@ -281,6 +300,7 @@ export default function ReportsPage() {
       mSales.forEach(sale => {
         const res = resolveSaleFinancials(sale, ratesConfig);
         revenue += res.revenue;
+        // Also capture quantity
       });
       
       return { 
@@ -291,7 +311,7 @@ export default function ReportsPage() {
         profit: parseFloat((revenue - cost).toFixed(2)) 
       };
     });
-  }, [allEntries, allSales, isClient, farmers, ratesConfig, conversionRate, selectedMonth]);
+  }, [allEntries, allSales, isClient, farmers, ratesConfig, selectedMonth]);
 
   const activeInvoices = masterRoster.filter(f => f.totalQty > 0);
 
@@ -374,30 +394,31 @@ export default function ReportsPage() {
     doc.line(135, y+1, 190, y+1);
 
     const cycleEntries = filteredCycleEntries.filter(e => e.farmerId === farmer.id);
-    const dateMap: Record<string, { morning: number, evening: number }> = {};
+    const dateMap: Record<string, { morning: number, evening: number, rate: number }> = {};
     for (let d = cycleStart; d <= cycleEnd; d++) {
       const dateStr = `${year}-${month.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`;
-      dateMap[dateStr] = { morning: 0, evening: 0 };
+      dateMap[dateStr] = { morning: 0, evening: 0, rate: resolvedRate };
     }
     
     cycleEntries.forEach(e => {
       if (dateMap[e.date]) {
-        const { qtyLitre } = resolveEntryFinancials(e, farmers, ratesConfig);
+        const { qtyLitre, resolvedRate: entryRate } = resolveEntryFinancials(e, farmers, ratesConfig);
         if (e.session === 'Morning') dateMap[e.date].morning += qtyLitre;
         else dateMap[e.date].evening += qtyLitre;
+        dateMap[e.date].rate = entryRate;
       }
     });
 
     const tableRows = Object.keys(dateMap).sort().map(date => {
       const d = dateMap[date];
       const totalL = parseFloat((d.morning + d.evening).toFixed(2));
-      const amt = parseFloat((totalL * resolvedRate).toFixed(2));
+      const amt = parseFloat((totalL * d.rate).toFixed(2));
       return [
         format(new Date(date), 'dd/MM/yy'), 
         d.morning.toFixed(2), 
         d.evening.toFixed(2), 
         totalL.toFixed(2), 
-        resolvedRate.toFixed(2), 
+        d.rate.toFixed(2), 
         amt.toFixed(2)
       ];
     });
@@ -558,7 +579,7 @@ export default function ReportsPage() {
           <header className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">{ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS"} Reports</h1>
-              <p className="text-muted-foreground font-medium">Financial Summary • April - March Cycle</p>
+              <p className="text-muted-foreground font-medium">Financial Summary • April - March Fiscal Cycle</p>
             </div>
             <div className="flex gap-4">
                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
@@ -574,7 +595,7 @@ export default function ReportsPage() {
                 <TabsTrigger value="overview" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Overview</TabsTrigger>
                 <TabsTrigger value="cycle" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Cycle Bill</TabsTrigger>
                 <TabsTrigger value="master" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Master Summary</TabsTrigger>
-                <TabsTrigger value="audit" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Audit</TabsTrigger>
+                <TabsTrigger value="audit" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Internal Audit</TabsTrigger>
               </TabsList>
 
               {activeTab !== "audit" && (

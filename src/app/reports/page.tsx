@@ -103,30 +103,43 @@ export default function ReportsPage() {
     });
   }, [allEntries, selectedMonth, currentCycle]);
 
+  // Helper to resolve an entry's cost correctly
+  const resolveEntryCost = (entry: any, farmersList: any[], config: any) => {
+    const qty = Number(entry.quantity) || 0;
+    if (qty === 0) return 0;
+
+    // Use saved total if it exists and is valid
+    if (Number(entry.totalAmount) > 0) return Number(entry.totalAmount);
+
+    // Dynamic resolution fallback
+    const farmer = farmersList?.find(f => f.id === entry.farmerId);
+    let resolvedRate = 0;
+    if (farmer) {
+      if (farmer.milkType === 'BUFFALO') {
+        resolvedRate = Number(farmer.customRate) > 0 
+          ? Number(farmer.customRate) 
+          : (Number(config?.buffaloRate) || 0);
+      } else {
+        resolvedRate = Number(config?.cowRate) || 0;
+      }
+    } else {
+      resolvedRate = Number(entry.rate) || 0;
+    }
+
+    return qty * resolvedRate;
+  };
+
   const masterRoster = useMemo(() => {
     if (!farmers || !currentCycle) return [];
     return farmers.map(farmer => {
       const fEntries = filteredCycleEntries.filter(e => e.farmerId === farmer.id);
       
-      // Resolve the effective rate for this farmer for fallback or calculation
-      let resolvedRate = 0;
-      if (farmer.milkType === 'BUFFALO') {
-        resolvedRate = Number(farmer.customRate) > 0 
-          ? Number(farmer.customRate) 
-          : (Number(ratesConfig?.buffaloRate) || 0);
-      } else {
-        resolvedRate = Number(ratesConfig?.cowRate) || 0;
-      }
-
       const mQty = fEntries.filter(e => e.session === 'Morning').reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
       const eQty = fEntries.filter(e => e.session === 'Evening').reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
       const totalQty = mQty + eQty;
 
-      // Calculate amount based on entry rates, falling back to resolved rate if entry rate is 0
       const totalAmount = fEntries.reduce((acc, curr) => {
-        const qty = Number(curr.quantity) || 0;
-        const rate = Number(curr.rate) > 0 ? Number(curr.rate) : resolvedRate;
-        return acc + (qty * rate);
+        return acc + resolveEntryCost(curr, farmers, ratesConfig);
       }, 0);
 
       return {
@@ -149,7 +162,7 @@ export default function ReportsPage() {
   const activeInvoices = masterRoster.filter(f => f.totalQty > 0);
 
   const monthStats = useMemo(() => {
-    if (!allEntries || !allSales || !selectedMonth) return {
+    if (!allEntries || !allSales || !selectedMonth || !farmers) return {
       totalEntryQty: 0,
       totalSaleQty: 0,
       totalEntryAmt: 0,
@@ -162,7 +175,11 @@ export default function ReportsPage() {
 
     const totalEntryQty = mEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
     const totalSaleQty = mSales.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
-    const totalEntryAmt = mEntries.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
+    
+    const totalEntryAmt = mEntries.reduce((acc, curr) => {
+      return acc + resolveEntryCost(curr, farmers, ratesConfig);
+    }, 0);
+
     const totalSaleAmt = mSales.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
 
     return {
@@ -172,10 +189,10 @@ export default function ReportsPage() {
       totalSaleAmt,
       profit: totalSaleAmt - totalEntryAmt
     };
-  }, [allEntries, allSales, selectedMonth]);
+  }, [allEntries, allSales, selectedMonth, farmers, ratesConfig]);
 
   const monthlyAuditSummary = useMemo(() => {
-    if (!allEntries || !allSales || !isClient) return [];
+    if (!allEntries || !allSales || !isClient || !farmers) return [];
     
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -193,13 +210,17 @@ export default function ReportsPage() {
       const mSales = allSales.filter(s => s.date.startsWith(monthStr));
       
       const collectionL = mEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
-      const cost = mEntries.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
+      
+      const cost = mEntries.reduce((acc, curr) => {
+        return acc + resolveEntryCost(curr, farmers, ratesConfig);
+      }, 0);
+
       const revenue = mSales.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
       const profit = revenue - cost;
       
       return { monthName, collectionL, cost, revenue, profit };
     });
-  }, [allEntries, allSales, isClient]);
+  }, [allEntries, allSales, isClient, farmers, ratesConfig]);
 
   const grandTotalAmt = masterRoster.reduce((acc, curr) => acc + curr.totalAmount, 0);
 
@@ -287,7 +308,6 @@ export default function ReportsPage() {
     doc.setFontSize(10);
     let y = 45;
     
-    // STRICT Buffalo Rate Prioritization for Invoice Header
     let displayRate = 0;
     if (farmer.milkType === 'BUFFALO') {
       displayRate = Number(farmer.customRate) > 0 
@@ -346,7 +366,6 @@ export default function ReportsPage() {
       if (dateMap[e.date]) {
         if (e.session === 'Morning') dateMap[e.date].morning = Number(e.quantity);
         else dateMap[e.date].evening = Number(e.quantity);
-        // Use the rate saved in the entry, or fall back to the resolved display rate
         dateMap[e.date].rate = Number(e.rate) > 0 ? Number(e.rate) : displayRate;
       }
     });

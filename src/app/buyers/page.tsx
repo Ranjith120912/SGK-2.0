@@ -5,13 +5,21 @@ import { useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { useCollection, useMemoFirebase, useFirestore } from "@/firebase";
-import { collection, serverTimestamp } from "firebase/firestore";
-import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { collection, serverTimestamp, doc } from "firebase/firestore";
+import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { UserPlus, Search, Contact, ClipboardList } from "lucide-react";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription,
+  DialogFooter 
+} from "@/components/ui/dialog";
+import { UserPlus, Search, Contact, ClipboardList, Pencil, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function BuyersPage() {
@@ -20,6 +28,7 @@ export default function BuyersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [newBuyer, setNewBuyer] = useState({ name: "", buyerCode: "", phone: "" });
+  const [editingBuyer, setEditingBuyer] = useState<any>(null);
 
   const buyersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -30,8 +39,8 @@ export default function BuyersPage() {
 
   const filteredBuyers = buyers?.filter(b => 
     b.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    b.buyerCode.includes(searchTerm)
-  ).sort((a, b) => a.buyerCode.localeCompare(b.buyerCode));
+    b.buyerCode.toLowerCase().includes(searchTerm.toLowerCase())
+  ).sort((a, b) => a.buyerCode.localeCompare(b.buyerCode)) || [];
 
   const handleAddBuyer = () => {
     if (!newBuyer.name || !newBuyer.buyerCode) {
@@ -52,6 +61,25 @@ export default function BuyersPage() {
     toast({ title: "Success", description: "Buyer added successfully." });
   };
 
+  const handleUpdateBuyer = () => {
+    if (!editingBuyer || !editingBuyer.name || !editingBuyer.buyerCode) {
+      toast({ title: "Error", description: "Name and Code are required.", variant: "destructive" });
+      return;
+    }
+
+    if (!firestore) return;
+
+    updateDocumentNonBlocking(doc(firestore, 'buyers', editingBuyer.id), {
+      name: editingBuyer.name,
+      buyerCode: editingBuyer.buyerCode,
+      phone: editingBuyer.phone,
+      updatedAt: serverTimestamp(),
+    });
+
+    setEditingBuyer(null);
+    toast({ title: "Updated", description: "Buyer details updated successfully." });
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
@@ -59,19 +87,19 @@ export default function BuyersPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
             <div>
-              <h1 className="text-3xl font-black text-primary tracking-tight">Buyer Management</h1>
-              <p className="text-muted-foreground">Manage your milk distribution customers.</p>
+              <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Buyer Management</h1>
+              <p className="text-muted-foreground font-medium">Manage your milk distribution customers.</p>
             </div>
-            <Button onClick={() => setIsAdding(!isAdding)} variant={isAdding ? "outline" : "default"} className="rounded-full">
-              <UserPlus className="w-4 h-4 mr-2" />
-              {isAdding ? "Cancel" : "Add Buyer"}
+            <Button onClick={() => setIsAdding(!isAdding)} variant={isAdding ? "outline" : "default"} className="rounded-full h-11 px-6 shadow-md">
+              {isAdding ? <X className="w-4 h-4 mr-2" /> : <UserPlus className="w-4 h-4 mr-2" />}
+              {isAdding ? "Cancel" : "Add New Buyer"}
             </Button>
           </div>
 
           {isAdding && (
             <Card className="mb-8 border-primary/20 bg-primary/5 rounded-3xl shadow-sm animate-in fade-in slide-in-from-top-4 duration-300">
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
+                <CardTitle className="text-lg font-black flex items-center gap-2 uppercase tracking-tight">
                   <Contact className="w-5 h-5 text-primary" />
                   New Buyer Profile
                 </CardTitle>
@@ -79,35 +107,35 @@ export default function BuyersPage() {
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-muted-foreground uppercase">Full Name</label>
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Full Name / Entity</label>
                     <Input 
                       placeholder="e.g. City Dairy" 
                       value={newBuyer.name}
                       onChange={(e) => setNewBuyer({...newBuyer, name: e.target.value})}
-                      className="rounded-xl h-11"
+                      className="rounded-xl h-11 border-primary/10"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-muted-foreground uppercase">Buyer Code</label>
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Buyer Code</label>
                     <Input 
                       placeholder="e.g. B-101" 
                       value={newBuyer.buyerCode}
                       onChange={(e) => setNewBuyer({...newBuyer, buyerCode: e.target.value})}
-                      className="rounded-xl h-11"
+                      className="rounded-xl h-11 border-primary/10"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-muted-foreground uppercase">Phone Number</label>
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Contact Number</label>
                     <Input 
                       placeholder="e.g. 9123456789" 
                       value={newBuyer.phone}
                       onChange={(e) => setNewBuyer({...newBuyer, phone: e.target.value})}
-                      className="rounded-xl h-11"
+                      className="rounded-xl h-11 border-primary/10"
                     />
                   </div>
                 </div>
                 <div className="mt-6 flex justify-end">
-                  <Button onClick={handleAddBuyer} className="rounded-full px-8">Save Buyer</Button>
+                  <Button onClick={handleAddBuyer} className="rounded-full px-10 h-11 font-black uppercase text-xs shadow-lg">Save Buyer</Button>
                 </div>
               </CardContent>
             </Card>
@@ -126,42 +154,96 @@ export default function BuyersPage() {
           <Card className="rounded-3xl overflow-hidden border-none shadow-xl bg-card/50 backdrop-blur-sm">
             <Table>
               <TableHeader className="bg-muted/50 border-b">
-                <TableRow>
-                  <TableHead className="w-[120px] font-bold text-primary pl-6">Code</TableHead>
-                  <TableHead className="font-bold text-primary">Buyer Name</TableHead>
-                  <TableHead className="font-bold text-primary">Phone</TableHead>
-                  <TableHead className="text-right pr-6 font-bold text-primary">Actions</TableHead>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-[120px] font-black text-primary pl-10 uppercase text-[10px] tracking-widest">Code</TableHead>
+                  <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Buyer Name</TableHead>
+                  <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Phone</TableHead>
+                  <TableHead className="text-right pr-10 font-black text-primary uppercase text-[10px] tracking-widest">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={4} className="text-center py-20 text-muted-foreground animate-pulse">Loading buyers...</TableCell></TableRow>
-                ) : filteredBuyers?.length === 0 ? (
+                  <TableRow><TableCell colSpan={4} className="text-center py-20 text-muted-foreground animate-pulse font-medium">Syncing directory...</TableCell></TableRow>
+                ) : filteredBuyers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-20">
-                      <div className="flex flex-col items-center gap-2">
+                      <div className="flex flex-col items-center gap-3">
                         <ClipboardList className="w-10 h-10 text-muted-foreground/30" />
-                        <p className="text-muted-foreground font-medium">No buyers found.</p>
+                        <p className="text-muted-foreground font-semibold">No buyers found in directory.</p>
                       </div>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredBuyers?.map((buyer) => (
+                  filteredBuyers.map((buyer) => (
                     <TableRow key={buyer.id} className="group hover:bg-primary/5 transition-colors">
-                      <TableCell className="font-black text-primary pl-6 text-lg">{buyer.buyerCode}</TableCell>
-                      <TableCell className="font-semibold text-base">{buyer.name}</TableCell>
-                      <TableCell className="text-muted-foreground font-mono">{buyer.phone || "—"}</TableCell>
-                      <TableCell className="text-right pr-6">
-                        <Button variant="ghost" size="sm" className="rounded-full opacity-0 group-hover:opacity-100 transition-opacity">Edit</Button>
+                      <TableCell className="font-black text-primary pl-10 text-lg uppercase">{buyer.buyerCode}</TableCell>
+                      <TableCell className="font-bold text-base uppercase">{buyer.name}</TableCell>
+                      <TableCell className="text-muted-foreground font-mono font-medium">{buyer.phone || "—"}</TableCell>
+                      <TableCell className="text-right pr-10">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => setEditingBuyer(buyer)}
+                          className="rounded-full text-primary hover:bg-primary/10 font-black uppercase text-[10px] px-4"
+                        >
+                          <Pencil className="w-3 h-3 mr-2" /> Edit
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
                 )}
               </TableBody>
             </Table>
+            <div className="p-5 bg-muted/20 text-center text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] border-t">
+              Total Managed Buyers: {buyers?.length || 0}
+            </div>
           </Card>
         </div>
       </main>
+
+      <Dialog open={!!editingBuyer} onOpenChange={(open) => !open && setEditingBuyer(null)}>
+        <DialogContent className="sm:max-w-[450px] rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black text-primary uppercase tracking-tight">Edit Buyer Profile</DialogTitle>
+            <DialogDescription>Update distribution account information.</DialogDescription>
+          </DialogHeader>
+          
+          {editingBuyer && (
+            <div className="space-y-6 py-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Buyer Name</label>
+                <Input 
+                  value={editingBuyer.name} 
+                  onChange={(e) => setEditingBuyer({...editingBuyer, name: e.target.value})}
+                  className="rounded-xl h-11"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Buyer Code</label>
+                <Input 
+                  value={editingBuyer.buyerCode} 
+                  onChange={(e) => setEditingBuyer({...editingBuyer, buyerCode: e.target.value})}
+                  className="rounded-xl h-11"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Contact Phone</label>
+                <Input 
+                  value={editingBuyer.phone} 
+                  onChange={(e) => setEditingBuyer({...editingBuyer, phone: e.target.value})}
+                  className="rounded-xl h-11"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="border-t pt-4">
+            <Button variant="ghost" onClick={() => setEditingBuyer(null)} className="rounded-full">Cancel</Button>
+            <Button onClick={handleUpdateBuyer} className="rounded-full px-8 shadow-md">Update Account</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Footer />
     </div>
   );

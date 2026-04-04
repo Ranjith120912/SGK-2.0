@@ -94,7 +94,7 @@ export default function SettingsPage() {
         buffaloRate: currentSettings.buffaloRate?.toString() || "",
         cowSellingRate: currentSettings.cowSellingRate?.toString() || "",
         buffaloSellingRate: currentSettings.buffaloSellingRate?.toString() || "",
-        kgToLitreRate: currentSettings.kgToLitreRate?.toString() || "0.96"
+        kgToLitreRate: "0.96" // Locked to business standard
       });
     }
   }, [currentSettings]);
@@ -117,7 +117,7 @@ export default function SettingsPage() {
       buffaloRate: parseFloat(config.buffaloRate) || 0,
       cowSellingRate: parseFloat(config.cowSellingRate) || 0,
       buffaloSellingRate: parseFloat(config.buffaloSellingRate) || 0,
-      kgToLitreRate: parseFloat(config.kgToLitreRate) || 0.96,
+      kgToLitreRate: 0.96, // Strictly enforced
       updatedAt: serverTimestamp()
     }, { merge: true });
     setTimeout(() => {
@@ -151,9 +151,9 @@ export default function SettingsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <header className="mb-10">
             <h1 className="text-3xl font-black text-primary tracking-tight flex items-center gap-3 uppercase">
-              <SettingsIcon className="w-8 h-8" /> Configuration
+              <SettingsIcon className="w-8 h-8" /> System Configuration
             </h1>
-            <p className="text-muted-foreground font-medium">Manage company profile, pricing, and system standards.</p>
+            <p className="text-muted-foreground font-medium">Manage pricing, business identity, and conversion standards.</p>
           </header>
 
           <div className="space-y-8">
@@ -161,50 +161,36 @@ export default function SettingsPage() {
               <CardHeader className="bg-destructive/10">
                 <div className="flex justify-between items-center">
                   <CardTitle className="text-xl font-black flex items-center gap-3 text-destructive uppercase">
-                    <DatabaseZap className="w-6 h-6" /> Master Data Wipe
+                    <DatabaseZap className="w-6 h-6" /> System Wipe
                   </CardTitle>
-                  <div className="flex gap-4">
-                    <div className="text-center">
-                      <p className="text-[10px] font-black uppercase text-muted-foreground">Farmers</p>
-                      <p className="text-lg font-black text-destructive">{allFarmers?.length ?? '...'}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-[10px] font-black uppercase text-muted-foreground">Entries</p>
-                      <p className="text-lg font-black text-destructive">{allEntries?.length ?? '...'}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-[10px] font-black uppercase text-muted-foreground">Sales</p>
-                      <p className="text-lg font-black text-destructive">{allSales?.length ?? '...'}</p>
-                    </div>
-                  </div>
                 </div>
               </CardHeader>
               <CardContent className="p-6 flex flex-col sm:flex-row justify-between items-center gap-6">
                 <div className="flex gap-4">
                   <AlertTriangle className="w-10 h-10 text-destructive animate-pulse" />
                   <div className="space-y-1">
-                    <p className="text-sm font-bold text-destructive leading-tight uppercase tracking-tight">System Purge Warning</p>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      This will permanently delete ALL suppliers, collection logs, and sales records across your entire organization.
+                    <p className="text-sm font-bold text-destructive uppercase">Irreversible Action</p>
+                    <p className="text-xs text-muted-foreground">
+                      This will delete all farmers, collection logs, and sales records across your database.
                     </p>
                   </div>
                 </div>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" size="lg" className="rounded-full px-10 h-14 font-black uppercase shadow-xl" disabled={isResetting}>
-                      {isResetting ? <Loader2 className="animate-spin mr-2" /> : <RefreshCcw className="mr-2" />} System Reset
+                      {isResetting ? <Loader2 className="animate-spin mr-2" /> : <RefreshCcw className="mr-2" />} Master Reset
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent className="rounded-3xl">
                     <AlertDialogHeader>
                       <AlertDialogTitle className="font-black text-destructive uppercase">Confirm Total Wipe</AlertDialogTitle>
                       <AlertDialogDescription>
-                        You are about to delete all records from the database. This action is irreversible.
+                        This will delete ALL data. This action cannot be undone.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel className="rounded-full">Abort</AlertDialogCancel>
-                      <AlertDialogAction onClick={masterReset} className="rounded-full bg-destructive">YES, WIPE EVERYTHING</AlertDialogAction>
+                      <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={masterReset} className="rounded-full bg-destructive">Proceed with Reset</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
@@ -263,14 +249,18 @@ export default function SettingsPage() {
                 </div>
               </Card>
               <Card className="rounded-3xl border-none shadow-md p-6">
-                <CardTitle className="text-xs font-black uppercase tracking-widest text-foreground mb-6 flex items-center gap-2"><Scale className="w-4 h-4" /> Conversion Factor</CardTitle>
-                <div className="space-y-2"><Label className="text-[9px] font-bold uppercase">Kg to Litre</Label><Input type="number" value={config.kgToLitreRate} onChange={(e) => setConfig({...config, kgToLitreRate: e.target.value})} /></div>
+                <CardTitle className="text-xs font-black uppercase tracking-widest text-foreground mb-6 flex items-center gap-2"><Scale className="w-4 h-4" /> Conversion Standard</CardTitle>
+                <div className="space-y-2">
+                  <Label className="text-[9px] font-bold uppercase">Kg to Litre</Label>
+                  <Input type="number" value="0.96" disabled className="bg-muted/50 font-black" />
+                  <p className="text-[8px] text-muted-foreground mt-1 uppercase font-black">Strict Business Standard Locked</p>
+                </div>
               </Card>
             </div>
 
             <div className="flex justify-end pt-4">
               <Button onClick={handleSave} disabled={isSaving} className="rounded-full px-12 h-14 font-black uppercase tracking-widest shadow-xl">
-                {isSaving ? "Saving..." : "Apply Changes"}
+                {isSaving ? "Applying..." : "Apply Config"}
               </Button>
             </div>
           </div>

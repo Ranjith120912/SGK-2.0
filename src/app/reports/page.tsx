@@ -15,15 +15,14 @@ import {
   Loader2, 
   BarChart4,
   Download,
-  ShieldCheck,
-  TrendingUp,
   IndianRupee,
   ChevronRight,
   FileDown,
   Milk,
-  ArrowRight,
   CalendarDays,
-  PieChart
+  PieChart,
+  TrendingUp,
+  AlertCircle
 } from "lucide-react";
 import { format, endOfMonth, subMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -97,23 +96,24 @@ export default function ReportsPage() {
 
   const currentCycle = cycles[activeCycle];
 
-  // Global Standard Conversion Rate
+  // Global Standard Conversion Rate (Strict 0.96)
   const globalConversionRate = Number(ratesConfig?.kgToLitreRate) || 0.96;
 
   /**
-   * Database-First Financial Resolution Engine
-   * Ensures 100% synchronization by preferring saved values over recalculation.
+   * CENTRAL FINANCIAL RESOLUTION ENGINE
+   * This is the single source of truth for ALL payout calculations in the app.
    */
   const resolveEntryFinancials = (entry: any, farmersList: any[], config: any) => {
     // 1. Prefer saved values from database for volume and cost
     const savedQty = Number(entry.quantity);
     const savedCost = Number(entry.totalAmount);
+    const savedRate = Number(entry.rate);
     
     if (savedQty > 0 && savedCost > 0) {
-      return { qtyLitre: savedQty, cost: savedCost, resolvedRate: Number(entry.rate) || 0 };
+      return { qtyLitre: savedQty, cost: savedCost, resolvedRate: savedRate };
     }
 
-    // 2. Fallback to calculation if values are missing (legacy or uninitialized data)
+    // 2. Fallback to calculation if values are missing
     const kg = Number(entry.kgWeight) || 0;
     const qtyLitre = parseFloat((kg * globalConversionRate).toFixed(2));
     
@@ -129,7 +129,7 @@ export default function ReportsPage() {
         resolvedRate = Number(config?.cowRate) || 0;
       }
     } else {
-      resolvedRate = Number(entry.rate) || 0;
+      resolvedRate = savedRate || 0;
     }
 
     const cost = parseFloat((qtyLitre * resolvedRate).toFixed(2));
@@ -137,16 +137,16 @@ export default function ReportsPage() {
   };
 
   const resolveSaleFinancials = (sale: any, config: any) => {
-    // Prefer saved values
     const savedQty = Number(sale.quantity);
     const savedRevenue = Number(sale.totalAmount);
+    const savedRate = Number(sale.rate);
 
     if (savedQty > 0 && savedRevenue > 0) {
-      return { qty: savedQty, revenue: savedRevenue, rate: Number(sale.rate) || 0 };
+      return { qty: savedQty, revenue: savedRevenue, rate: savedRate };
     }
 
     const qty = Number(sale.quantity) || 0;
-    let rate = Number(sale.rate);
+    let rate = savedRate;
     
     if (!rate || rate === 0) {
       rate = sale.milkType === 'BUFFALO' 
@@ -158,6 +158,7 @@ export default function ReportsPage() {
     return { qty, revenue, rate };
   };
 
+  // 1. Entry Filtering & Processing
   const filteredCycleEntries = useMemo(() => {
     if (!allEntries || !selectedMonth || !currentCycle) return [];
     return allEntries.filter(entry => {
@@ -176,43 +177,57 @@ export default function ReportsPage() {
     });
   }, [allSales, selectedMonth, currentCycle]);
 
+  // 2. Master Roster Generation (Driven by entries to ensure 100% sync)
   const masterRoster = useMemo(() => {
-    if (!farmers || !currentCycle || !ratesConfig) return [];
-    return farmers.map(farmer => {
-      const fEntries = filteredCycleEntries.filter(e => e.farmerId === farmer.id);
-      
-      let morningQty = 0;
-      let eveningQty = 0;
-      let totalAmount = 0;
+    if (!filteredCycleEntries || !farmers || !ratesConfig) return [];
+    
+    const farmerMap: Record<string, any> = {};
 
-      fEntries.forEach(entry => {
-        const { qtyLitre, cost } = resolveEntryFinancials(entry, farmers, ratesConfig);
-        if (entry.session === 'Morning') morningQty += qtyLitre;
-        else eveningQty += qtyLitre;
-        totalAmount += cost;
-      });
+    filteredCycleEntries.forEach(entry => {
+      const farmerId = entry.farmerId;
+      if (!farmerMap[farmerId]) {
+        const farmerInfo = farmers.find(f => f.id === farmerId);
+        farmerMap[farmerId] = {
+          id: farmerId,
+          name: farmerInfo?.name || "Unknown/Deleted",
+          canNumber: farmerInfo?.canNumber || "???",
+          bankAccountNumber: farmerInfo?.bankAccountNumber || "",
+          milkType: farmerInfo?.milkType || "COW",
+          customRate: farmerInfo?.customRate || 0,
+          morningQty: 0,
+          eveningQty: 0,
+          totalQty: 0,
+          totalAmount: 0
+        };
+      }
 
-      return {
-        ...farmer,
-        morningQty: parseFloat(morningQty.toFixed(2)),
-        eveningQty: parseFloat(eveningQty.toFixed(2)),
-        totalQty: parseFloat((morningQty + eveningQty).toFixed(2)),
-        totalAmount: parseFloat(totalAmount.toFixed(2))
-      };
-    }).sort((a, b) => {
+      const { qtyLitre, cost } = resolveEntryFinancials(entry, farmers, ratesConfig);
+      if (entry.session === 'Morning') farmerMap[farmerId].morningQty += qtyLitre;
+      else farmerMap[farmerId].eveningQty += qtyLitre;
+      farmerMap[farmerId].totalAmount += cost;
+    });
+
+    return Object.values(farmerMap).map(f => ({
+      ...f,
+      morningQty: parseFloat(f.morningQty.toFixed(2)),
+      eveningQty: parseFloat(f.eveningQty.toFixed(2)),
+      totalQty: parseFloat((f.morningQty + f.eveningQty).toFixed(2)),
+      totalAmount: parseFloat(f.totalAmount.toFixed(2))
+    })).sort((a, b) => {
       const aNum = parseInt(a.canNumber);
       const bNum = parseInt(b.canNumber);
       return (isNaN(aNum) || isNaN(bNum)) ? a.canNumber.localeCompare(b.canNumber) : aNum - bNum;
     });
-  }, [farmers, filteredCycleEntries, ratesConfig, currentCycle]);
+  }, [filteredCycleEntries, farmers, ratesConfig]);
 
-  const cowRoster = masterRoster.filter(f => f.milkType === 'COW' || !f.milkType);
+  const cowRoster = masterRoster.filter(f => f.milkType === 'COW');
   const buffaloRoster = masterRoster.filter(f => f.milkType === 'BUFFALO');
 
-  const grandTotalAmt = parseFloat(masterRoster.reduce((acc, curr) => acc + curr.totalAmount, 0).toFixed(2));
-  const grandTotalQty = parseFloat(masterRoster.reduce((acc, curr) => acc + curr.totalQty, 0).toFixed(2));
-
+  // 3. Cycle & Month Statistics (Derived from rosters and identical logic)
   const cycleStats = useMemo(() => {
+    const totalEntryAmt = masterRoster.reduce((acc, curr) => acc + curr.totalAmount, 0);
+    const totalEntryQty = masterRoster.reduce((acc, curr) => acc + curr.totalQty, 0);
+
     let totalSaleAmt = 0;
     let totalSaleQty = 0;
 
@@ -223,22 +238,18 @@ export default function ReportsPage() {
     });
 
     return {
-      totalEntryQty: grandTotalQty,
+      totalEntryQty: parseFloat(totalEntryQty.toFixed(2)),
       totalSaleQty: parseFloat(totalSaleQty.toFixed(2)),
-      totalEntryAmt: grandTotalAmt,
+      totalEntryAmt: parseFloat(totalEntryAmt.toFixed(2)),
       totalSaleAmt: parseFloat(totalSaleAmt.toFixed(2)),
-      profit: parseFloat((totalSaleAmt - grandTotalAmt).toFixed(2))
+      profit: parseFloat((totalSaleAmt - totalEntryAmt).toFixed(2))
     };
-  }, [grandTotalQty, grandTotalAmt, filteredCycleSales, ratesConfig]);
+  }, [masterRoster, filteredCycleSales, ratesConfig]);
 
   const monthStats = useMemo(() => {
-    if (!allEntries || !allSales || !selectedMonth || !farmers || !ratesConfig) return {
-      totalEntryQty: 0,
-      totalSaleQty: 0,
-      totalEntryAmt: 0,
-      totalSaleAmt: 0,
-      profit: 0
-    };
+    if (!allEntries || !allSales || !selectedMonth || !farmers || !ratesConfig) {
+      return { totalEntryQty: 0, totalSaleQty: 0, totalEntryAmt: 0, totalSaleAmt: 0, profit: 0 };
+    }
     
     const mEntries = allEntries.filter(e => e.date.startsWith(selectedMonth));
     const mSales = allSales.filter(s => s.date.startsWith(selectedMonth));
@@ -269,20 +280,19 @@ export default function ReportsPage() {
     };
   }, [allEntries, allSales, selectedMonth, farmers, ratesConfig]);
 
+  // 4. Monthly Audit Summary (Locked to Fiscal Year April-March)
   const monthlyAuditSummary = useMemo(() => {
     if (!allEntries || !allSales || !isClient || !farmers || !ratesConfig || !selectedMonth) return [];
     
     const [yearPart] = selectedMonth.split('-').map(Number);
     const monthOfSelection = parseInt(selectedMonth.split('-')[1]);
-    // Fiscal year logic (April to March)
     const fiscalYearStart = monthOfSelection <= 3 ? yearPart - 1 : yearPart;
     
     return Array.from({ length: 12 }).map((_, i) => {
-      const monthIdx = (3 + i) % 12; // Start from April (idx 3)
+      const monthIdx = (3 + i) % 12; // Start from April
       const year = fiscalYearStart + (3 + i >= 12 ? 1 : 0);
       const d = new Date(year, monthIdx, 1);
       const monthStr = format(d, 'yyyy-MM');
-      const monthName = format(d, 'MMMM yyyy');
       
       const mEntries = allEntries.filter(e => e.date.startsWith(monthStr));
       const mSales = allSales.filter(s => s.date.startsWith(monthStr));
@@ -300,11 +310,10 @@ export default function ReportsPage() {
       mSales.forEach(sale => {
         const res = resolveSaleFinancials(sale, ratesConfig);
         revenue += res.revenue;
-        // Also capture quantity
       });
       
       return { 
-        monthName, 
+        monthName: format(d, 'MMMM yyyy'), 
         collectionL: parseFloat(collectionL.toFixed(2)), 
         cost: parseFloat(cost.toFixed(2)), 
         revenue: parseFloat(revenue.toFixed(2)), 
@@ -327,6 +336,7 @@ export default function ReportsPage() {
   const cowTotals = calculateRosterTotals(cowRoster);
   const buffaloTotals = calculateRosterTotals(buffaloRoster);
 
+  // 5. PDF Generation Logic (Synchronized)
   const generateSingleInvoice = (doc: jsPDF, farmer: any) => {
     const companyName = (ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS").toUpperCase();
     const [year, month] = selectedMonth.split('-').map(Number);
@@ -338,9 +348,7 @@ export default function ReportsPage() {
 
     let resolvedRate = 0;
     if (farmer.milkType === 'BUFFALO') {
-      resolvedRate = Number(farmer.customRate) > 0 
-        ? Number(farmer.customRate) 
-        : (Number(ratesConfig?.buffaloRate) || 0);
+      resolvedRate = Number(farmer.customRate) > 0 ? Number(farmer.customRate) : (Number(ratesConfig?.buffaloRate) || 0);
     } else {
       resolvedRate = Number(ratesConfig?.cowRate) || 0;
     }
@@ -388,44 +396,27 @@ export default function ReportsPage() {
     doc.line(45, y+1, 100, y+1);
 
     doc.setFont("helvetica", "normal");
-    doc.text("RATE (Rs):", 110, y);
+    doc.text("MILK TYPE:", 110, y);
     doc.setFont("helvetica", "bold");
-    doc.text(resolvedRate.toFixed(2), 135, y);
+    doc.text(farmer.milkType || "COW", 135, y);
     doc.line(135, y+1, 190, y+1);
 
     const cycleEntries = filteredCycleEntries.filter(e => e.farmerId === farmer.id);
-    const dateMap: Record<string, { morning: number, evening: number, rate: number }> = {};
-    for (let d = cycleStart; d <= cycleEnd; d++) {
-      const dateStr = `${year}-${month.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`;
-      dateMap[dateStr] = { morning: 0, evening: 0, rate: resolvedRate };
-    }
-    
-    cycleEntries.forEach(e => {
-      if (dateMap[e.date]) {
-        const { qtyLitre, resolvedRate: entryRate } = resolveEntryFinancials(e, farmers, ratesConfig);
-        if (e.session === 'Morning') dateMap[e.date].morning += qtyLitre;
-        else dateMap[e.date].evening += qtyLitre;
-        dateMap[e.date].rate = entryRate;
-      }
-    });
-
-    const tableRows = Object.keys(dateMap).sort().map(date => {
-      const d = dateMap[date];
-      const totalL = parseFloat((d.morning + d.evening).toFixed(2));
-      const amt = parseFloat((totalL * d.rate).toFixed(2));
+    const tableRows = cycleEntries.sort((a, b) => a.date.localeCompare(b.date)).map(e => {
+      const { qtyLitre, cost, resolvedRate } = resolveEntryFinancials(e, farmers, ratesConfig);
       return [
-        format(new Date(date), 'dd/MM/yy'), 
-        d.morning.toFixed(2), 
-        d.evening.toFixed(2), 
-        totalL.toFixed(2), 
-        d.rate.toFixed(2), 
-        amt.toFixed(2)
+        format(new Date(e.date), 'dd/MM/yy'),
+        e.session === 'Morning' ? qtyLitre.toFixed(2) : "0.00",
+        e.session === 'Evening' ? qtyLitre.toFixed(2) : "0.00",
+        qtyLitre.toFixed(2),
+        resolvedRate.toFixed(2),
+        cost.toFixed(2)
       ];
     });
 
     (doc as any).autoTable({
       startY: y + 15,
-      head: [['DATE', 'MORNING (L)', 'EVENING (L)', 'TOTAL LITRES', 'RATE (Rs)', 'AMOUNT (Rs)']],
+      head: [['DATE', 'MORNING (L)', 'EVENING (L)', 'TOTAL L', 'RATE (Rs)', 'AMOUNT (Rs)']],
       body: tableRows,
       theme: 'grid',
       headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', lineWidth: 0.1, lineColor: [0, 0, 0], halign: 'center' },
@@ -441,8 +432,6 @@ export default function ReportsPage() {
     doc.text(farmer.totalAmount.toFixed(2), 185, finalY + 5, { align: 'right' });
     doc.line(20, finalY + 8, 190, finalY + 8);
 
-    doc.text("Total Amount (Rs):", 155, finalY + 25, { align: 'right' });
-    doc.text(farmer.totalAmount.toFixed(2), 185, finalY + 25, { align: 'right' });
     doc.setFontSize(9);
     doc.text("AUTHORIZED SIGNATURE", 140, 275);
   };
@@ -470,7 +459,7 @@ export default function ReportsPage() {
 
       (doc as any).autoTable({
         startY: startY + 5,
-        head: [['CAN', 'FARMER NAME', 'BANK A/C', 'MORNING (L)', 'EVENING (L)', 'TOTAL L', 'PAYOUT (Rs.)']],
+        head: [['CAN', 'FARMER NAME', 'BANK A/C', 'MORNING (L)', 'EVENING (L)', 'TOTAL L', 'PAYOUT (Rs)']],
         body: tableData,
         theme: 'grid',
         headStyles: { fillColor: [37, 99, 235], textColor: 255 },
@@ -488,10 +477,7 @@ export default function ReportsPage() {
     doc.text(`Master Roster: ${cycleLabel} - ${monthLabel}`, 14, 28);
 
     let currentY = 35;
-    if (cowRoster.length > 0) {
-      currentY = addRosterSection("COW MILK ROSTER", cowRoster, currentY, cowTotals);
-    }
-    
+    if (cowRoster.length > 0) currentY = addRosterSection("COW MILK ROSTER", cowRoster, currentY, cowTotals);
     if (buffaloRoster.length > 0) {
       if (currentY > 160) { doc.addPage('l', 'mm', 'a4'); currentY = 20; }
       addRosterSection("BUFFALO MILK ROSTER", buffaloRoster, currentY, buffaloTotals);
@@ -578,8 +564,8 @@ export default function ReportsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <header className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <h1 className="text-3xl font-black text-primary tracking-tight uppercase">{ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS"} Reports</h1>
-              <p className="text-muted-foreground font-medium">Financial Summary • April - March Fiscal Cycle</p>
+              <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Reports & Audit</h1>
+              <p className="text-muted-foreground font-medium">Synced financial data • {monthOptions.find(o => o.value === selectedMonth)?.label}</p>
             </div>
             <div className="flex gap-4">
                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
@@ -593,8 +579,8 @@ export default function ReportsPage() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
               <TabsList className="bg-muted p-1 rounded-full h-auto">
                 <TabsTrigger value="overview" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Overview</TabsTrigger>
-                <TabsTrigger value="cycle" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Cycle Bill</TabsTrigger>
-                <TabsTrigger value="master" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Master Summary</TabsTrigger>
+                <TabsTrigger value="cycle" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Farmer Bills</TabsTrigger>
+                <TabsTrigger value="master" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Master Roster</TabsTrigger>
                 <TabsTrigger value="audit" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Internal Audit</TabsTrigger>
               </TabsList>
 
@@ -620,7 +606,7 @@ export default function ReportsPage() {
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-primary">
                   <CalendarDays className="w-5 h-5" />
-                  <h2 className="font-black uppercase tracking-widest text-sm">Selected Cycle Statistics ({currentCycle.label})</h2>
+                  <h2 className="font-black uppercase tracking-widest text-sm">Selected Cycle Stats ({currentCycle.label})</h2>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <Card className="rounded-[2rem] bg-primary text-white p-8 shadow-xl shadow-primary/20">
@@ -647,7 +633,7 @@ export default function ReportsPage() {
               <div className="space-y-4 pt-4 border-t">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <PieChart className="w-5 h-5" />
-                  <h2 className="font-black uppercase tracking-widest text-sm">Full Month Summary ({monthOptions.find(o => o.value === selectedMonth)?.label})</h2>
+                  <h2 className="font-black uppercase tracking-widest text-sm">Monthly Summary ({monthOptions.find(o => o.value === selectedMonth)?.label})</h2>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="flex items-center justify-between p-6 bg-muted/30 rounded-3xl border">
@@ -655,7 +641,7 @@ export default function ReportsPage() {
                     <span className="text-2xl font-black text-primary">{monthStats.totalEntryQty.toFixed(2)} L</span>
                   </div>
                   <div className="flex items-center justify-between p-6 bg-muted/30 rounded-3xl border">
-                    <span className="text-xs font-bold text-muted-foreground uppercase">Monthly Procurement</span>
+                    <span className="text-xs font-bold text-muted-foreground uppercase">Monthly Payout</span>
                     <span className="text-2xl font-black text-destructive">Rs. {monthStats.totalEntryAmt.toFixed(2)}</span>
                   </div>
                   <div className="flex items-center justify-between p-6 bg-muted/30 rounded-3xl border">
@@ -713,7 +699,7 @@ export default function ReportsPage() {
                 <div className="flex items-center gap-4">
                   <div className="bg-primary px-8 py-4 rounded-[2rem] text-white shadow-xl shadow-primary/10 border-b-4 border-black/10">
                     <p className="text-[10px] font-black uppercase opacity-70 tracking-widest">Grand Total Payout ({currentCycle.label})</p>
-                    <p className="text-3xl font-black mt-1">Rs. {grandTotalAmt.toFixed(2)}</p>
+                    <p className="text-3xl font-black mt-1">Rs. {cycleStats.totalEntryAmt.toFixed(2)}</p>
                   </div>
                 </div>
                 <Button onClick={handleDownloadRosterPDF} className="rounded-full h-12 px-10 font-black uppercase text-[10px] shadow-lg hover:shadow-primary/20 transition-all">

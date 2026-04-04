@@ -55,7 +55,7 @@ export default function EntriesPage() {
   const { data: ratesConfig } = useDoc(settingsRef);
 
   // Conversion factor (Strictly 0.96 Standard)
-  const conversionRate = Number(ratesConfig?.kgToLitreRate) || 0.96;
+  const conversionRate = 0.96;
 
   const filteredFarmers = farmers?.filter(f => 
     f.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -80,7 +80,7 @@ export default function EntriesPage() {
     const existingEntry = entries?.find(e => e.farmerId === farmerId);
     const kgValue = kgStr !== undefined && kgStr !== "" ? parseFloat(kgStr) : (existingEntry ? Number(existingEntry.kgWeight) : 0);
     
-    // Rate Prioritization Logic
+    // Rate Prioritization Logic (Buffalo Custom > Global Config)
     let managedRate = 0;
     if (farmer.milkType === 'BUFFALO') {
       managedRate = Number(farmer.customRate) > 0 
@@ -175,7 +175,7 @@ export default function EntriesPage() {
             <div className="flex items-center gap-3 px-4 py-2 bg-primary/5 rounded-2xl border border-primary/10">
               <Scale className="w-5 h-5 text-primary" />
               <div className="text-xs">
-                <p className="font-bold text-primary">Weight Conversion</p>
+                <p className="font-bold text-primary">Standard Conversion</p>
                 <p className="text-muted-foreground">1 Kg = {conversionRate} L</p>
               </div>
             </div>
@@ -211,7 +211,7 @@ export default function EntriesPage() {
                   const kgNum = parseFloat(currentKgStr);
                   const previewLitre = !isNaN(kgNum) ? (kgNum * conversionRate).toFixed(2) : "0.00";
                   
-                  // Rate Prioritization Logic
+                  // Rate Logic (Buffalo Custom > Buffalo Global > Cow Global)
                   let managedRate = 0;
                   const isBuffalo = farmer.milkType === 'BUFFALO';
                   if (isBuffalo) {

@@ -69,8 +69,11 @@ export default function FarmersPage() {
   const [importData, setImportData] = useState("");
   const [isImporting, setIsImporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  
+  // Dialog States
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isClearAllDialogOpen, setIsClearAllDialogOpen] = useState(false);
+  const [rowToDelete, setRowToDelete] = useState<{id: string, name: string} | null>(null);
 
   const farmersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -158,13 +161,14 @@ export default function FarmersPage() {
     setIsDeleteDialogOpen(false);
   };
 
-  const handleDeleteRow = (id: string, name: string) => {
-    if (!firestore) return;
+  const confirmDeleteRow = () => {
+    if (!firestore || !rowToDelete) return;
     
-    deleteDocumentNonBlocking(doc(firestore, 'farmers', id));
-    toast({ title: "Deleted", description: `Farmer "${name}" removed.` });
+    deleteDocumentNonBlocking(doc(firestore, 'farmers', rowToDelete.id));
+    toast({ title: "Deleted", description: `Farmer "${rowToDelete.name}" removed.` });
     
-    setSelectedIds(prev => prev.filter(i => i !== id));
+    setSelectedIds(prev => prev.filter(i => i !== rowToDelete.id));
+    setRowToDelete(null);
   };
 
   const confirmClearAll = () => {
@@ -573,7 +577,7 @@ export default function FarmersPage() {
                             variant="ghost" 
                             size="sm" 
                             className="rounded-full text-destructive hover:bg-destructive/10"
-                            onClick={() => handleDeleteRow(farmer.id, farmer.name)}
+                            onClick={() => setRowToDelete({id: farmer.id, name: farmer.name})}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -672,7 +676,27 @@ export default function FarmersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Alert */}
+      {/* Row Delete Confirmation Alert */}
+      <AlertDialog open={!!rowToDelete} onOpenChange={(open) => !open && setRowToDelete(null)}>
+        <AlertDialogContent className="rounded-3xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase">
+              <Trash2 className="w-5 h-5" /> Confirm Delete
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete farmer <strong>{rowToDelete?.name}</strong>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-full">No, Keep</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteRow} className="rounded-full bg-destructive hover:bg-destructive/90">
+              Yes, Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation Alert */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent className="rounded-3xl">
           <AlertDialogHeader>
@@ -680,13 +704,13 @@ export default function FarmersPage() {
               <AlertTriangle className="w-5 h-5" /> Confirm Bulk Deletion
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove {selectedIds.length} selected farmers from your directory. This action cannot be undone.
+              Are you sure you want to permanently remove {selectedIds.length} selected farmers? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-full">Cancel Action</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-full">No, Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDeleteSelected} className="rounded-full bg-destructive hover:bg-destructive/90">
-              Confirm Deletion
+              Yes, Delete Selected
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -696,17 +720,19 @@ export default function FarmersPage() {
       <AlertDialog open={isClearAllDialogOpen} onOpenChange={setIsClearAllDialogOpen}>
         <AlertDialogContent className="rounded-3xl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase">
-              <Trash2 className="w-5 h-5" /> Wipe Entire Directory?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              CRITICAL: You are about to delete ALL {farmers?.length || 0} farmers. This is an irreversible operation that will clear your entire supplier roster.
-            </AlertDialogDescription>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase">
+                <Trash2 className="w-5 h-5" /> Wipe Entire Directory?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                CRITICAL: You are about to delete ALL {farmers?.length || 0} farmers. This is an irreversible operation that will clear your entire supplier roster.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-full">Abort</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-full">No, Abort</AlertDialogCancel>
             <AlertDialogAction onClick={confirmClearAll} className="rounded-full bg-destructive hover:bg-destructive/90">
-              Wipe Data
+              Yes, Wipe All Data
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

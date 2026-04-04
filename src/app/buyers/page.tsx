@@ -6,7 +6,7 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { useCollection, useMemoFirebase, useFirestore } from "@/firebase";
 import { collection, serverTimestamp, doc } from "firebase/firestore";
-import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -19,7 +19,17 @@ import {
   DialogDescription,
   DialogFooter 
 } from "@/components/ui/dialog";
-import { UserPlus, Search, Contact, ClipboardList, Pencil, X } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { UserPlus, Search, Contact, ClipboardList, Pencil, X, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function BuyersPage() {
@@ -29,6 +39,8 @@ export default function BuyersPage() {
   const [isAdding, setIsAdding] = useState(false);
   const [newBuyer, setNewBuyer] = useState({ name: "", buyerCode: "", phone: "" });
   const [editingBuyer, setEditingBuyer] = useState<any>(null);
+  const [buyerToDelete, setBuyerToDelete] = useState<{id: string, name: string} | null>(null);
+  const [isClearAllOpen, setIsClearAllOpen] = useState(false);
 
   const buyersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -80,6 +92,20 @@ export default function BuyersPage() {
     toast({ title: "Updated", description: "Buyer details updated successfully." });
   };
 
+  const confirmDeleteBuyer = () => {
+    if (!firestore || !buyerToDelete) return;
+    deleteDocumentNonBlocking(doc(firestore, 'buyers', buyerToDelete.id));
+    toast({ title: "Deleted", description: `Buyer "${buyerToDelete.name}" removed.` });
+    setBuyerToDelete(null);
+  };
+
+  const confirmClearAll = () => {
+    if (!firestore || !buyers) return;
+    buyers.forEach(b => deleteDocumentNonBlocking(doc(firestore, 'buyers', b.id)));
+    toast({ title: "Directory Cleared", description: "All buyer records removed." });
+    setIsClearAllOpen(false);
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
@@ -90,10 +116,15 @@ export default function BuyersPage() {
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Buyer Management</h1>
               <p className="text-muted-foreground font-medium">Manage your milk distribution customers.</p>
             </div>
-            <Button onClick={() => setIsAdding(!isAdding)} variant={isAdding ? "outline" : "default"} className="rounded-full h-11 px-6 shadow-md">
-              {isAdding ? <X className="w-4 h-4 mr-2" /> : <UserPlus className="w-4 h-4 mr-2" />}
-              {isAdding ? "Cancel" : "Add New Buyer"}
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={() => setIsAdding(!isAdding)} variant={isAdding ? "outline" : "default"} className="rounded-full h-11 px-6 shadow-md">
+                {isAdding ? <X className="w-4 h-4 mr-2" /> : <UserPlus className="w-4 h-4 mr-2" />}
+                {isAdding ? "Cancel" : "Add New Buyer"}
+              </Button>
+              <Button onClick={() => setIsClearAllOpen(true)} variant="ghost" className="rounded-full h-11 px-4 text-destructive border border-dashed hover:bg-destructive/10">
+                <Trash2 className="w-4 h-4 mr-2" /> Clear All
+              </Button>
+            </div>
           </div>
 
           {isAdding && (
@@ -180,14 +211,24 @@ export default function BuyersPage() {
                       <TableCell className="font-bold text-base uppercase">{buyer.name}</TableCell>
                       <TableCell className="text-muted-foreground font-mono font-medium">{buyer.phone || "—"}</TableCell>
                       <TableCell className="text-right pr-10">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => setEditingBuyer(buyer)}
-                          className="rounded-full text-primary hover:bg-primary/10 font-black uppercase text-[10px] px-4"
-                        >
-                          <Pencil className="w-3 h-3 mr-2" /> Edit
-                        </Button>
+                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => setEditingBuyer(buyer)}
+                            className="rounded-full text-primary hover:bg-primary/10 font-black uppercase text-[10px] px-4"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => setBuyerToDelete({id: buyer.id, name: buyer.name})}
+                            className="rounded-full text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -243,6 +284,46 @@ export default function BuyersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Row Delete Confirmation Alert */}
+      <AlertDialog open={!!buyerToDelete} onOpenChange={(open) => !open && setBuyerToDelete(null)}>
+        <AlertDialogContent className="rounded-3xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase">
+              <Trash2 className="w-5 h-5" /> Confirm Delete
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete buyer <strong>{buyerToDelete?.name}</strong>? All their historical sales data will remain but they will be removed from the directory.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-full">No, Keep</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteBuyer} className="rounded-full bg-destructive hover:bg-destructive/90">
+              Yes, Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Clear All Confirmation Alert */}
+      <AlertDialog open={isClearAllOpen} onOpenChange={setIsClearAllOpen}>
+        <AlertDialogContent className="rounded-3xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase">
+              <Trash2 className="w-5 h-5" /> Wipe Buyer Directory?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              CRITICAL: You are about to delete ALL distribution buyers. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-full">No, Stop</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmClearAll} className="rounded-full bg-destructive hover:bg-destructive/90">
+              Yes, Clear All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Footer />
     </div>

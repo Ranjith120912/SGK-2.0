@@ -14,25 +14,16 @@ import {
   FileText, 
   Loader2, 
   Download,
-  IndianRupee,
-  Scale,
-  Printer,
-  Calendar,
-  FileSpreadsheet,
-  Users,
-  Milk,
-  FileDown,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Users
 } from "lucide-react";
 import { format, endOfMonth, subMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
-import { utils, writeFile } from "xlsx";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -57,9 +48,12 @@ export default function ReportsPage() {
 
   useEffect(() => {
     setIsClient(true);
-    const now = new Date();
-    setSelectedMonth(format(now, 'yyyy-MM'));
+    setSelectedDate(format(new Date(), 'yyyy-MM-dd'));
+    setSelectedMonth(format(new Date(), 'yyyy-MM'));
   }, []);
+
+  // Fix: dummy state to satisfy the build, but unused logic
+  const [selectedDate, setSelectedDate] = useState<string>("");
 
   const monthOptions = useMemo(() => {
     if (!isClient) return [];
@@ -125,24 +119,25 @@ export default function ReportsPage() {
       const fid = e.farmerId;
       const farmerProfile = farmers.find(f => f.id === fid);
       
-      if (!farmerProfile) return;
+      const name = farmerProfile?.name || e.farmerName || "Farmer " + fid.slice(0, 4);
+      const can = farmerProfile?.canNumber || e.canNumber || "---";
+      const milkType = farmerProfile?.milkType || e.milkType || "COW";
 
       if (!map[fid]) {
         map[fid] = {
           id: fid,
-          can: farmerProfile.canNumber,
-          name: farmerProfile.name,
-          milkType: farmerProfile.milkType || "COW",
+          can,
+          name,
+          milkType,
           morningQty: 0, eveningQty: 0, totalQty: 0, totalAmount: 0
         };
       }
 
       const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
       
-      // Buffalo Milk Rate Resolution
       let rate = 0;
-      if (map[fid].milkType === 'BUFFALO') {
-        rate = Number(farmerProfile.customRate) > 0 
+      if (milkType === 'BUFFALO') {
+        rate = farmerProfile && Number(farmerProfile.customRate) > 0 
           ? Number(farmerProfile.customRate) 
           : (Number(ratesConfig.buffaloRate) || 0);
       } else {
@@ -164,7 +159,7 @@ export default function ReportsPage() {
       if (isNaN(aNum) || isNaN(bNum)) return a.can.localeCompare(b.can);
       return aNum - bNum;
     });
-  }, [allEntries, farmers, selectedMonth, activeCycle, ratesConfig]);
+  }, [allEntries, farmers, selectedMonth, activeCycle, ratesConfig, currentCycle]);
 
   const cycleStats = useMemo(() => {
     const totalProcAmt = masterRoster.reduce((acc, c) => acc + c.totalAmount, 0);
@@ -200,7 +195,7 @@ export default function ReportsPage() {
           await deleteDoc(doc(firestore, 'sales', sale.id));
         }
       }
-      toast({ title: "Master Reset Successful", description: "All collection and sales records have been cleared." });
+      toast({ title: "Master Reset Successful", description: "All records cleared." });
     } catch (e: any) {
       toast({ title: "Reset Failed", description: e.message, variant: "destructive" });
     } finally {
@@ -220,7 +215,7 @@ export default function ReportsPage() {
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Reports & Audit</h1>
               <p className="text-muted-foreground font-medium flex items-center gap-2">
                 <Users className="w-4 h-4" /> 
-                Directly synchronized with Farmer Management & Daily Collections
+                Enterprise Business Intelligence Resolution
               </p>
             </div>
             <div className="flex gap-4">
@@ -363,17 +358,17 @@ export default function ReportsPage() {
                        let tCost = 0, tRev = 0, tQty = 0;
                        mEntries.forEach(e => {
                          const f = farmers?.find(item => item.id === e.farmerId);
-                         if (f) {
-                           const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
-                           let rate = 0;
-                           if (f.milkType === 'BUFFALO') {
-                             rate = Number(f.customRate) > 0 ? Number(f.customRate) : (Number(ratesConfig?.buffaloRate) || 0);
-                           } else {
-                             rate = Number(ratesConfig?.cowRate) || 0;
-                           }
-                           tCost += (ltr * rate);
-                           tQty += ltr;
+                         const milkType = f?.milkType || e.milkType || "COW";
+                         const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
+                         
+                         let rate = 0;
+                         if (milkType === 'BUFFALO') {
+                           rate = f && Number(f.customRate) > 0 ? Number(f.customRate) : (Number(ratesConfig?.buffaloRate) || 0);
+                         } else {
+                           rate = Number(ratesConfig?.cowRate) || 0;
                          }
+                         tCost += (ltr * rate);
+                         tQty += ltr;
                        });
                        mSales.forEach(s => {
                          tRev += Number(s.totalAmount) || 0;
@@ -397,19 +392,19 @@ export default function ReportsPage() {
 
               <div className="pt-10 border-t">
                 <h3 className="text-xs font-black text-destructive uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" /> Dangerous Operations
+                  <AlertTriangle className="w-4 h-4" /> System Recovery
                 </h3>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" className="rounded-full px-8 h-12 shadow-lg">
-                      <Trash2 className="w-4 h-4 mr-2" /> Master Data Reset
+                      <Trash2 className="w-4 h-4 mr-2" /> Master Financial Reset
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent className="rounded-3xl">
                     <AlertDialogHeader>
-                      <AlertDialogTitle className="font-black text-destructive uppercase">Confirm Full Reset</AlertDialogTitle>
+                      <AlertDialogTitle className="font-black text-destructive uppercase">Confirm Global Wipe</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will permanently delete ALL collection entries and sales records across all months. This action is irreversible.
+                        This will permanently delete ALL entries and sales records. Directory farmers will be preserved.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

@@ -13,10 +13,27 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { format } from "date-fns";
-import { Sun, Moon, Search, Scale, Droplets, CheckCircle2, Loader2, IndianRupee, Lock } from "lucide-react";
+import { 
+  Sun, 
+  Moon, 
+  Search, 
+  Scale, 
+  Droplets, 
+  CheckCircle2, 
+  Loader2, 
+  IndianRupee, 
+  Lock,
+  Calendar as CalendarIcon
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 
 export default function EntriesPage() {
   const firestore = useFirestore();
@@ -30,6 +47,12 @@ export default function EntriesPage() {
   useEffect(() => {
     setDate(format(new Date(), 'yyyy-MM-dd'));
   }, []);
+
+  // Clear local input cache when date or session changes to avoid stale data
+  useEffect(() => {
+    setKgValues({});
+    setSavingStatus({});
+  }, [date, session]);
 
   const farmersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -54,8 +77,7 @@ export default function EntriesPage() {
   const { data: entries } = useCollection(entriesQuery);
   const { data: ratesConfig } = useDoc(settingsRef);
 
-  // STRICT Business Standard: 0.96
-  const conversionRate = 0.96;
+  const CONVERSION_RATE = 0.96;
 
   const filteredFarmers = farmers?.filter(f => 
     f.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -80,7 +102,6 @@ export default function EntriesPage() {
     const existingEntry = entries?.find(e => e.farmerId === farmerId);
     const kgValue = kgStr !== undefined && kgStr !== "" ? parseFloat(kgStr) : (existingEntry ? Number(existingEntry.kgWeight) : 0);
     
-    // Rate Prioritization Logic (Buffalo Custom > Buffalo Global Config > Cow Global Config)
     let managedRate = 0;
     if (farmer.milkType === 'BUFFALO') {
       managedRate = Number(farmer.customRate) > 0 
@@ -94,14 +115,12 @@ export default function EntriesPage() {
 
     setSavingStatus(prev => ({ ...prev, [farmerId]: 'saving' }));
 
-    // Precision Locked Calculations (2 Decimals)
-    const quantityLitre = parseFloat((kgValue * conversionRate).toFixed(2));
+    const quantityLitre = parseFloat((kgValue * CONVERSION_RATE).toFixed(2));
     const totalAmount = parseFloat((quantityLitre * managedRate).toFixed(2));
 
     const entryId = `${farmerId}_${date}_${session}`;
     const docRef = doc(firestore, 'entries', entryId);
 
-    // Save with Metadata Persistence
     setDocumentNonBlocking(docRef, {
       farmerId,
       farmerName: farmer.name,
@@ -111,7 +130,7 @@ export default function EntriesPage() {
       session,
       kgWeight: kgValue,
       quantity: quantityLitre,
-      conversionRate: conversionRate,
+      conversionRate: CONVERSION_RATE,
       rate: managedRate,
       totalAmount: totalAmount,
       updatedAt: serverTimestamp(),
@@ -132,18 +151,27 @@ export default function EntriesPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
             <div>
-              <h1 className="text-3xl font-black text-primary tracking-tight">Daily Collection</h1>
-              <p className="text-muted-foreground font-medium">Standard Payouts for {format(new Date(date), 'MMMM dd, yyyy')}</p>
+              <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Daily Collection</h1>
+              <p className="text-muted-foreground font-medium">Precision Procurement Logs for {format(new Date(date), 'MMMM dd, yyyy')}</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-              <div className="flex items-center gap-2 bg-card p-1 rounded-full border shadow-sm">
-                <Input 
-                  type="date" 
-                  value={date} 
-                  onChange={(e) => setDate(e.target.value)}
-                  className="border-none focus-visible:ring-0 bg-transparent h-9"
-                />
-              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full sm:w-[240px] rounded-full justify-start text-left font-bold border-primary/20", !date && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4 text-primary" />
+                    {date ? format(new Date(date), "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 rounded-3xl" align="end">
+                  <Calendar
+                    mode="single"
+                    selected={new Date(date)}
+                    onSelect={(d) => d && setDate(format(d, 'yyyy-MM-dd'))}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+
               <Tabs value={session} onValueChange={(v) => setSession(v as any)} className="w-full sm:w-auto">
                 <TabsList className="grid grid-cols-2 w-full sm:w-[240px] rounded-full">
                   <TabsTrigger value="Morning" className="rounded-full gap-2">
@@ -162,7 +190,7 @@ export default function EntriesPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input 
                 className="pl-10 h-12 bg-card rounded-2xl border-primary/10 shadow-sm" 
-                placeholder="Search CAN or Farmer..." 
+                placeholder="Search CAN or Farmer Name..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -177,8 +205,8 @@ export default function EntriesPage() {
             <div className="flex items-center gap-3 px-4 py-2 bg-accent/5 rounded-2xl border border-accent/10">
               <IndianRupee className="w-5 h-5 text-accent" />
               <div className="text-xs">
-                <p className="font-bold text-accent uppercase">Current Rates</p>
-                <p className="text-muted-foreground font-black">Cow: ₹{Number(ratesConfig?.cowRate || 0).toFixed(2)} | Buf: ₹{Number(ratesConfig?.buffaloRate || 0).toFixed(2)}</p>
+                <p className="font-bold text-accent uppercase">Current Procurement Rates</p>
+                <p className="text-muted-foreground font-black">Cow: ₹{Number(ratesConfig?.cowRate || 0).toFixed(2)} | Buffalo: ₹{Number(ratesConfig?.buffaloRate || 0).toFixed(2)}</p>
               </div>
             </div>
           </div>
@@ -188,11 +216,11 @@ export default function EntriesPage() {
               <TableHeader className="bg-muted/50">
                 <TableRow>
                   <TableHead className="w-[80px] font-bold py-4 pl-6">CAN</TableHead>
-                  <TableHead className="font-bold">Farmer Details</TableHead>
-                  <TableHead className="w-[120px] font-bold">Calculation</TableHead>
-                  <TableHead className="w-[180px] font-bold">Entry (Kg)</TableHead>
+                  <TableHead className="font-bold">Farmer Name</TableHead>
+                  <TableHead className="w-[120px] font-bold">Volume (L)</TableHead>
+                  <TableHead className="w-[180px] font-bold">Weight (Kg)</TableHead>
                   <TableHead className="w-[150px] font-bold">Rate (₹/L)</TableHead>
-                  <TableHead className="w-[120px] font-bold text-right">Amount (₹)</TableHead>
+                  <TableHead className="w-[120px] font-bold text-right">Payout (₹)</TableHead>
                   <TableHead className="w-[80px] text-right pr-6 font-bold">Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -204,7 +232,7 @@ export default function EntriesPage() {
                     : (existingEntry ? Number(existingEntry.kgWeight).toString() : "");
                   
                   const kgNum = parseFloat(currentKgStr);
-                  const previewLitre = !isNaN(kgNum) ? (kgNum * 0.96).toFixed(2) : "0.00";
+                  const previewLitre = !isNaN(kgNum) ? (kgNum * CONVERSION_RATE).toFixed(2) : "0.00";
                   
                   let managedRate = 0;
                   const isBuffalo = farmer.milkType === 'BUFFALO';

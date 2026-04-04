@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   FileText, 
   Printer, 
-  Calendar, 
   Loader2, 
   ChevronRight,
   FileDown
@@ -77,6 +76,8 @@ export default function FarmerBillsPage() {
 
   const CONVERSION_RATE = 0.96;
 
+  const currentCycle = cycles[activeCycle];
+
   const masterRoster = useMemo(() => {
     if (!allEntries || !selectedMonth || !currentCycle || !farmers || !ratesConfig) return [];
     
@@ -90,14 +91,17 @@ export default function FarmerBillsPage() {
     cycleEntries.forEach(e => {
       const fid = e.farmerId;
       const farmerProfile = farmers.find(f => f.id === fid);
-      if (!farmerProfile) return;
+      
+      const name = farmerProfile?.name || e.farmerName || "Farmer " + fid.slice(0, 4);
+      const can = farmerProfile?.canNumber || e.canNumber || "---";
+      const milkType = farmerProfile?.milkType || e.milkType || "COW";
 
       if (!map[fid]) {
         map[fid] = {
           id: fid,
-          can: farmerProfile.canNumber,
-          name: farmerProfile.name,
-          milkType: farmerProfile.milkType || "COW",
+          can,
+          name,
+          milkType,
           totalQty: 0,
           totalAmount: 0
         };
@@ -105,10 +109,10 @@ export default function FarmerBillsPage() {
 
       const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
       
-      // Buffalo Milk Rate Resolution
+      // Buffalo Milk Rate Resolution (Custom > Global)
       let rate = 0;
-      if (map[fid].milkType === 'BUFFALO') {
-        rate = Number(farmerProfile.customRate) > 0 
+      if (milkType === 'BUFFALO') {
+        rate = farmerProfile && Number(farmerProfile.customRate) > 0 
           ? Number(farmerProfile.customRate) 
           : (Number(ratesConfig.buffaloRate) || 0);
       } else {
@@ -125,9 +129,7 @@ export default function FarmerBillsPage() {
       if (isNaN(aNum) || isNaN(bNum)) return a.can.localeCompare(b.can);
       return aNum - bNum;
     });
-  }, [allEntries, farmers, selectedMonth, activeCycle, ratesConfig]);
-
-  const currentCycle = cycles[activeCycle];
+  }, [allEntries, farmers, selectedMonth, activeCycle, ratesConfig, currentCycle]);
 
   const generateProfessionalInvoice = (pdf: jsPDF, f: any) => {
     const company = (ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS").toUpperCase();
@@ -184,8 +186,8 @@ export default function FarmerBillsPage() {
 
       let rate = 0;
       if (f.milkType === 'BUFFALO') {
-        rate = Number(farmerProfile?.customRate) > 0 
-          ? Number(farmerProfile?.customRate) 
+        rate = farmerProfile && Number(farmerProfile.customRate) > 0 
+          ? Number(farmerProfile.customRate) 
           : (Number(ratesConfig?.buffaloRate) || 0);
       } else {
         rate = Number(ratesConfig?.cowRate) || 0;
@@ -239,12 +241,10 @@ export default function FarmerBillsPage() {
             <div>
               <div className="flex items-center gap-2 text-primary mb-1">
                 <FileText className="w-5 h-5" />
-                <span className="text-xs font-black uppercase tracking-widest">Billing Cycle Module</span>
+                <span className="text-xs font-black uppercase tracking-widest">Enterprise Billing</span>
               </div>
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Farmer Bills</h1>
-              <p className="text-muted-foreground font-medium flex items-center gap-2">
-                Generate professional invoices based on collection history and directory records.
-              </p>
+              <p className="text-muted-foreground font-medium">Generate professional invoices for your supplier directory.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4">
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
@@ -302,7 +302,7 @@ export default function FarmerBillsPage() {
                 {entriesLoading || farmersLoading ? (
                   <TableRow><TableCell colSpan={6} className="text-center py-20"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" /></TableCell></TableRow>
                 ) : masterRoster.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-20 italic text-muted-foreground">No data found in Farmer Management directory for this cycle.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center py-20 italic text-muted-foreground">No transaction data found for this cycle.</TableCell></TableRow>
                 ) : (
                   masterRoster.map(f => (
                     <TableRow key={f.id} className="hover:bg-primary/5 transition-colors group">

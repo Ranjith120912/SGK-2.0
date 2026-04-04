@@ -9,11 +9,10 @@ import { collection, doc } from "firebase/firestore";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { 
   FileBarChart, 
   Printer, 
-  Calendar, 
+  Calendar as CalendarIcon, 
   FileSpreadsheet, 
   Users, 
   Loader2 
@@ -23,6 +22,13 @@ import { Badge } from "@/components/ui/badge";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import { utils, writeFile } from "xlsx";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 
 export default function DailyReportsPage() {
   const firestore = useFirestore();
@@ -65,14 +71,17 @@ export default function DailyReportsPage() {
       const fid = e.farmerId;
       const farmerProfile = farmers.find(f => f.id === fid);
       
-      if (!farmerProfile) return;
+      // Resolution Strategy: Live Directory > Stored Metadata > Fallback
+      const name = farmerProfile?.name || e.farmerName || "Farmer " + fid.slice(0, 4);
+      const can = farmerProfile?.canNumber || e.canNumber || "---";
+      const milkType = farmerProfile?.milkType || e.milkType || "COW";
 
       if (!map[fid]) {
         map[fid] = {
           fid,
-          can: farmerProfile.canNumber,
-          name: farmerProfile.name,
-          milkType: farmerProfile.milkType || "COW",
+          can,
+          name,
+          milkType,
           amKg: 0, amLtr: 0,
           pmKg: 0, pmLtr: 0,
           totalLtr: 0, totalAmt: 0
@@ -82,10 +91,10 @@ export default function DailyReportsPage() {
       const kg = Number(e.kgWeight) || 0;
       const ltr = kg * CONVERSION_RATE;
       
-      // Buffalo Milk Rate Resolution
+      // Buffalo Milk Rate Resolution (Custom > Global)
       let rate = 0;
-      if (map[fid].milkType === 'BUFFALO') {
-        rate = Number(farmerProfile.customRate) > 0 
+      if (milkType === 'BUFFALO') {
+        rate = farmerProfile && Number(farmerProfile.customRate) > 0 
           ? Number(farmerProfile.customRate) 
           : (Number(ratesConfig.buffaloRate) || 0);
       } else {
@@ -173,24 +182,32 @@ export default function DailyReportsPage() {
             <div>
               <div className="flex items-center gap-2 text-primary mb-1">
                 <FileBarChart className="w-5 h-5" />
-                <span className="text-xs font-black uppercase tracking-widest">Precision Resolution</span>
+                <span className="text-xs font-black uppercase tracking-widest">Enterprise Precision</span>
               </div>
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Daily Reports</h1>
               <p className="text-muted-foreground font-medium flex items-center gap-2">
                 <Users className="w-4 h-4" /> 
-                Derived Strictly from Farmer Management & Collections
+                Synchronized Directory & Transactions
               </p>
             </div>
             <div className="flex flex-col sm:flex-row items-center gap-4">
-              <div className="flex items-center gap-3 bg-card p-2 rounded-full border shadow-sm px-6">
-                <Calendar className="w-4 h-4 text-primary" />
-                <Input 
-                  type="date" 
-                  value={selectedDate} 
-                  onChange={(e) => setSelectedDate(e.target.value)} 
-                  className="border-none focus-visible:ring-0 bg-transparent h-8 w-[140px] font-bold" 
-                />
-              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full sm:w-[240px] rounded-full justify-start text-left font-bold border-primary/20 bg-card px-6 h-11 shadow-sm")}>
+                    <CalendarIcon className="mr-2 h-4 w-4 text-primary" />
+                    {selectedDate ? format(new Date(selectedDate), "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 rounded-3xl" align="end">
+                  <Calendar
+                    mode="single"
+                    selected={new Date(selectedDate)}
+                    onSelect={(d) => d && setSelectedDate(format(d, 'yyyy-MM-dd'))}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+
               <div className="flex gap-2">
                 <Button onClick={handleExportExcel} variant="outline" className="rounded-full font-black uppercase text-[10px] h-11 px-6">
                   <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel

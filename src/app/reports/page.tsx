@@ -116,6 +116,7 @@ export default function ReportsPage() {
    */
   const resolveEntryFinancials = (entry: any, farmersList: any[], config: any) => {
     const kg = Number(entry.kgWeight) || 0;
+    // Prefer database saved quantity or calculate with strict 0.96
     const quantity = Number(entry.quantity) || parseFloat((kg * 0.96).toFixed(2));
     
     // Identity Sync Logic: Live Directory > Persisted Metadata
@@ -134,6 +135,7 @@ export default function ReportsPage() {
       }
     }
 
+    // Prefer database saved amount or calculate with 2-decimal precision
     const amount = Number(entry.totalAmount) || parseFloat((quantity * rate).toFixed(2));
     
     return { 
@@ -143,7 +145,8 @@ export default function ReportsPage() {
       appliedRate: rate,
       farmerName: farmerName,
       canNumber: canNumber,
-      session: entry.session || "Morning"
+      session: entry.session || "Morning",
+      milkType: farmerInDirectory?.milkType || 'COW'
     };
   };
 
@@ -297,7 +300,7 @@ export default function ReportsPage() {
   // --- PDF & Excel Generation ---
   const generateDailyReportPDF = () => {
     const pdf = new jsPDF('l', 'mm', 'a4');
-    const company = (ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS").toUpperCase();
+    const company = (ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS").toUpperCase();
     const dateStr = format(new Date(selectedDailyDate), 'dd/MM/yyyy');
 
     pdf.setFont("helvetica", "bold");
@@ -356,10 +359,6 @@ export default function ReportsPage() {
   };
 
   const generateDailyReportExcel = () => {
-    const company = (ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS").toUpperCase();
-    const dateStr = format(new Date(selectedDailyDate), 'dd-MM-yyyy');
-
-    // PROCUREMENT DATA (Sheet 1)
     const procData = dailyData.procurement.map((p: any) => ({
       "CAN": p.can,
       "FARMER NAME": p.name.toUpperCase(),
@@ -371,7 +370,6 @@ export default function ReportsPage() {
       "AMOUNT (Rs)": p.totalAmt
     }));
     
-    // SALES DATA (Sheet 2)
     const saleData = dailyData.sales.map(s => ({
       "BUYER NAME": s.buyerName.toUpperCase(),
       "SESSION": s.session.toUpperCase(),
@@ -382,10 +380,8 @@ export default function ReportsPage() {
     }));
 
     const wb = utils.book_new();
-    
     const wsProc = utils.json_to_sheet(procData);
     utils.book_append_sheet(wb, wsProc, "Procurement");
-    
     const wsSale = utils.json_to_sheet(saleData);
     utils.book_append_sheet(wb, wsSale, "Sales");
 
@@ -393,64 +389,45 @@ export default function ReportsPage() {
   };
 
   const generateSingleInvoice = (pdf: jsPDF, f: any) => {
-    const company = (ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS").toUpperCase();
+    const company = (ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS").toUpperCase();
     const [y_part, m_part] = selectedMonth.split('-').map(Number);
     const range = `${currentCycle.start.toString().padStart(2, '0')}/${m_part.toString().padStart(2, '0')}/${y_part.toString().slice(-2)} to ${currentCycle.end.toString().padStart(2, '0')}/${m_part.toString().padStart(2, '0')}/${y_part.toString().slice(-2)}`;
     const todayStr = format(new Date(), 'dd/MM/yyyy');
 
     pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(16);
+    pdf.setFontSize(18);
     pdf.text(company, 105, 20, { align: 'center' });
     pdf.setFontSize(13);
     pdf.text("MILK INVOICE", 105, 28, { align: 'center' });
     pdf.setLineWidth(0.1);
-    pdf.line(90, 30, 120, 30); 
+    pdf.line(85, 30, 125, 30); 
 
-    pdf.setFontSize(9);
+    pdf.setFontSize(10);
     pdf.setFont("helvetica", "normal");
-    const labelX1 = 20;
-    const valueX1 = 45;
-    const labelX2 = 110;
-    const valueX2 = 135;
-    const lineW = 60;
-
+    const col1_X = 20;
+    const col2_X = 110;
     let y = 45;
-    pdf.text("NAME:", labelX1, y);
-    pdf.setFont("helvetica", "bold");
-    pdf.text(f.name.toUpperCase(), valueX1, y);
-    pdf.line(valueX1, y+1, valueX1 + lineW, y+1);
-    
-    pdf.setFont("helvetica", "normal");
-    pdf.text("DATE:", labelX2, y);
-    pdf.setFont("helvetica", "bold");
-    pdf.text(todayStr, valueX2, y);
-    pdf.line(valueX2, y+1, valueX2 + lineW, y+1);
 
+    // Field Drawing Helper
+    const drawField = (label: string, value: string, x: number, y: number) => {
+      pdf.setFont("helvetica", "normal");
+      pdf.text(label, x, y);
+      const labelW = pdf.getTextWidth(label);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(value, x + labelW + 5, y);
+      pdf.line(x + labelW + 4, y + 1, x + labelW + 65, y + 1);
+    };
+
+    drawField("NAME:", f.name.toUpperCase(), col1_X, y);
+    drawField("DATE:", todayStr, col2_X, y);
     y += 10;
-    pdf.text("A/C NO:", labelX1, y);
-    pdf.setFont("helvetica", "bold");
     const farmerInDir = farmers?.find(item => item.id === f.id);
-    pdf.text(farmerInDir?.bankAccountNumber || "—", valueX1, y);
-    pdf.line(valueX1, y+1, valueX1 + lineW, y+1);
-
-    pdf.setFont("helvetica", "normal");
-    pdf.text("PERIOD:", labelX2, y);
-    pdf.setFont("helvetica", "bold");
-    pdf.text(range, valueX2, y);
-    pdf.line(valueX2, y+1, valueX2 + lineW, y+1);
-
+    drawField("A/C NO:", farmerInDir?.bankAccountNumber || "—", col1_X, y);
+    drawField("PERIOD:", range, col2_X, y);
     y += 10;
-    pdf.text("CAN NO:", labelX1, y);
-    pdf.setFont("helvetica", "bold");
-    pdf.text(f.canNumber, valueX1, y);
-    pdf.line(valueX1, y+1, valueX1 + lineW, y+1);
-
-    pdf.setFont("helvetica", "normal");
-    pdf.text("RATE (Rs):", labelX2, y);
-    pdf.setFont("helvetica", "bold");
+    drawField("CAN NO:", f.canNumber, col1_X, y);
     const effectiveRate = farmerInDir?.customRate > 0 ? farmerInDir.customRate : (farmerInDir?.milkType === 'BUFFALO' ? ratesConfig?.buffaloRate : ratesConfig?.cowRate);
-    pdf.text(Number(effectiveRate || 0).toFixed(2), valueX2, y);
-    pdf.line(valueX2, y+1, valueX2 + lineW, y+1);
+    drawField("RATE (Rs):", Number(effectiveRate || 0).toFixed(2), col2_X, y);
 
     const fEntries = allEntries!.filter(e => e.farmerId === f.id && e.date.startsWith(selectedMonth) && parseInt(e.date.split('-')[2]) >= currentCycle.start && parseInt(e.date.split('-')[2]) <= currentCycle.end);
     
@@ -471,21 +448,24 @@ export default function ReportsPage() {
       head: [['DATE', 'MORNING (L)', 'EVENING (L)', 'TOTAL LITRES', 'RATE (Rs)', 'AMOUNT (Rs)']],
       body: rows,
       theme: 'grid',
-      headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center', lineWidth: 0.1, lineColor: [0, 0, 0] },
-      bodyStyles: { textColor: [0, 0, 0], halign: 'center', lineWidth: 0.1, lineColor: [0, 0, 0] },
+      headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center', lineWidth: 0.1, lineColor: [0, 0, 0] },
+      bodyStyles: { textColor: [0, 0, 0], halign: 'center', lineWidth: 0.1, lineColor: [0, 0, 0], fontSize: 9 },
       margin: { left: 20, right: 20 }
     });
 
     const finalY = (pdf as any).lastAutoTable.finalY;
-    pdf.setFontSize(10);
+    pdf.setFontSize(11);
     pdf.setFont("helvetica", "bold");
     pdf.text("TOTAL", 20, finalY + 10);
-    pdf.text(f.totalQty.toFixed(2), 118, finalY + 10, { align: 'center' }); 
+    pdf.text(f.totalQty.toFixed(2), 125, finalY + 10, { align: 'center' }); 
     pdf.text(f.totalAmount.toFixed(2), 190, finalY + 10, { align: 'right' });
 
     pdf.setFontSize(8);
-    pdf.line(140, 280, 190, 280);
-    pdf.text("AUTHORIZED SIGNATURE", 165, 284, { align: 'center' });
+    pdf.setFont("helvetica", "italic");
+    pdf.text("System generated invoice - Precision Locked to 0.96 Standard", 105, 275, { align: 'center' });
+    pdf.setFont("helvetica", "bold");
+    pdf.line(140, 285, 190, 285);
+    pdf.text("AUTHORIZED SIGNATURE", 165, 289, { align: 'center' });
   };
 
   if (!isClient) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
@@ -587,7 +567,7 @@ export default function ReportsPage() {
                 <Card className="rounded-3xl border-none shadow-xl overflow-hidden">
                   <div className="p-6 bg-primary/5 border-b flex items-center justify-between">
                     <h3 className="font-black text-primary uppercase text-xs tracking-widest flex items-center gap-2">
-                      <ClipboardList className="w-4 h-4" /> Daily Procurement (AM/PM)
+                      <ClipboardList className="w-4 h-4" /> Daily Procurement (Horizontal AM/PM)
                     </h3>
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-1 text-[10px] font-black text-muted-foreground uppercase"><Scale className="w-3 h-3"/> Standard: 0.96</div>

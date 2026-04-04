@@ -108,6 +108,12 @@
         "buyerId": {
           "type": "string"
         },
+        "buyerName": {
+          "type": "string"
+        },
+        "buyerCode": {
+          "type": "string"
+        },
         "date": {
           "type": "string",
           "format": "date"

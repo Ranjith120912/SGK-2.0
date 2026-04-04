@@ -21,13 +21,15 @@ import {
   ChevronRight,
   FileDown,
   Milk,
-  ArrowRight
+  ArrowRight,
+  CalendarDays,
+  PieChart
 } from "lucide-react";
 import { format, endOfMonth, subMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import jsPDF from "jspdf";
+import jspdf from "jspdf";
 import "jspdf-autotable";
 
 export default function ReportsPage() {
@@ -96,7 +98,6 @@ export default function ReportsPage() {
 
   /**
    * Centralized Rate & Cost Resolution Engine
-   * Ensures 100% synchronization across all report tabs and PDFs.
    */
   const resolveEntryCost = (entry: any, farmersList: any[], config: any) => {
     const qtyLitre = Number(entry.quantity) || 0;
@@ -117,7 +118,6 @@ export default function ReportsPage() {
       resolvedRate = Number(entry.rate) || 0;
     }
 
-    // Always recalculate with 2-decimal precision for total synchronization
     return parseFloat((qtyLitre * resolvedRate).toFixed(2));
   };
 
@@ -129,6 +129,15 @@ export default function ReportsPage() {
       return day >= currentCycle.start && day <= currentCycle.end;
     });
   }, [allEntries, selectedMonth, currentCycle]);
+
+  const filteredCycleSales = useMemo(() => {
+    if (!allSales || !selectedMonth || !currentCycle) return [];
+    return allSales.filter(sale => {
+      if (!sale.date.startsWith(selectedMonth)) return false;
+      const day = parseInt(sale.date.split('-')[2]);
+      return day >= currentCycle.start && day <= currentCycle.end;
+    });
+  }, [allSales, selectedMonth, currentCycle]);
 
   const masterRoster = useMemo(() => {
     if (!farmers || !currentCycle) return [];
@@ -161,6 +170,33 @@ export default function ReportsPage() {
   const buffaloRoster = masterRoster.filter(f => f.milkType === 'BUFFALO');
 
   const activeInvoices = masterRoster.filter(f => f.totalQty > 0);
+
+  const cycleStats = useMemo(() => {
+    if (!filteredCycleEntries || !filteredCycleSales || !farmers) return {
+      totalEntryQty: 0,
+      totalSaleQty: 0,
+      totalEntryAmt: 0,
+      totalSaleAmt: 0,
+      profit: 0
+    };
+    
+    const totalEntryQty = filteredCycleEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
+    const totalSaleQty = filteredCycleSales.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
+    
+    const totalEntryAmt = filteredCycleEntries.reduce((acc, curr) => {
+      return acc + resolveEntryCost(curr, farmers, ratesConfig);
+    }, 0);
+
+    const totalSaleAmt = filteredCycleSales.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
+
+    return {
+      totalEntryQty,
+      totalSaleQty,
+      totalEntryAmt,
+      totalSaleAmt,
+      profit: totalSaleAmt - totalEntryAmt
+    };
+  }, [filteredCycleEntries, filteredCycleSales, farmers, ratesConfig]);
 
   const monthStats = useMemo(() => {
     if (!allEntries || !allSales || !selectedMonth || !farmers) return {
@@ -199,7 +235,6 @@ export default function ReportsPage() {
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
     
-    // April - March Fiscal Cycle
     const fiscalYearStart = currentMonth < 3 ? currentYear - 1 : currentYear;
     
     return Array.from({ length: 12 }).map((_, i) => {
@@ -235,7 +270,7 @@ export default function ReportsPage() {
   const cowTotals = calculateRosterTotals(cowRoster);
   const buffaloTotals = calculateRosterTotals(buffaloRoster);
 
-  const generateSingleInvoice = (doc: jsPDF, farmer: any) => {
+  const generateSingleInvoice = (doc: jspdf, farmer: any) => {
     const companyName = (ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS").toUpperCase();
     const [year, month] = selectedMonth.split('-').map(Number);
     const cycleStart = currentCycle.start;
@@ -354,7 +389,7 @@ export default function ReportsPage() {
   };
 
   const handleDownloadRosterPDF = () => {
-    const doc = new jsPDF('l', 'mm', 'a4');
+    const doc = new jspdf('l', 'mm', 'a4');
     const companyName = ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS";
     const cycleLabel = currentCycle?.label || "";
     const monthLabel = monthOptions.find(o => o.value === selectedMonth)?.label || "";
@@ -409,14 +444,14 @@ export default function ReportsPage() {
   const handleDownloadFarmerBillPDF = (farmerId: string) => {
     const f = masterRoster.find(m => m.id === farmerId);
     if (!f) return;
-    const doc = new jsPDF();
+    const doc = new jspdf();
     generateSingleInvoice(doc, f);
     doc.save(`Invoice_${f.canNumber}_${f.name}_${selectedMonth}.pdf`);
   };
 
   const handleDownloadBulkInvoicesPDF = () => {
     if (activeInvoices.length === 0) return;
-    const doc = new jsPDF();
+    const doc = new jspdf();
     activeInvoices.forEach((f, idx) => {
       if (idx > 0) doc.addPage();
       generateSingleInvoice(doc, f);
@@ -487,57 +522,126 @@ export default function ReportsPage() {
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">{ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS"} Reports</h1>
               <p className="text-muted-foreground font-medium">Financial Summary • April - March Cycle</p>
             </div>
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-[200px] rounded-full font-bold h-11"><SelectValue /></SelectTrigger>
-              <SelectContent>{monthOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
-            </Select>
+            <div className="flex gap-4">
+               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="w-[200px] rounded-full font-bold h-11"><SelectValue /></SelectTrigger>
+                <SelectContent>{monthOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
           </header>
 
           <Tabs defaultValue="overview" className="space-y-8">
-            <TabsList className="bg-muted p-1 rounded-full h-auto">
-              <TabsTrigger value="overview" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Overview</TabsTrigger>
-              <TabsTrigger value="cycle" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Cycle Bill</TabsTrigger>
-              <TabsTrigger value="master" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Master Summary</TabsTrigger>
-              <TabsTrigger value="audit" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Audit</TabsTrigger>
-            </TabsList>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
+              <TabsList className="bg-muted p-1 rounded-full h-auto">
+                <TabsTrigger value="overview" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Overview</TabsTrigger>
+                <TabsTrigger value="cycle" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Cycle Bill</TabsTrigger>
+                <TabsTrigger value="master" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Master Summary</TabsTrigger>
+                <TabsTrigger value="audit" className="rounded-full px-6 py-2 font-black uppercase text-[10px]">Audit</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="overview" className="animate-in fade-in duration-500">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card className="rounded-[2rem] bg-primary text-white p-8">
-                  <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Collection Volume</p>
-                  <p className="text-4xl font-black mt-4">{monthStats.totalEntryQty.toFixed(2)} L</p>
-                </Card>
-                <Card className="rounded-[2rem] bg-accent text-white p-8">
-                  <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Sales Revenue</p>
-                  <p className="text-4xl font-black mt-4">Rs. {monthStats.totalSaleAmt.toFixed(2)}</p>
-                </Card>
-                <Card className="rounded-[2rem] p-8 border-none shadow-xl">
-                  <p className="text-[10px] font-black uppercase text-muted-foreground">Net Profit</p>
-                  <p className={cn("text-4xl font-black mt-4", monthStats.profit >= 0 ? "text-green-600" : "text-destructive")}>Rs. {monthStats.profit.toFixed(2)}</p>
-                </Card>
-                <Card className="rounded-[2rem] p-8 border-none shadow-xl bg-card">
-                  <p className="text-[10px] font-black uppercase text-muted-foreground">Procurement Cost</p>
-                  <p className="text-3xl font-black mt-4 text-primary">Rs. {monthStats.totalEntryAmt.toFixed(2)}</p>
-                </Card>
+              <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-full border">
+                {cycles.map((c, i) => (
+                  <button 
+                    key={i} 
+                    onClick={() => setActiveCycle(i)} 
+                    className={cn(
+                      "rounded-full text-[10px] font-black px-4 h-8 transition-all", 
+                      activeCycle === i ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:bg-muted"
+                    )}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <TabsContent value="overview" className="animate-in fade-in duration-500 space-y-12">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-primary">
+                  <CalendarDays className="w-5 h-5" />
+                  <h2 className="font-black uppercase tracking-widest text-sm">Selected Cycle Statistics ({currentCycle.label})</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <Card className="rounded-[2rem] bg-primary text-white p-8 shadow-xl shadow-primary/20">
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Cycle Volume</p>
+                    <p className="text-4xl font-black mt-4">{cycleStats.totalEntryQty.toFixed(2)} L</p>
+                  </Card>
+                  <Card className="rounded-[2rem] bg-accent text-white p-8 shadow-xl shadow-accent/20">
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Cycle Sales</p>
+                    <p className="text-4xl font-black mt-4">Rs. {cycleStats.totalSaleAmt.toFixed(2)}</p>
+                  </Card>
+                  <Card className="rounded-[2rem] p-8 border-none shadow-xl bg-card border-l-4 border-destructive">
+                    <p className="text-[10px] font-black uppercase text-muted-foreground">Cycle Payout</p>
+                    <p className="text-3xl font-black mt-4 text-destructive">Rs. {cycleStats.totalEntryAmt.toFixed(2)}</p>
+                  </Card>
+                  <Card className="rounded-[2rem] p-8 border-none shadow-xl bg-card border-l-4 border-green-500">
+                    <p className="text-[10px] font-black uppercase text-muted-foreground">Cycle Profit</p>
+                    <p className={cn("text-3xl font-black mt-4", cycleStats.profit >= 0 ? "text-green-600" : "text-destructive")}>
+                      Rs. {cycleStats.profit.toFixed(2)}
+                    </p>
+                  </Card>
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <PieChart className="w-5 h-5" />
+                  <h2 className="font-black uppercase tracking-widest text-sm">Full Month Summary ({monthOptions.find(o => o.value === selectedMonth)?.label})</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="flex items-center justify-between p-6 bg-muted/30 rounded-3xl border">
+                    <span className="text-xs font-bold text-muted-foreground uppercase">Monthly Volume</span>
+                    <span className="text-2xl font-black text-primary">{monthStats.totalEntryQty.toFixed(2)} L</span>
+                  </div>
+                  <div className="flex items-center justify-between p-6 bg-muted/30 rounded-3xl border">
+                    <span className="text-xs font-bold text-muted-foreground uppercase">Monthly Procurement</span>
+                    <span className="text-2xl font-black text-destructive">Rs. {monthStats.totalEntryAmt.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-6 bg-muted/30 rounded-3xl border">
+                    <span className="text-xs font-bold text-muted-foreground uppercase">Monthly Profit</span>
+                    <span className={cn("text-2xl font-black", monthStats.profit >= 0 ? "text-green-600" : "text-destructive")}>
+                      Rs. {monthStats.profit.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
               </div>
             </TabsContent>
 
             <TabsContent value="cycle" className="space-y-6 animate-in fade-in">
-              <div className="flex justify-between items-center">
-                <div className="flex gap-2 bg-muted p-1 rounded-full border">
-                  {cycles.map((c, i) => (
-                    <button key={i} onClick={() => setActiveCycle(i)} className={cn("rounded-full text-[10px] font-black px-6 h-8", activeCycle === i ? "bg-primary text-white" : "text-muted-foreground")}>{c.label}</button>
-                  ))}
-                </div>
-                <Button onClick={handleDownloadBulkInvoicesPDF} disabled={activeInvoices.length === 0} className="rounded-full bg-red-600">Download Bulk Invoices</Button>
+              <div className="flex justify-end items-center">
+                <Button onClick={handleDownloadBulkInvoicesPDF} disabled={activeInvoices.length === 0} className="rounded-full bg-red-600 shadow-lg shadow-red-200 hover:bg-red-700">
+                  <Download className="w-4 h-4 mr-2" /> Download Bulk Invoices
+                </Button>
               </div>
-              <Card className="rounded-3xl overflow-hidden border-none shadow-lg">
+              <Card className="rounded-3xl overflow-hidden border-none shadow-lg bg-card/50 backdrop-blur-sm">
                 <Table>
-                  <TableHeader className="bg-muted/50"><TableRow><TableHead className="pl-10">CAN</TableHead><TableHead>Farmer Name</TableHead><TableHead className="text-right">Qty (L)</TableHead><TableHead className="text-right">Amount (Rs)</TableHead><TableHead className="text-right pr-10">Actions</TableHead></TableRow></TableHeader>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="pl-10 font-black text-[10px] text-primary uppercase tracking-widest py-5">CAN</TableHead>
+                      <TableHead className="font-black text-[10px] text-primary uppercase tracking-widest py-5">Farmer Name</TableHead>
+                      <TableHead className="text-right font-black text-[10px] text-primary uppercase tracking-widest py-5">Qty (L)</TableHead>
+                      <TableHead className="text-right font-black text-[10px] text-primary uppercase tracking-widest py-5">Amount (Rs)</TableHead>
+                      <TableHead className="text-right pr-10 font-black text-[10px] text-primary uppercase tracking-widest py-5">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
                   <TableBody>
-                    {activeInvoices.map(f => (
-                      <TableRow key={f.id}><TableCell className="pl-10 font-black text-primary">{f.canNumber}</TableCell><TableCell className="font-bold">{f.name}</TableCell><TableCell className="text-right font-black">{f.totalQty.toFixed(2)}</TableCell><TableCell className="text-right font-mono">Rs. {f.totalAmount.toFixed(2)}</TableCell><TableCell className="text-right pr-10"><Button variant="ghost" onClick={() => handleDownloadFarmerBillPDF(f.id)} className="text-red-600 font-bold">Download Bill</Button></TableCell></TableRow>
-                    ))}
+                    {activeInvoices.length === 0 ? (
+                      <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground font-medium">No active collections in this cycle.</TableCell></TableRow>
+                    ) : (
+                      activeInvoices.map(f => (
+                        <TableRow key={f.id} className="hover:bg-primary/5 transition-colors">
+                          <TableCell className="pl-10 font-black text-primary text-lg">{f.canNumber}</TableCell>
+                          <TableCell className="font-bold uppercase text-sm">{f.name}</TableCell>
+                          <TableCell className="text-right font-black">{f.totalQty.toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-mono text-primary">Rs. {f.totalAmount.toFixed(2)}</TableCell>
+                          <TableCell className="text-right pr-10">
+                            <Button variant="ghost" onClick={() => handleDownloadFarmerBillPDF(f.id)} className="text-red-600 font-black uppercase text-[10px] hover:bg-red-50">
+                              <Download className="w-3 h-3 mr-2" /> Download Bill
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </Card>
@@ -545,18 +649,15 @@ export default function ReportsPage() {
 
             <TabsContent value="master" className="space-y-10 animate-in fade-in">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-                <div className="flex gap-2 bg-muted p-1 rounded-full border">
-                  {cycles.map((c, i) => (
-                    <button key={i} onClick={() => setActiveCycle(i)} className={cn("rounded-full text-[10px] font-black px-6 h-8", activeCycle === i ? "bg-primary text-white" : "text-muted-foreground")}>{c.label}</button>
-                  ))}
-                </div>
                 <div className="flex items-center gap-4">
-                  <div className="bg-primary px-8 py-3 rounded-2xl text-white shadow-xl shadow-primary/10">
-                    <p className="text-[10px] font-black uppercase opacity-70">Total Cycle Amount</p>
-                    <p className="text-2xl font-black">Rs. {grandTotalAmt.toFixed(2)}</p>
+                  <div className="bg-primary px-8 py-4 rounded-[2rem] text-white shadow-xl shadow-primary/10 border-b-4 border-black/10">
+                    <p className="text-[10px] font-black uppercase opacity-70 tracking-widest">Grand Total Payout ({currentCycle.label})</p>
+                    <p className="text-3xl font-black mt-1">Rs. {grandTotalAmt.toFixed(2)}</p>
                   </div>
-                  <Button onClick={handleDownloadRosterPDF} className="rounded-full h-12 px-8 font-black uppercase text-[10px]">Download PDF Roster</Button>
                 </div>
+                <Button onClick={handleDownloadRosterPDF} className="rounded-full h-12 px-10 font-black uppercase text-[10px] shadow-lg hover:shadow-primary/20 transition-all">
+                  <FileDown className="w-4 h-4 mr-2" /> Export PDF Roster
+                </Button>
               </div>
 
               {renderRosterTable("Cow Milk Roster", cowRoster, cowTotals, "text-blue-600")}
@@ -564,12 +665,30 @@ export default function ReportsPage() {
             </TabsContent>
 
             <TabsContent value="audit" className="animate-in fade-in">
-              <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-2xl">
+              <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-2xl bg-card/50 backdrop-blur-sm">
                 <Table>
-                  <TableHeader className="bg-muted/50"><TableRow><TableHead className="pl-10">Month</TableHead><TableHead className="text-center">Collection (L)</TableHead><TableHead className="text-center">Cost (Rs)</TableHead><TableHead className="text-center">Revenue (Rs)</TableHead><TableHead className="text-right pr-10">Profit (Rs)</TableHead></TableRow></TableHeader>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="pl-10 font-black text-[10px] text-primary uppercase tracking-widest py-5">Month</TableHead>
+                      <TableHead className="text-center font-black text-[10px] text-primary uppercase tracking-widest py-5">Collection (L)</TableHead>
+                      <TableHead className="text-center font-black text-[10px] text-primary uppercase tracking-widest py-5">Procurement Cost (Rs)</TableHead>
+                      <TableHead className="text-center font-black text-[10px] text-primary uppercase tracking-widest py-5">Sales Revenue (Rs)</TableHead>
+                      <TableHead className="text-right pr-10 font-black text-[10px] text-primary uppercase tracking-widest py-5">Net Profit (Rs)</TableHead>
+                    </TableRow>
+                  </TableHeader>
                   <TableBody>
                     {monthlyAuditSummary.map((m, i) => (
-                      <TableRow key={i} className="border-b last:border-0"><TableCell className="pl-10 font-black text-primary">{m.monthName}</TableCell><TableCell className="text-center font-bold">{m.collectionL.toFixed(2)}</TableCell><TableCell className="text-center text-destructive">Rs. {m.cost.toFixed(2)}</TableCell><TableCell className="text-center text-green-600">Rs. {m.revenue.toFixed(2)}</TableCell><TableCell className="text-right pr-10 font-black">Rs. {m.profit.toFixed(2)}</TableCell></TableRow>
+                      <TableRow key={i} className="border-b last:border-0 hover:bg-muted/5 transition-colors">
+                        <TableCell className="pl-10 font-black text-primary uppercase text-sm">{m.monthName}</TableCell>
+                        <TableCell className="text-center font-bold">{m.collectionL.toFixed(2)}</TableCell>
+                        <TableCell className="text-center text-destructive font-mono">Rs. {m.cost.toFixed(2)}</TableCell>
+                        <TableCell className="text-center text-green-600 font-mono">Rs. {m.revenue.toFixed(2)}</TableCell>
+                        <TableCell className="text-right pr-10 font-black text-lg">
+                          <span className={cn(m.profit >= 0 ? "text-green-600" : "text-destructive")}>
+                            Rs. {m.profit.toFixed(2)}
+                          </span>
+                        </TableCell>
+                      </TableRow>
                     ))}
                   </TableBody>
                 </Table>

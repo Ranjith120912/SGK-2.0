@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -112,10 +113,8 @@ export default function ReportsPage() {
 
     cycleEntries.forEach(e => {
       const fid = e.farmerId;
-      // STRICT DIRECTORY VALIDATION: Only include validated farmers from management tab
       const farmerProfile = farmers.find(f => f.id === fid || f.canNumber === e.canNumber);
-      
-      if (!farmerProfile) return; // REMOVE records for farmers not in the directory
+      if (!farmerProfile) return;
 
       const name = farmerProfile.name;
       const can = farmerProfile.canNumber;
@@ -132,42 +131,28 @@ export default function ReportsPage() {
       }
 
       const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
-      
-      let rate = 0;
-      if (milkType === 'BUFFALO') {
-        rate = Number(farmerProfile.customRate) > 0 
-          ? Number(farmerProfile.customRate) 
-          : (Number(ratesConfig.buffaloRate) || 0);
-      } else {
-        rate = Number(ratesConfig.cowRate) || 0;
-      }
+      let rate = milkType === 'BUFFALO' 
+        ? (Number(farmerProfile.customRate) > 0 ? Number(farmerProfile.customRate) : (Number(ratesConfig.buffaloRate) || 0))
+        : (Number(ratesConfig.cowRate) || 0);
 
       const amt = ltr * rate;
-
       if (e.session === 'Morning') map[fid].morningQty += ltr;
       else map[fid].eveningQty += ltr;
-      
       map[fid].totalQty += ltr;
       map[fid].totalAmount += amt;
     });
 
-    return Object.values(map).sort((a: any, b: any) => {
-      const aNum = parseInt(a.can);
-      const bNum = parseInt(b.can);
-      if (isNaN(aNum) || isNaN(bNum)) return a.can.localeCompare(b.can);
-      return aNum - bNum;
-    });
+    return Object.values(map).sort((a: any, b: any) => parseInt(a.can) - parseInt(b.can));
   }, [allEntries, farmers, selectedMonth, activeCycle, ratesConfig, currentCycle]);
 
   const cycleStats = useMemo(() => {
     const totalProcAmt = masterRoster.reduce((acc, c) => acc + c.totalAmount, 0);
     const totalProcQty = masterRoster.reduce((acc, c) => acc + c.totalQty, 0);
 
-    const cycleSales = allSales?.filter(s => {
-      if (!s.date.startsWith(selectedMonth)) return false;
-      const day = parseInt(s.date.split('-')[2]);
-      return day >= currentCycle.start && day <= currentCycle.end;
-    }) || [];
+    // Filter Cycle-Based Sales
+    const cycleSales = allSales?.filter(s => 
+      s.month === selectedMonth && s.cycleId === activeCycle
+    ) || [];
 
     const totalSaleAmt = cycleSales.reduce((acc, s) => acc + (Number(s.totalAmount) || 0), 0);
 
@@ -177,21 +162,17 @@ export default function ReportsPage() {
       saleRev: totalSaleAmt,
       profit: totalSaleAmt - totalProcAmt
     };
-  }, [masterRoster, allSales, selectedMonth, currentCycle]);
+  }, [masterRoster, allSales, selectedMonth, activeCycle]);
 
   const handleMasterReset = async () => {
     if (!firestore) return;
     setIsResetting(true);
     try {
       if (allEntries) {
-        for (const entry of allEntries) {
-          await deleteDoc(doc(firestore, 'entries', entry.id));
-        }
+        for (const entry of allEntries) await deleteDoc(doc(firestore, 'entries', entry.id));
       }
       if (allSales) {
-        for (const sale of allSales) {
-          await deleteDoc(doc(firestore, 'sales', sale.id));
-        }
+        for (const sale of allSales) await deleteDoc(doc(firestore, 'sales', sale.id));
       }
       toast({ title: "Master Reset Successful", description: "All records cleared." });
     } catch (e: any) {
@@ -283,9 +264,8 @@ export default function ReportsPage() {
                 </div>
                 <Button onClick={() => {
                   const pdf = new jsPDF('l', 'mm', 'a4');
-                  const company = (ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS").toUpperCase();
                   pdf.setFontSize(18);
-                  pdf.text(company, 14, 20);
+                  pdf.text((ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS").toUpperCase(), 14, 20);
                   pdf.setFontSize(12);
                   pdf.text(`MASTER PROCUREMENT ROSTER - ${currentCycle.label} (${selectedMonth})`, 14, 28);
                   (pdf as any).autoTable({
@@ -293,8 +273,7 @@ export default function ReportsPage() {
                     head: [['CAN', 'FARMER NAME', 'TYPE', 'MORNING QTY', 'EVENING QTY', 'TOTAL LITRES', 'PAYOUT (Rs)']],
                     body: masterRoster.map(f => [f.can, f.name, f.milkType, f.morningQty.toFixed(2), f.eveningQty.toFixed(2), f.totalQty.toFixed(2), f.totalAmount.toFixed(2)]),
                     theme: 'grid',
-                    headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' },
-                    bodyStyles: { halign: 'center' }
+                    headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' }
                   });
                   pdf.save(`Master_Roster_${selectedMonth}_${currentCycle.label}.pdf`);
                 }} className="rounded-full bg-white text-primary hover:bg-white/90 h-12 px-8 font-black uppercase text-xs shadow-lg">
@@ -355,31 +334,23 @@ export default function ReportsPage() {
                   <TableBody>
                     {monthOptions.map((opt, i) => {
                        const mEntries = allEntries?.filter(e => e.date.startsWith(opt.value)) || [];
-                       const mSales = allSales?.filter(s => s.date.startsWith(opt.value)) || [];
+                       const mSales = allSales?.filter(s => s.month === opt.value) || [];
                        
                        let tCost = 0, tRev = 0, tQty = 0;
                        mEntries.forEach(e => {
                          const f = farmers?.find(item => item.id === e.farmerId || item.canNumber === e.canNumber);
-                         if (!f) return; // ONLY include directory farmers
-                         
-                         const milkType = f.milkType || "COW";
+                         if (!f) return;
                          const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
-                         
-                         let rate = 0;
-                         if (milkType === 'BUFFALO') {
-                           rate = Number(f.customRate) > 0 ? Number(f.customRate) : (Number(ratesConfig?.buffaloRate) || 0);
-                         } else {
-                           rate = Number(ratesConfig?.cowRate) || 0;
-                         }
+                         let rate = f.milkType === 'BUFFALO' 
+                           ? (Number(f.customRate) > 0 ? Number(f.customRate) : (Number(ratesConfig?.buffaloRate) || 0))
+                           : (Number(ratesConfig?.cowRate) || 0);
                          tCost += (ltr * rate);
                          tQty += ltr;
                        });
-                       mSales.forEach(s => {
-                         tRev += Number(s.totalAmount) || 0;
-                       });
+                       mSales.forEach(s => tRev += Number(s.totalAmount) || 0);
 
                        return (
-                        <TableRow key={i} className="hover:bg-muted/10 group transition-colors border-b last:border-0">
+                        <TableRow key={i} className="hover:bg-muted/10 transition-colors border-b last:border-0">
                           <TableCell className="pl-10 font-black text-primary uppercase text-sm py-6">{opt.label}</TableCell>
                           <TableCell className="text-center font-bold text-base">{tQty.toFixed(2)} L</TableCell>
                           <TableCell className="text-center text-rose-600 font-black">₹ {tCost.toFixed(2)}</TableCell>
@@ -395,9 +366,6 @@ export default function ReportsPage() {
               </Card>
 
               <div className="pt-10 border-t">
-                <h3 className="text-xs font-black text-destructive uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" /> System Recovery
-                </h3>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" className="rounded-full px-8 h-12 shadow-lg">
@@ -408,7 +376,7 @@ export default function ReportsPage() {
                     <AlertDialogHeader>
                       <AlertDialogTitle className="font-black text-destructive uppercase">Confirm Global Wipe</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will permanently delete ALL entries and sales records. Directory farmers will be preserved.
+                        This will permanently delete ALL entries and sales records.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

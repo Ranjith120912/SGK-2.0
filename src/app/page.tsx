@@ -10,7 +10,7 @@ export default function Home() {
     { href: "/farmers", label: "Farmers", icon: Users, color: "text-blue-600", bg: "bg-blue-600/10" },
     { href: "/buyers", label: "Buyers", icon: Contact, color: "text-indigo-600", bg: "bg-indigo-600/10" },
     { href: "/entries", label: "Collection", icon: PlusCircle, color: "text-primary", bg: "bg-primary/10" },
-    { href: "/sales", label: "Sales", icon: ShoppingCart, color: "text-secondary", bg: "bg-secondary/10" },
+    { href: "/sales", label: "Cycle Sales", icon: ShoppingCart, color: "text-secondary", bg: "bg-secondary/10" },
     { href: "/daily-reports", label: "Daily Report", icon: FileBarChart, color: "text-amber-600", bg: "bg-amber-600/10" },
     { href: "/farmer-bills", label: "Farmer Bills", icon: FileText, color: "text-rose-600", bg: "bg-rose-600/10" },
     { href: "/reports", label: "Audit", icon: BarChart3, color: "text-emerald-600", bg: "bg-emerald-600/10" },

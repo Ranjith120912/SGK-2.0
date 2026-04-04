@@ -33,7 +33,7 @@ export function Navbar() {
               </Link>
               <Link href="/sales" className="text-[10px] font-black text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 uppercase tracking-widest">
                 <ShoppingCart className="w-3 h-3" />
-                Sales
+                Cycle Sales
               </Link>
               <Link href="/daily-reports" className="text-[10px] font-black text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 uppercase tracking-widest">
                 <FileBarChart className="w-3 h-3" />

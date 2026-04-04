@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { useCollection, useDoc, useMemoFirebase, useFirestore } from "@/firebase";
@@ -9,30 +9,52 @@ import { collection, query, where, serverTimestamp, doc } from "firebase/firesto
 import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
-import { format } from "date-fns";
-import { Sun, Moon, Search, ShoppingCart, IndianRupee, Loader2, CheckCircle2 } from "lucide-react";
+import { format, endOfMonth, subMonths } from "date-fns";
+import { Search, ShoppingCart, IndianRupee, Loader2, CheckCircle2, Calendar as CalendarIcon, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 
-export default function SalesPage() {
+export default function CycleSalesPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
-  const [date, setDate] = useState<string>("");
-  const [session, setSession] = useState<'Morning' | 'Evening'>('Morning');
+  const [selectedMonth, setSelectedMonth] = useState<string>("");
+  const [activeCycle, setActiveCycle] = useState<number>(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [quantityValues, setQuantityValues] = useState<Record<string, string>>({});
   const [rateValues, setRateValues] = useState<Record<string, string>>({});
   const [milkTypes, setMilkTypes] = useState<Record<string, 'COW' | 'BUFFALO'>>({});
   const [savingStatus, setSavingStatus] = useState<Record<string, 'idle' | 'saving' | 'saved'>>({});
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setDate(format(new Date(), 'yyyy-MM-dd'));
+    setIsClient(true);
+    setSelectedMonth(format(new Date(), 'yyyy-MM'));
   }, []);
+
+  const monthOptions = useMemo(() => {
+    if (!isClient) return [];
+    const now = new Date();
+    return Array.from({ length: 12 }).map((_, i) => {
+      const d = subMonths(now, i);
+      return { value: format(d, 'yyyy-MM'), label: format(d, 'MMMM yyyy') };
+    });
+  }, [isClient]);
+
+  const cycles = useMemo(() => {
+    if (!selectedMonth) return [];
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const monthEnd = endOfMonth(new Date(year, month - 1));
+    const lastDay = monthEnd.getDate();
+    return [
+      { id: 0, label: "Cycle 1", range: "1st - 10th", start: 1, end: 10 },
+      { id: 1, label: "Cycle 2", range: "11th - 20th", start: 11, end: 20 },
+      { id: 2, label: "Cycle 3", range: `21st - ${lastDay}`, start: 21, end: lastDay }
+    ];
+  }, [selectedMonth]);
 
   const buyersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -40,13 +62,13 @@ export default function SalesPage() {
   }, [firestore]);
 
   const salesQuery = useMemoFirebase(() => {
-    if (!firestore || !date) return null;
+    if (!firestore || !selectedMonth) return null;
     return query(
       collection(firestore, 'sales'), 
-      where('date', '==', date),
-      where('session', '==', session)
+      where('month', '==', selectedMonth),
+      where('cycleId', '==', activeCycle)
     );
-  }, [firestore, date, session]);
+  }, [firestore, selectedMonth, activeCycle]);
 
   const settingsRef = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -59,8 +81,8 @@ export default function SalesPage() {
 
   const filteredBuyers = buyers?.filter(b => 
     b.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    b.buyerCode.includes(searchTerm)
-  );
+    b.buyerCode.toLowerCase().includes(searchTerm.toLowerCase())
+  ).sort((a, b) => a.buyerCode.localeCompare(b.buyerCode)) || [];
 
   const handleQuantityChange = (buyerId: string, value: string) => {
     setQuantityValues(prev => ({ ...prev, [buyerId]: value }));
@@ -80,10 +102,9 @@ export default function SalesPage() {
   const handleAutoSave = (buyerId: string) => {
     const qtyStr = quantityValues[buyerId];
     const milkType = milkTypes[buyerId] || 'COW';
-    if (!firestore) return;
+    if (!firestore || !selectedMonth) return;
 
     const existingSale = sales?.find(s => s.buyerId === buyerId && s.milkType === milkType);
-    
     const qty = qtyStr !== undefined ? parseFloat(qtyStr) : (existingSale ? existingSale.quantity : 0);
     
     const manualRate = rateValues[buyerId];
@@ -95,16 +116,18 @@ export default function SalesPage() {
     if (isNaN(qty) || qty < 0 || isNaN(finalRate)) return;
 
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
-    // Precision locked total amount
     const totalAmount = parseFloat((qty * finalRate).toFixed(2));
 
-    const saleId = `${buyerId}_${date}_${session}_${milkType}`;
+    // ID is based on Month and Cycle for Bulk Sales
+    const saleId = `${buyerId}_${selectedMonth}_C${activeCycle}_${milkType}`;
     const docRef = doc(firestore, 'sales', saleId);
 
     setDocumentNonBlocking(docRef, {
       buyerId,
-      date,
-      session,
+      month: selectedMonth,
+      cycleId: activeCycle,
+      cycleLabel: cycles[activeCycle]?.label,
+      date: `${selectedMonth}-${cycles[activeCycle]?.start.toString().padStart(2, '0')}`, // Reference date for sorting
       milkType,
       quantity: qty,
       rate: finalRate,
@@ -118,128 +141,194 @@ export default function SalesPage() {
     }, 500);
   };
 
-  if (!date) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
+  if (!isClient) return null;
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col bg-background selection:bg-primary/20">
       <Navbar />
       <main className="flex-grow pt-24 pb-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
             <div>
-              <h1 className="text-3xl font-black text-primary tracking-tight">Daily Sales</h1>
-              <p className="text-muted-foreground">Record distribution for {format(new Date(date), 'MMMM dd, yyyy')}</p>
+              <div className="flex items-center gap-2 text-primary mb-1">
+                <ShoppingCart className="w-5 h-5" />
+                <span className="text-xs font-black uppercase tracking-widest">Business Distribution</span>
+              </div>
+              <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Cycle Sales</h1>
+              <p className="text-muted-foreground font-medium">Record bulk sales for 10-day distribution periods.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full sm:w-[200px] rounded-full" />
-              <Tabs value={session} onValueChange={(v) => setSession(v as any)}>
-                <TabsList className="rounded-full">
-                  <TabsTrigger value="Morning" className="rounded-full gap-2"><Sun className="w-4 h-4" /> Morning</TabsTrigger>
-                  <TabsTrigger value="Evening" className="rounded-full gap-2"><Moon className="w-4 h-4" /> Evening</TabsTrigger>
-                </TabsList>
-              </Tabs>
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="w-full sm:w-[200px] rounded-full font-bold h-11 border-primary/20 shadow-sm bg-card">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              
+              <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-full border shadow-sm">
+                {cycles.map((c, i) => (
+                  <button 
+                    key={i} 
+                    onClick={() => {
+                      setActiveCycle(i);
+                      setQuantityValues({});
+                      setRateValues({});
+                      setSavingStatus({});
+                    }} 
+                    className={cn(
+                      "rounded-full text-[10px] font-black px-4 h-9 transition-all", 
+                      activeCycle === i ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:bg-muted"
+                    )}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </header>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input className="pl-10 h-12 bg-card rounded-2xl" placeholder="Search buyer code or name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input 
+                className="pl-12 h-14 bg-card rounded-2xl border-primary/10 shadow-sm focus:ring-primary/20 text-lg" 
+                placeholder="Search by name or code..." 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+              />
             </div>
-            <div className="flex items-center gap-3 px-4 py-2 bg-primary/5 rounded-2xl border border-primary/10">
-              <IndianRupee className="w-5 h-5 text-primary" />
-              <div>
-                <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Default Sell Rates</p>
-                <p className="text-xs font-black">Cow: ₹{ratesConfig?.cowSellingRate || 0} | Buf: ₹{ratesConfig?.buffaloSellingRate || 0}</p>
+            <Card className="flex items-center gap-4 px-6 py-2 bg-primary/5 rounded-2xl border border-primary/10 shadow-sm">
+              <div className="p-2 bg-primary/10 rounded-xl">
+                <IndianRupee className="w-5 h-5 text-primary" />
               </div>
-            </div>
+              <div>
+                <p className="text-[10px] font-black text-primary/60 uppercase tracking-widest">Current Sell Rates</p>
+                <p className="text-sm font-black">Cow: ₹{ratesConfig?.cowSellingRate || 0} | Buf: ₹{ratesConfig?.buffaloSellingRate || 0}</p>
+              </div>
+            </Card>
+            <Card className="flex items-center gap-4 px-6 py-2 bg-accent/5 rounded-2xl border border-accent/10 shadow-sm">
+              <div className="p-2 bg-accent/10 rounded-xl">
+                <CalendarIcon className="w-5 h-5 text-accent" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-accent/60 uppercase tracking-widest">Current Range</p>
+                <p className="text-sm font-black uppercase">{cycles[activeCycle]?.range}</p>
+              </div>
+            </Card>
           </div>
 
-          <Card className="rounded-3xl overflow-hidden border-none shadow-xl bg-card/50 backdrop-blur-sm">
+          <Card className="rounded-[2rem] overflow-hidden border-none shadow-xl bg-card/50 backdrop-blur-sm">
             <Table>
-              <TableHeader className="bg-muted/50">
-                <TableRow>
-                  <TableHead className="w-[80px] font-bold pl-6">Code</TableHead>
-                  <TableHead className="font-bold">Buyer Name</TableHead>
-                  <TableHead className="w-[120px] font-bold">Milk Type</TableHead>
-                  <TableHead className="w-[150px] font-bold">Quantity (L)</TableHead>
-                  <TableHead className="w-[120px] font-bold">Rate (₹/L)</TableHead>
-                  <TableHead className="w-[120px] font-bold text-right">Amount (₹)</TableHead>
-                  <TableHead className="w-[80px] text-right pr-6 font-bold">Status</TableHead>
+              <TableHeader className="bg-muted/50 border-b">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-[100px] font-black text-primary pl-10 py-5 uppercase text-[10px] tracking-widest">Code</TableHead>
+                  <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Buyer Name</TableHead>
+                  <TableHead className="w-[140px] font-black text-primary uppercase text-[10px] tracking-widest">Milk Type</TableHead>
+                  <TableHead className="w-[180px] font-black text-primary uppercase text-[10px] tracking-widest">Total Qty (L)</TableHead>
+                  <TableHead className="w-[140px] font-black text-primary uppercase text-[10px] tracking-widest">Rate (₹/L)</TableHead>
+                  <TableHead className="w-[140px] font-black text-primary text-right uppercase text-[10px] tracking-widest">Total (₹)</TableHead>
+                  <TableHead className="w-[100px] text-right pr-10 font-black text-primary uppercase text-[10px] tracking-widest">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredBuyers?.map((buyer) => {
-                  const currentMilkType = milkTypes[buyer.id] || 'COW';
-                  const existingSale = sales?.find(s => s.buyerId === buyer.id && s.milkType === currentMilkType);
-                  
-                  const currentQtyStr = quantityValues[buyer.id] !== undefined ? quantityValues[buyer.id] : (existingSale ? existingSale.quantity.toString() : "");
-                  
-                  const defaultRate = currentMilkType === 'BUFFALO' 
-                    ? (ratesConfig?.buffaloSellingRate || 0) 
-                    : (ratesConfig?.cowSellingRate || 0);
+                {filteredBuyers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-20">
+                      <div className="flex flex-col items-center gap-3">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary/20" />
+                        <p className="text-muted-foreground font-semibold">No buyers found in directory.</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredBuyers.map((buyer) => {
+                    const currentMilkType = milkTypes[buyer.id] || 'COW';
+                    const existingSale = sales?.find(s => s.buyerId === buyer.id && s.milkType === currentMilkType);
                     
-                  const currentRateStr = rateValues[buyer.id] !== undefined
-                    ? rateValues[buyer.id]
-                    : (existingSale ? existingSale.rate.toString() : defaultRate.toString());
-                  
-                  const activeRateNum = parseFloat(currentRateStr) || 0;
-                  const previewAmount = (parseFloat(currentQtyStr) || 0) * activeRateNum;
-                  
-                  const status = savingStatus[buyer.id] || (existingSale ? 'saved' : 'idle');
+                    const currentQtyStr = quantityValues[buyer.id] !== undefined ? quantityValues[buyer.id] : (existingSale ? existingSale.quantity.toString() : "");
+                    
+                    const defaultRate = currentMilkType === 'BUFFALO' 
+                      ? (ratesConfig?.buffaloSellingRate || 0) 
+                      : (ratesConfig?.cowSellingRate || 0);
+                      
+                    const currentRateStr = rateValues[buyer.id] !== undefined
+                      ? rateValues[buyer.id]
+                      : (existingSale ? existingSale.rate.toString() : defaultRate.toString());
+                    
+                    const activeRateNum = parseFloat(currentRateStr) || 0;
+                    const previewAmount = (parseFloat(currentQtyStr) || 0) * activeRateNum;
+                    
+                    const status = savingStatus[buyer.id] || (existingSale ? 'saved' : 'idle');
 
-                  return (
-                    <TableRow key={buyer.id} className={cn(existingSale && "bg-primary/5")}>
-                      <TableCell className="font-black text-primary pl-6 text-lg">{buyer.buyerCode}</TableCell>
-                      <TableCell className="font-bold">{buyer.name}</TableCell>
-                      <TableCell>
-                        <Select value={currentMilkType} onValueChange={(v) => handleMilkTypeChange(buyer.id, v as any)}>
-                          <SelectTrigger className="h-9 rounded-xl">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="COW">COW</SelectItem>
-                            <SelectItem value="BUFFALO">BUFFALO</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <div className="relative">
-                          <Input 
-                            type="number" 
-                            placeholder="0.00" 
-                            className="h-11 rounded-xl pr-10 font-bold" 
-                            value={currentQtyStr} 
-                            onChange={(e) => handleQuantityChange(buyer.id, e.target.value)}
-                            onBlur={() => handleAutoSave(buyer.id)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAutoSave(buyer.id)}
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black opacity-30">L</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Input 
-                          type="number" 
-                          placeholder={defaultRate.toString()}
-                          className="h-11 rounded-xl font-medium text-sm" 
-                          value={currentRateStr} 
-                          onChange={(e) => handleRateChange(buyer.id, e.target.value)}
-                          onBlur={() => handleAutoSave(buyer.id)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleAutoSave(buyer.id)}
-                        />
-                      </TableCell>
-                      <TableCell className="text-right font-black">₹ {previewAmount.toFixed(2)}</TableCell>
-                      <TableCell className="text-right pr-6">
-                        <div className="flex justify-end">
-                          {status === 'saving' && <Loader2 className="animate-spin text-primary/40 w-5 h-5" />}
-                          {status === 'saved' && <CheckCircle2 className="text-green-500 w-5 h-5" />}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                    return (
+                      <TableRow key={buyer.id} className={cn("group transition-colors border-b last:border-0", existingSale ? "bg-primary/5" : "hover:bg-primary/5")}>
+                        <TableCell className="font-black text-primary pl-10 text-lg uppercase">{buyer.buyerCode}</TableCell>
+                        <TableCell className="font-bold text-base uppercase">{buyer.name}</TableCell>
+                        <TableCell>
+                          <Select value={currentMilkType} onValueChange={(v) => handleMilkTypeChange(buyer.id, v as any)}>
+                            <SelectTrigger className="h-10 rounded-xl border-primary/10 bg-background/50">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="COW">COW</SelectItem>
+                              <SelectItem value="BUFFALO">BUFFALO</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <div className="relative">
+                            <Input 
+                              type="number" 
+                              placeholder="0.00" 
+                              className="h-12 rounded-xl pr-12 font-black text-lg border-primary/10 focus:border-primary" 
+                              value={currentQtyStr} 
+                              onChange={(e) => handleQuantityChange(buyer.id, e.target.value)}
+                              onBlur={() => handleAutoSave(buyer.id)}
+                              onKeyDown={(e) => e.key === 'Enter' && handleAutoSave(buyer.id)}
+                            />
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-primary/40 uppercase">LTR</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="relative">
+                            <Input 
+                              type="number" 
+                              placeholder={defaultRate.toString()}
+                              className="h-12 rounded-xl pl-8 font-bold text-sm border-primary/10" 
+                              value={currentRateStr} 
+                              onChange={(e) => handleRateChange(buyer.id, e.target.value)}
+                              onBlur={() => handleAutoSave(buyer.id)}
+                              onKeyDown={(e) => e.key === 'Enter' && handleAutoSave(buyer.id)}
+                            />
+                            <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground/50" />
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="text-lg font-black text-primary">
+                            ₹ {previewAmount.toFixed(2)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right pr-10">
+                          <div className="flex justify-end">
+                            {status === 'saving' && <Loader2 className="animate-spin text-primary/40 w-6 h-6" />}
+                            {status === 'saved' && <CheckCircle2 className="text-green-500 w-6 h-6 animate-in zoom-in duration-300" />}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
               </TableBody>
             </Table>
+            <div className="p-5 bg-muted/20 text-center text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] border-t">
+              Cycle Grand Total Revenue: ₹ {filteredBuyers.reduce((acc, b) => {
+                const milkType = milkTypes[b.id] || 'COW';
+                const s = sales?.find(sale => sale.buyerId === b.id && sale.milkType === milkType);
+                return acc + (Number(s?.totalAmount) || 0);
+              }, 0).toFixed(2)}
+            </div>
           </Card>
         </div>
       </main>

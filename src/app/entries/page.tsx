@@ -54,8 +54,8 @@ export default function EntriesPage() {
   const { data: entries } = useCollection(entriesQuery);
   const { data: ratesConfig } = useDoc(settingsRef);
 
-  // Conversion factor (1 kg = 0.97 Litre as per PRD)
-  const conversionRate = ratesConfig?.kgToLitreRate || 0.97;
+  // Conversion factor (1 kg = 0.97 Litre as per requirement)
+  const conversionRate = Number(ratesConfig?.kgToLitreRate) || 0.97;
 
   const filteredFarmers = farmers?.filter(f => 
     f.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -80,12 +80,12 @@ export default function EntriesPage() {
     const existingEntry = entries?.find(e => e.farmerId === farmerId);
     
     // Determine the value to save: current input or existing value
-    const kgValue = kgStr !== undefined ? parseFloat(kgStr) : (existingEntry ? existingEntry.kgWeight : 0);
+    const kgValue = kgStr !== undefined ? parseFloat(kgStr) : (existingEntry ? Number(existingEntry.kgWeight) : 0);
     
-    // Rate is managed centrally (Farmer Management for Buffalo, or Global Settings)
+    // CRITICAL: Calculate rate based on Farmer Profile for Buffalo, fallback to global settings
     const managedRate = farmer.milkType === 'BUFFALO' 
-      ? (farmer.customRate || ratesConfig?.buffaloRate || 0) 
-      : (ratesConfig?.cowRate || 0);
+      ? (Number(farmer.customRate) || Number(ratesConfig?.buffaloRate) || 0) 
+      : (Number(ratesConfig?.cowRate) || 0);
 
     if (isNaN(kgValue) || kgValue < 0) return;
 
@@ -180,7 +180,7 @@ export default function EntriesPage() {
               <IndianRupee className="w-5 h-5 text-accent" />
               <div className="text-xs">
                 <p className="font-bold text-accent">Default Rates</p>
-                <p className="text-muted-foreground">Cow: ₹{ratesConfig?.cowRate || 0} | Buffalo: ₹{ratesConfig?.buffaloRate || 0}</p>
+                <p className="text-muted-foreground">Cow: ₹{Number(ratesConfig?.cowRate || 0).toFixed(2)} | Buffalo: ₹{Number(ratesConfig?.buffaloRate || 0).toFixed(2)}</p>
               </div>
             </div>
           </div>
@@ -203,15 +203,15 @@ export default function EntriesPage() {
                   const existingEntry = entries?.find(e => e.farmerId === farmer.id);
                   const currentKgStr = kgValues[farmer.id] !== undefined 
                     ? kgValues[farmer.id] 
-                    : (existingEntry ? existingEntry.kgWeight.toString() : "");
+                    : (existingEntry ? Number(existingEntry.kgWeight).toString() : "");
                   
                   const kgNum = parseFloat(currentKgStr);
                   const previewLitre = !isNaN(kgNum) ? (kgNum * conversionRate).toFixed(2) : "0.00";
                   
                   // Rate is managed in Farmer Management or Global Settings
                   const managedRate = farmer.milkType === 'BUFFALO' 
-                    ? (farmer.customRate || ratesConfig?.buffaloRate || 0) 
-                    : (ratesConfig?.cowRate || 0);
+                    ? (Number(farmer.customRate) || Number(ratesConfig?.buffaloRate) || 0) 
+                    : (Number(ratesConfig?.cowRate) || 0);
                   
                   const previewAmount = !isNaN(kgNum) ? (parseFloat(previewLitre) * managedRate).toFixed(2) : "0.00";
                   
@@ -279,7 +279,7 @@ export default function EntriesPage() {
               </TableBody>
             </Table>
             <div className="p-4 bg-muted/20 text-center text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] border-t">
-              Milk rates are managed in Settings and Farmer Management. Rates are locked here to ensure procurement accuracy.
+              Milk rates are managed in Settings and Farmer Management. Buffalo pricing prioritizes profile-specific custom rates.
             </div>
           </Card>
         </div>

@@ -264,7 +264,11 @@ export default function ReportsPage() {
 
     doc.setFontSize(10);
     let y = 45;
-    const currentRate = farmer.milkType === 'BUFFALO' ? (farmer.customRate || ratesConfig?.buffaloRate || 0) : (ratesConfig?.cowRate || 0);
+    
+    // Rate for display - prioritize farmer profile for Buffalo
+    const displayRate = farmer.milkType === 'BUFFALO' 
+      ? (Number(farmer.customRate) || Number(ratesConfig?.buffaloRate) || 0) 
+      : (Number(ratesConfig?.cowRate) || 0);
 
     doc.setFont("helvetica", "normal");
     doc.text("NAME:", 20, y);
@@ -301,27 +305,35 @@ export default function ReportsPage() {
     doc.setFont("helvetica", "normal");
     doc.text("RATE (Rs):", 110, y);
     doc.setFont("helvetica", "bold");
-    doc.text(currentRate.toFixed(2), 135, y);
+    doc.text(displayRate.toFixed(2), 135, y);
     doc.line(135, y+1, 190, y+1);
 
     const cycleEntries = filteredCycleEntries.filter(e => e.farmerId === farmer.id);
     const dateMap: Record<string, { morning: number, evening: number, rate: number }> = {};
     for (let d = cycleStart; d <= cycleEnd; d++) {
       const dateStr = `${year}-${month.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`;
-      dateMap[dateStr] = { morning: 0, evening: 0, rate: currentRate };
+      dateMap[dateStr] = { morning: 0, evening: 0, rate: displayRate };
     }
+    
     cycleEntries.forEach(e => {
       if (dateMap[e.date]) {
         if (e.session === 'Morning') dateMap[e.date].morning = Number(e.quantity);
         else dateMap[e.date].evening = Number(e.quantity);
-        dateMap[e.date].rate = e.rate;
+        dateMap[e.date].rate = Number(e.rate);
       }
     });
 
     const tableRows = Object.keys(dateMap).sort().map(date => {
       const d = dateMap[date];
       const total = d.morning + d.evening;
-      return [format(new Date(date), 'dd/MM/yy'), d.morning.toFixed(2), d.evening.toFixed(2), total.toFixed(2), d.rate.toFixed(2), (total * d.rate).toFixed(2)];
+      return [
+        format(new Date(date), 'dd/MM/yy'), 
+        d.morning.toFixed(2), 
+        d.evening.toFixed(2), 
+        total.toFixed(2), 
+        d.rate.toFixed(2), 
+        (total * d.rate).toFixed(2)
+      ];
     });
 
     (doc as any).autoTable({

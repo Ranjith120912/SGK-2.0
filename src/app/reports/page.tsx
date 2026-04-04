@@ -23,7 +23,8 @@ import {
   CheckCircle2,
   Lock,
   ChevronRight,
-  Milk
+  Milk,
+  FileDown
 } from "lucide-react";
 import { format, endOfMonth, subMonths, startOfMonth, addDays, isSameDay } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -97,7 +98,7 @@ export default function ReportsPage() {
 
   const currentCycle = cycles[activeCycle];
 
-  // Daily Procurement Data Aggregation
+  // Helper to get formatted Daily Data (Horizontal AM/PM)
   const dailyData = useMemo(() => {
     if (!allEntries || !selectedDailyDate) return [];
     const map: Record<string, any> = {};
@@ -105,13 +106,14 @@ export default function ReportsPage() {
     
     filteredEntries.forEach(e => {
       const fid = e.farmerId;
-      const farmerDir = farmers?.find(f => f.id === fid);
-      const name = farmerDir?.name || e.farmerName || "Unknown Farmer";
-      const can = farmerDir?.canNumber || e.canNumber || "---";
-      const milkType = farmerDir?.milkType || e.milkType || "COW";
+      const farmerProfile = farmers?.find(f => f.id === fid);
+      const name = farmerProfile?.name || e.farmerName || "Unknown Farmer";
+      const can = farmerProfile?.canNumber || e.canNumber || "---";
+      const milkType = farmerProfile?.milkType || e.milkType || "COW";
       
       if (!map[fid]) {
         map[fid] = {
+          fid,
           can,
           name,
           milkType,
@@ -145,7 +147,7 @@ export default function ReportsPage() {
     });
   }, [allEntries, farmers, selectedDailyDate]);
 
-  // Master Roster / Cycle Aggregation
+  // Helper for Cycle Master Roster
   const masterRoster = useMemo(() => {
     if (!allEntries || !selectedMonth || !currentCycle) return [];
     
@@ -158,10 +160,10 @@ export default function ReportsPage() {
 
     cycleEntries.forEach(e => {
       const fid = e.farmerId;
-      const farmerDir = farmers?.find(f => f.id === fid);
-      const name = farmerDir?.name || e.farmerName || "Unknown Farmer";
-      const can = farmerDir?.canNumber || e.canNumber || "---";
-      const milkType = farmerDir?.milkType || e.milkType || "COW";
+      const farmerProfile = farmers?.find(f => f.id === fid);
+      const name = farmerProfile?.name || e.farmerName || "Unknown Farmer";
+      const can = farmerProfile?.canNumber || e.canNumber || "---";
+      const milkType = farmerProfile?.milkType || e.milkType || "COW";
 
       if (!map[fid]) {
         map[fid] = {
@@ -211,7 +213,8 @@ export default function ReportsPage() {
     };
   }, [masterRoster, allSales, selectedMonth, currentCycle]);
 
-  const generateSingleInvoice = (pdf: jsPDF, f: any) => {
+  // Professional Farmer Bill Generation (Exact Match)
+  const generateProfessionalInvoice = (pdf: jsPDF, f: any) => {
     const company = (ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS").toUpperCase();
     const [year, month] = selectedMonth.split('-').map(Number);
     const periodStartStr = `01/${month}/${year.toString().slice(-2)}`;
@@ -224,9 +227,9 @@ export default function ReportsPage() {
     pdf.text(company, 105, 20, { align: 'center' });
     pdf.setFontSize(12);
     pdf.text("MILK INVOICE", 105, 27, { align: 'center' });
-    pdf.line(93, 28, 117, 28); // Underline for title
+    pdf.line(93, 28, 117, 28); // Title Underline
 
-    // Farmer Info Section
+    // Info Section with Underlines
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "normal");
     
@@ -234,16 +237,16 @@ export default function ReportsPage() {
       pdf.text(label, x, y);
       const labelWidth = pdf.getTextWidth(label);
       pdf.setFont("helvetica", "bold");
-      pdf.text(value, x + labelWidth + 5, y);
+      pdf.text(value.toUpperCase(), x + labelWidth + 5, y);
       pdf.line(x + labelWidth + 4, y + 1, x + width, y + 1);
       pdf.setFont("helvetica", "normal");
     };
 
-    drawUnderlinedField("NAME:", f.name.toUpperCase(), 20, 45, 100);
+    drawUnderlinedField("NAME:", f.name, 20, 45, 100);
     drawUnderlinedField("DATE:", format(new Date(), 'dd/MM/yyyy'), 110, 45, 190);
     
-    const farmerDir = farmers?.find(item => item.id === f.id);
-    drawUnderlinedField("A/C NO:", farmerDir?.bankAccountNumber || "—", 20, 55, 100);
+    const farmerProfile = farmers?.find(item => item.id === f.id);
+    drawUnderlinedField("A/C NO:", farmerProfile?.bankAccountNumber || "---", 20, 55, 100);
     drawUnderlinedField("PERIOD:", period, 110, 55, 190);
     
     drawUnderlinedField("CAN NO:", f.can, 20, 65, 100);
@@ -283,39 +286,35 @@ export default function ReportsPage() {
       theme: 'grid',
       headStyles: { fillColor: [255, 255, 255], textColor: 0, halign: 'center', fontStyle: 'bold', lineWidth: 0.1 },
       bodyStyles: { halign: 'center', textColor: 0, lineWidth: 0.1 },
-      styles: { fontSize: 9, cellPadding: 2 },
+      styles: { fontSize: 9, cellPadding: 2.5 },
       margin: { left: 20, right: 20 }
     });
 
     const finalY = (pdf as any).lastAutoTable.finalY;
     
-    // Total Row
+    // Total Summary
     pdf.setFont("helvetica", "bold");
     pdf.line(20, finalY, 190, finalY);
-    pdf.text("TOTAL", 25, finalY + 6);
-    pdf.text(f.totalQty.toFixed(2), 128, finalY + 6, { align: 'center' });
-    pdf.text(f.totalAmount.toFixed(2), 178, finalY + 6, { align: 'center' });
-    pdf.line(20, finalY + 10, 190, finalY + 10);
+    pdf.text("TOTAL", 25, finalY + 7);
+    pdf.text(f.totalQty.toFixed(2), 125, finalY + 7, { align: 'center' });
+    pdf.text(f.totalAmount.toFixed(2), 178, finalY + 7, { align: 'center' });
+    pdf.line(20, finalY + 11, 190, finalY + 11);
 
-    // Summary
+    // Right-aligned summary labels
     let summaryY = finalY + 25;
     pdf.setFont("helvetica", "normal");
-    pdf.text("Total Litres:", 140, summaryY);
+    pdf.text("Total Litres:", 145, summaryY);
     pdf.setFont("helvetica", "bold");
     pdf.text(f.totalQty.toFixed(2), 185, summaryY, { align: 'right' });
     
     summaryY += 8;
     pdf.setFont("helvetica", "normal");
-    pdf.text("Total Amount (Rs):", 140, summaryY);
+    pdf.text("Total Amount (Rs):", 145, summaryY);
     pdf.setFont("helvetica", "bold");
     pdf.text(f.totalAmount.toFixed(2), 185, summaryY, { align: 'right' });
 
-    // Footer
+    // Signature Footer
     const pageHeight = pdf.internal.pageSize.getHeight();
-    pdf.setFontSize(8);
-    pdf.setFont("helvetica", "italic");
-    pdf.text(`Generated by ${company} Management System`, 20, pageHeight - 15);
-    
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(10);
     pdf.text("AUTHORIZED SIGNATURE", 190, pageHeight - 15, { align: 'right' });
@@ -326,13 +325,13 @@ export default function ReportsPage() {
     const data = dailyData.map((p: any) => ({
       "CAN": p.can,
       "FARMER NAME": p.name,
-      "TYPE": p.milkType,
+      "MILK TYPE": p.milkType,
       "AM-KG": p.amKg.toFixed(2),
       "AM-LITRE": p.amLtr.toFixed(2),
       "PM-KG": p.pmKg.toFixed(2),
       "PM-LITRE": p.pmLtr.toFixed(2),
       "TOTAL LITRES": p.totalLtr.toFixed(2),
-      "TOTAL AMOUNT (Rs)": p.totalAmt.toFixed(2)
+      "PAYOUT (Rs)": p.totalAmt.toFixed(2)
     }));
     const ws = utils.json_to_sheet(data);
     const wb = utils.book_new();
@@ -343,22 +342,26 @@ export default function ReportsPage() {
   if (!isClient) return null;
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col bg-background selection:bg-primary/20">
       <Navbar />
       <main className="flex-grow pt-24 pb-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <header className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <header className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
             <div>
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Reports & Audit</h1>
               <p className="text-muted-foreground font-medium flex items-center gap-2">
                 <Users className="w-4 h-4" /> 
-                System Records for Active Farmers
+                Reflecting Farmer Management & Collection Registry
               </p>
             </div>
             <div className="flex gap-4">
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger className="w-[200px] rounded-full font-bold h-11"><SelectValue /></SelectTrigger>
-                <SelectContent>{monthOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
+                <SelectTrigger className="w-[200px] rounded-full font-bold h-11 border-primary/20 shadow-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                </SelectContent>
               </Select>
             </div>
           </header>
@@ -374,14 +377,14 @@ export default function ReportsPage() {
               </TabsList>
 
               {["overview", "cycle", "master"].includes(activeTab) && (
-                <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-full border">
+                <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-full border shadow-sm">
                   {cycles.map((c, i) => (
                     <button 
                       key={i} 
                       onClick={() => setActiveCycle(i)} 
                       className={cn(
                         "rounded-full text-[10px] font-black px-4 h-8 transition-all", 
-                        activeCycle === i ? "bg-primary text-white" : "text-muted-foreground hover:bg-muted"
+                        activeCycle === i ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:bg-muted"
                       )}
                     >
                       {c.label}
@@ -393,19 +396,19 @@ export default function ReportsPage() {
 
             <TabsContent value="overview" className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <Card className="rounded-[2rem] bg-primary text-white p-8 shadow-xl">
+                <Card className="rounded-[2rem] bg-primary text-white p-8 shadow-xl border-none">
                   <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Cycle Volume</p>
                   <p className="text-4xl font-black mt-2">{cycleStats.qty.toFixed(2)} L</p>
                 </Card>
-                <Card className="rounded-[2rem] bg-accent text-white p-8 shadow-xl">
+                <Card className="rounded-[2rem] bg-accent text-white p-8 shadow-xl border-none">
                   <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Cycle Revenue</p>
                   <p className="text-4xl font-black mt-2">₹ {cycleStats.saleRev.toFixed(2)}</p>
                 </Card>
-                <Card className="rounded-[2rem] p-8 border-none bg-destructive/10 text-destructive">
+                <Card className="rounded-[2rem] p-8 border-none bg-destructive/10 text-destructive shadow-sm">
                   <p className="text-[10px] font-black uppercase opacity-70">Cycle Payout</p>
                   <p className="text-3xl font-black mt-2">₹ {cycleStats.procCost.toFixed(2)}</p>
                 </Card>
-                <Card className="rounded-[2rem] p-8 border-none bg-green-500/10 text-green-600">
+                <Card className="rounded-[2rem] p-8 border-none bg-green-500/10 text-green-600 shadow-sm">
                   <p className="text-[10px] font-black uppercase opacity-70">Cycle Profit</p>
                   <p className="text-3xl font-black mt-2">₹ {cycleStats.profit.toFixed(2)}</p>
                 </Card>
@@ -415,31 +418,36 @@ export default function ReportsPage() {
             <TabsContent value="daily" className="space-y-6">
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-card p-6 rounded-3xl border shadow-sm">
                 <div className="flex items-center gap-4">
-                  <Calendar className="text-primary" />
-                  <Input type="date" value={selectedDailyDate} onChange={(e) => setSelectedDailyDate(e.target.value)} className="w-[200px] font-bold h-11 rounded-full px-6" />
+                  <Calendar className="text-primary w-5 h-5" />
+                  <Input 
+                    type="date" 
+                    value={selectedDailyDate} 
+                    onChange={(e) => setSelectedDailyDate(e.target.value)} 
+                    className="w-[200px] font-bold h-11 rounded-full px-6 border-primary/10" 
+                  />
                 </div>
                 <div className="flex gap-2">
-                  <Button onClick={handleExportDailyExcel} variant="outline" className="rounded-full h-11 px-6 font-bold uppercase text-[10px]">
-                    <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
+                  <Button onClick={handleExportDailyExcel} variant="outline" className="rounded-full h-11 px-6 font-bold uppercase text-[10px] border-primary/20">
+                    <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Export
                   </Button>
                   <Button onClick={() => {
                     const pdf = new jsPDF('l', 'mm', 'a4');
-                    pdf.setFontSize(18);
                     const company = (ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS").toUpperCase();
+                    pdf.setFontSize(18);
                     pdf.text(company, 148, 20, { align: 'center' });
                     pdf.setFontSize(12);
                     pdf.text(`DAILY PROCUREMENT REPORT - ${format(new Date(selectedDailyDate), 'dd/MM/yyyy')}`, 148, 28, { align: 'center' });
                     (pdf as any).autoTable({
                       startY: 35,
-                      head: [['CAN', 'FARMER NAME', 'TYPE', 'AM-KG', 'AM-L', 'PM-KG', 'PM-L', 'TOT-L', 'AMOUNT (Rs)']],
+                      head: [['CAN', 'FARMER NAME', 'TYPE', 'AM-KG', 'AM-L', 'PM-KG', 'PM-L', 'TOT-L', 'PAYOUT (Rs)']],
                       body: dailyData.map(p => [p.can, p.name, p.milkType, p.amKg.toFixed(2), p.amLtr.toFixed(2), p.pmKg.toFixed(2), p.pmLtr.toFixed(2), p.totalLtr.toFixed(2), p.totalAmt.toFixed(2)]),
                       theme: 'grid',
                       headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' },
                       bodyStyles: { halign: 'center' }
                     });
                     pdf.save(`Daily_Procurement_${selectedDailyDate}.pdf`);
-                  }} className="rounded-full h-11 px-8 font-bold uppercase text-[10px]">
-                    <Printer className="mr-2 h-4 w-4" /> Print PDF
+                  }} className="rounded-full h-11 px-8 font-bold uppercase text-[10px] shadow-lg">
+                    <Printer className="mr-2 h-4 w-4" /> Print Daily Report
                   </Button>
                 </div>
               </div>
@@ -450,10 +458,10 @@ export default function ReportsPage() {
                     <TableRow>
                       <TableHead className="font-black text-[10px] text-center border-r w-[80px]">CAN</TableHead>
                       <TableHead className="font-black text-[10px] border-r">Farmer Name</TableHead>
-                      <TableHead className="font-black text-[10px] border-r text-center">Type</TableHead>
+                      <TableHead className="font-black text-[10px] border-r text-center">Milk Type</TableHead>
                       <TableHead colSpan={2} className="text-center font-black text-[10px] border-r bg-primary/5 uppercase tracking-widest">AM (Morning)</TableHead>
                       <TableHead colSpan={2} className="text-center font-black text-[10px] border-r bg-accent/5 uppercase tracking-widest">PM (Evening)</TableHead>
-                      <TableHead className="text-center font-black text-[10px] border-r">Total L</TableHead>
+                      <TableHead className="text-center font-black text-[10px] border-r bg-muted/20">Total L</TableHead>
                       <TableHead className="text-right font-black text-[10px] pr-6">Amount (Rs)</TableHead>
                     </TableRow>
                     <TableRow className="bg-muted/30">
@@ -464,20 +472,20 @@ export default function ReportsPage() {
                       <TableHead className="text-center text-[8px] font-black border-r">LTR</TableHead>
                       <TableHead className="text-center text-[8px] font-black border-r">KG</TableHead>
                       <TableHead className="text-center text-[8px] font-black border-r">LTR</TableHead>
-                      <TableHead className="border-r"></TableHead>
+                      <TableHead className="border-r bg-muted/20"></TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {dailyData.length === 0 ? (
-                      <TableRow><TableCell colSpan={9} className="text-center py-20 italic text-muted-foreground font-medium uppercase text-[10px] tracking-widest">No procurement records for this date.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={9} className="text-center py-20 italic text-muted-foreground font-medium uppercase text-[10px] tracking-widest">No procurement records found.</TableCell></TableRow>
                     ) : (
                       dailyData.map((p: any, i) => (
                         <TableRow key={i} className="hover:bg-primary/5 group transition-colors">
                           <TableCell className="text-center font-black border-r text-primary text-base">{p.can}</TableCell>
                           <TableCell className="font-bold border-r uppercase text-sm">{p.name}</TableCell>
                           <TableCell className="text-center border-r">
-                            <Badge variant={p.milkType === 'BUFFALO' ? "secondary" : "outline"} className="text-[8px] rounded-full px-2 font-black">
+                            <Badge variant={p.milkType === 'BUFFALO' ? "secondary" : "outline"} className="text-[8px] rounded-full px-2 font-black uppercase">
                               {p.milkType}
                             </Badge>
                           </TableCell>
@@ -500,10 +508,10 @@ export default function ReportsPage() {
                 <Button onClick={() => {
                   const pdf = new jsPDF();
                   const valid = masterRoster.filter(f => f.totalQty > 0);
-                  valid.forEach((f, i) => { if (i > 0) pdf.addPage(); generateSingleInvoice(pdf, f); });
+                  valid.forEach((f, i) => { if (i > 0) pdf.addPage(); generateProfessionalInvoice(pdf, f); });
                   pdf.save(`Bills_${selectedMonth}_${currentCycle.label}.pdf`);
                 }} className="rounded-full bg-destructive hover:bg-destructive/90 h-12 px-10 shadow-lg font-black uppercase text-xs">
-                  <Download className="mr-2 h-4 w-4" /> Download All Bills
+                  <FileDown className="mr-2 h-4 w-4" /> Download All Bills (PDF)
                 </Button>
               </div>
               <Card className="rounded-3xl border-none shadow-xl overflow-hidden bg-card/50 backdrop-blur-sm">
@@ -512,7 +520,7 @@ export default function ReportsPage() {
                     <TableRow>
                       <TableHead className="pl-10 font-black text-[10px] uppercase">CAN</TableHead>
                       <TableHead className="font-black text-[10px] uppercase">Farmer Name</TableHead>
-                      <TableHead className="font-black text-[10px] uppercase">Type</TableHead>
+                      <TableHead className="font-black text-[10px] uppercase">Milk Type</TableHead>
                       <TableHead className="text-right font-black text-[10px] uppercase">Volume (L)</TableHead>
                       <TableHead className="text-right font-black text-[10px] uppercase">Payout (Rs)</TableHead>
                       <TableHead className="text-right pr-10 font-black text-[10px] uppercase">Action</TableHead>
@@ -533,7 +541,7 @@ export default function ReportsPage() {
                         <TableCell className="text-right pr-10">
                           <Button variant="ghost" size="sm" onClick={() => {
                             const pdf = new jsPDF();
-                            generateSingleInvoice(pdf, f);
+                            generateProfessionalInvoice(pdf, f);
                             pdf.save(`Bill_${f.can}_${f.name}.pdf`);
                           }} className="text-primary font-black uppercase text-[10px] group-hover:bg-primary/10 rounded-full h-8 px-4">
                             PDF Bill
@@ -547,7 +555,7 @@ export default function ReportsPage() {
             </TabsContent>
 
             <TabsContent value="master" className="space-y-6">
-              <div className="flex justify-between items-center bg-primary p-8 rounded-[2rem] text-white shadow-xl">
+              <div className="flex justify-between items-center bg-primary p-8 rounded-[2rem] text-white shadow-xl border-none">
                 <div>
                   <p className="text-xs font-black uppercase opacity-60 tracking-widest">Cycle Grand Total Procurement</p>
                   <p className="text-4xl font-black mt-1">₹ {cycleStats.procCost.toFixed(2)}</p>
@@ -568,7 +576,7 @@ export default function ReportsPage() {
                     bodyStyles: { halign: 'center' }
                   });
                   pdf.save(`Master_Roster_${selectedMonth}_${currentCycle.label}.pdf`);
-                }} className="rounded-full bg-white text-primary hover:bg-white/90 h-12 px-8 font-black uppercase text-xs">
+                }} className="rounded-full bg-white text-primary hover:bg-white/90 h-12 px-8 font-black uppercase text-xs shadow-lg">
                   <Download className="mr-2 h-4 w-4" /> Export Roster PDF
                 </Button>
               </div>
@@ -602,7 +610,7 @@ export default function ReportsPage() {
 
                        return (
                         <TableRow key={i} className="hover:bg-muted/10 group transition-colors border-b last:border-0">
-                          <TableCell className="pl-10 font-black text-primary uppercase text-sm py-5">{opt.label}</TableCell>
+                          <TableCell className="pl-10 font-black text-primary uppercase text-sm py-6">{opt.label}</TableCell>
                           <TableCell className="text-center font-bold text-base">{tQty.toFixed(2)} L</TableCell>
                           <TableCell className="text-center text-destructive font-black">₹ {tCost.toFixed(2)}</TableCell>
                           <TableCell className="text-center text-green-600 font-black">₹ {tRev.toFixed(2)}</TableCell>

@@ -101,7 +101,7 @@ export default function EntriesPage() {
     const entryId = `${farmerId}_${date}_${session}`;
     const docRef = doc(firestore, 'entries', entryId);
 
-    // Save with metadata persistence (Denormalization for historical accuracy)
+    // Save with Metadata Persistence (LOCK IDENTITY TO TRANSACTION)
     setDocumentNonBlocking(docRef, {
       farmerId,
       farmerName: farmer.name,

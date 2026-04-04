@@ -111,26 +111,29 @@ export default function ReportsPage() {
   /**
    * UNIFIED FINANCIAL RESOLUTION ENGINE
    * Strictly 0.96 Conversion Standard
-   * Uses historical persistence fields if available.
+   * Robust Identity Resolution (Directory > Persistence > Fallback)
    */
   const resolveEntryFinancials = (entry: any, farmersList: any[], config: any) => {
     const kg = Number(entry.kgWeight) || 0;
     const quantity = Number(entry.quantity) || parseFloat((kg * 0.96).toFixed(2));
     
-    // Identity Persistence Lookup
-    // Priority 1: Saved in transaction (historical accuracy)
-    // Priority 2: Directory lookup (live data)
-    // Priority 3: Fallback (placeholder)
-    const farmerDirectoryInfo = farmersList?.find(f => f.id === entry.farmerId);
-    const farmerName = entry.farmerName || farmerDirectoryInfo?.name || "Deleted Supplier";
-    const canNumber = entry.canNumber || farmerDirectoryInfo?.canNumber || "???";
+    // Identity Sync Logic:
+    // 1. Check Live Directory (Farmer Management)
+    // 2. Fallback to Persisted Metadata (saved in entry)
+    // 3. Last fallback to generic labels
+    const farmerInDirectory = farmersList?.find(f => f.id === entry.farmerId);
+    
+    const farmerName = farmerInDirectory?.name || entry.farmerName || "Supplier " + (entry.canNumber || entry.farmerId);
+    const canNumber = farmerInDirectory?.canNumber || entry.canNumber || "???";
 
     let rate = Number(entry.rate) || 0;
     
-    // If rate is 0 in entry, try to infer it from live config (should be rare with new persistence)
-    if (rate === 0 && farmerDirectoryInfo) {
-      if (farmerDirectoryInfo.milkType === 'BUFFALO') {
-        rate = Number(farmerDirectoryInfo.customRate) > 0 ? Number(farmerDirectoryInfo.customRate) : (Number(config?.buffaloRate) || 0);
+    // If rate is missing in entry, infer it from live config (fallback only)
+    if (rate === 0 && farmerInDirectory) {
+      if (farmerInDirectory.milkType === 'BUFFALO') {
+        rate = Number(farmerInDirectory.customRate) > 0 
+          ? Number(farmerInDirectory.customRate) 
+          : (Number(config?.buffaloRate) || 0);
       } else {
         rate = Number(config?.cowRate) || 0;
       }
@@ -162,7 +165,7 @@ export default function ReportsPage() {
       qty: parseFloat(qty.toFixed(2)), 
       cost: parseFloat(amount.toFixed(2)), 
       appliedRate: rate,
-      buyerName: buyer?.name || "Unknown Buyer",
+      buyerName: sale.buyerName || buyer?.name || "Unknown Buyer",
       milkType: sale.milkType,
       session: sale.session || "Morning"
     };
@@ -421,9 +424,8 @@ export default function ReportsPage() {
     pdf.setFont("helvetica", "normal");
     pdf.text("A/C NO:", labelX1, y);
     pdf.setFont("helvetica", "bold");
-    // Look up live bank details if possible
-    const farmerInfo = farmers?.find(item => item.id === f.id);
-    pdf.text(farmerInfo?.bankAccountNumber || "—", valueX1, y);
+    const farmerInDir = farmers?.find(item => item.id === f.id);
+    pdf.text(farmerInDir?.bankAccountNumber || "—", valueX1, y);
     pdf.line(valueX1, y+1, valueX1 + lineW, y+1);
 
     pdf.setFont("helvetica", "normal");
@@ -442,7 +444,7 @@ export default function ReportsPage() {
     pdf.setFont("helvetica", "normal");
     pdf.text("RATE (Rs):", labelX2, y);
     pdf.setFont("helvetica", "bold");
-    const effectiveRate = farmerInfo?.customRate > 0 ? farmerInfo.customRate : (farmerInfo?.milkType === 'BUFFALO' ? ratesConfig?.buffaloRate : ratesConfig?.cowRate);
+    const effectiveRate = farmerInDir?.customRate > 0 ? farmerInDir.customRate : (farmerInDir?.milkType === 'BUFFALO' ? ratesConfig?.buffaloRate : ratesConfig?.cowRate);
     pdf.text(Number(effectiveRate || 0).toFixed(2), valueX2, y);
     pdf.line(valueX2, y+1, valueX2 + lineW, y+1);
 

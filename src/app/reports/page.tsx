@@ -26,7 +26,9 @@ import {
   Calendar,
   ClipboardList,
   ShoppingCart,
-  Printer
+  Printer,
+  Sun,
+  Moon
 } from "lucide-react";
 import { format, endOfMonth, subMonths, startOfMonth } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -128,11 +130,12 @@ export default function ReportsPage() {
     const amount = Number(entry.totalAmount) || parseFloat((quantity * rate).toFixed(2));
     
     return { 
-      qtyLitre: quantity, 
-      cost: amount, 
+      qtyLitre: parseFloat(quantity.toFixed(2)), 
+      cost: parseFloat(amount.toFixed(2)), 
       appliedRate: rate,
       farmerName: farmer?.name || "Unknown",
-      canNumber: farmer?.canNumber || "???"
+      canNumber: farmer?.canNumber || "???",
+      session: entry.session || "Morning"
     };
   };
 
@@ -146,11 +149,12 @@ export default function ReportsPage() {
     const buyer = buyersList?.find(b => b.id === sale.buyerId);
     
     return { 
-      qty, 
-      cost: amount, 
+      qty: parseFloat(qty.toFixed(2)), 
+      cost: parseFloat(amount.toFixed(2)), 
       appliedRate: rate,
       buyerName: buyer?.name || "Unknown Buyer",
-      milkType: sale.milkType
+      milkType: sale.milkType,
+      session: sale.session || "Morning"
     };
   };
 
@@ -160,8 +164,15 @@ export default function ReportsPage() {
       return { procurement: [], sales: [], totalProc: 0, totalSale: 0 };
     }
 
-    const dProc = allEntries.filter(e => e.date === selectedDailyDate).map(e => resolveEntryFinancials(e, farmers, ratesConfig));
-    const dSale = allSales.filter(s => s.date === selectedDailyDate).map(s => resolveSaleFinancials(s, buyers, ratesConfig));
+    const dProc = allEntries
+      .filter(e => e.date === selectedDailyDate)
+      .map(e => resolveEntryFinancials(e, farmers, ratesConfig))
+      .sort((a, b) => parseInt(a.canNumber) - parseInt(b.canNumber) || a.session.localeCompare(b.session));
+
+    const dSale = allSales
+      .filter(s => s.date === selectedDailyDate)
+      .map(s => resolveSaleFinancials(s, buyers, ratesConfig))
+      .sort((a, b) => a.buyerName.localeCompare(b.buyerName) || a.session.localeCompare(b.session));
 
     return {
       procurement: dProc,
@@ -258,17 +269,14 @@ export default function ReportsPage() {
     // Procurement Section
     pdf.setFontSize(11);
     pdf.text("I. PROCUREMENT SUMMARY", 14, 45);
-    const procRows = dailyData.procurement.map((p, i) => {
-      const entry = allEntries!.filter(e => e.date === selectedDailyDate)[i];
-      return [
-        p.canNumber,
-        p.farmerName.toUpperCase(),
-        entry?.session || "—",
-        p.qtyLitre.toFixed(2),
-        p.appliedRate.toFixed(2),
-        p.cost.toFixed(2)
-      ];
-    });
+    const procRows = dailyData.procurement.map(p => [
+      p.canNumber,
+      p.farmerName.toUpperCase(),
+      p.session.toUpperCase(),
+      p.qtyLitre.toFixed(2),
+      p.appliedRate.toFixed(2),
+      p.cost.toFixed(2)
+    ]);
 
     (pdf as any).autoTable({
       startY: 48,
@@ -284,17 +292,14 @@ export default function ReportsPage() {
     // Sales Section
     pdf.setFontSize(11);
     pdf.text("II. DISTRIBUTION / SALES SUMMARY", 14, nextY);
-    const saleRows = dailyData.sales.map((s, i) => {
-      const sale = allSales!.filter(sl => sl.date === selectedDailyDate)[i];
-      return [
-        s.buyerName.toUpperCase(),
-        sale?.session || "—",
-        s.milkType,
-        s.qty.toFixed(2),
-        s.appliedRate.toFixed(2),
-        s.cost.toFixed(2)
-      ];
-    });
+    const saleRows = dailyData.sales.map(s => [
+      s.buyerName.toUpperCase(),
+      s.session.toUpperCase(),
+      s.milkType,
+      s.qty.toFixed(2),
+      s.appliedRate.toFixed(2),
+      s.cost.toFixed(2)
+    ]);
 
     (pdf as any).autoTable({
       startY: nextY + 3,
@@ -396,7 +401,7 @@ export default function ReportsPage() {
 
     const fEntries = allEntries!.filter(e => e.farmerId === f.id && e.date.startsWith(selectedMonth) && parseInt(e.date.split('-')[2]) >= currentCycle.start && parseInt(e.date.split('-')[2]) <= currentCycle.end);
     
-    const rows = fEntries.sort((a, b) => a.date.localeCompare(b.date)).map(e => {
+    const rows = fEntries.sort((a, b) => a.date.localeCompare(b.date) || a.session.localeCompare(b.session)).map(e => {
       const res = resolveEntryFinancials(e, farmers!, ratesConfig!);
       return [
         format(new Date(e.date), 'dd/MM/yy'),
@@ -534,18 +539,22 @@ export default function ReportsPage() {
                       <TableRow>
                         <TableHead className="font-bold text-[10px] uppercase">CAN</TableHead>
                         <TableHead className="font-bold text-[10px] uppercase">Farmer</TableHead>
+                        <TableHead className="font-bold text-[10px] uppercase">Session</TableHead>
                         <TableHead className="text-right font-bold text-[10px] uppercase">Litre</TableHead>
                         <TableHead className="text-right font-bold text-[10px] uppercase">Amount</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {dailyData.procurement.length === 0 ? (
-                        <TableRow><TableCell colSpan={4} className="text-center py-10 text-muted-foreground italic">No collections recorded.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground italic">No collections recorded.</TableCell></TableRow>
                       ) : (
                         dailyData.procurement.map((p, i) => (
                           <TableRow key={i}>
                             <TableCell className="font-black text-primary">{p.canNumber}</TableCell>
                             <TableCell className="font-medium truncate max-w-[120px]">{p.farmerName}</TableCell>
+                            <TableCell>
+                              {p.session === 'Morning' ? <Sun className="w-3 h-3 text-orange-500" /> : <Moon className="w-3 h-3 text-blue-500" />}
+                            </TableCell>
                             <TableCell className="text-right font-bold">{p.qtyLitre.toFixed(2)}</TableCell>
                             <TableCell className="text-right font-mono">Rs. {p.cost.toFixed(2)}</TableCell>
                           </TableRow>
@@ -566,6 +575,7 @@ export default function ReportsPage() {
                     <TableHeader className="bg-muted/50">
                       <TableRow>
                         <TableHead className="font-bold text-[10px] uppercase">Buyer</TableHead>
+                        <TableHead className="font-bold text-[10px] uppercase">Session</TableHead>
                         <TableHead className="font-bold text-[10px] uppercase">Type</TableHead>
                         <TableHead className="text-right font-bold text-[10px] uppercase">Litre</TableHead>
                         <TableHead className="text-right font-bold text-[10px] uppercase">Amount</TableHead>
@@ -573,11 +583,14 @@ export default function ReportsPage() {
                     </TableHeader>
                     <TableBody>
                       {dailyData.sales.length === 0 ? (
-                        <TableRow><TableCell colSpan={4} className="text-center py-10 text-muted-foreground italic">No sales recorded.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground italic">No sales recorded.</TableCell></TableRow>
                       ) : (
                         dailyData.sales.map((s, i) => (
                           <TableRow key={i}>
                             <TableCell className="font-bold truncate max-w-[120px]">{s.buyerName}</TableCell>
+                            <TableCell>
+                              {s.session === 'Morning' ? <Sun className="w-3 h-3 text-orange-500" /> : <Moon className="w-3 h-3 text-blue-500" />}
+                            </TableCell>
                             <TableCell><Badge variant="outline" className="text-[8px] font-black">{s.milkType}</Badge></TableCell>
                             <TableCell className="text-right font-bold">{s.qty.toFixed(2)}</TableCell>
                             <TableCell className="text-right font-mono">Rs. {s.cost.toFixed(2)}</TableCell>

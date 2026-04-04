@@ -1,19 +1,18 @@
-
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { DashboardStats } from "@/components/dashboard-stats";
 import Link from "next/link";
-import { PlusCircle, Settings, ShoppingCart, BarChart3, Calculator, UserCheck, Users } from "lucide-react";
+import { PlusCircle, Settings, ShoppingCart, BarChart3, FileText, UserCheck, Users, FileBarChart } from "lucide-react";
 
 export default function Home() {
   const quickActions = [
     { href: "/farmers", label: "Farmers", icon: Users, color: "text-blue-600", bg: "bg-blue-600/10" },
     { href: "/entries", label: "Collection", icon: PlusCircle, color: "text-primary", bg: "bg-primary/10" },
     { href: "/sales", label: "Sales", icon: ShoppingCart, color: "text-secondary", bg: "bg-secondary/10" },
-    { href: "/converter", label: "Converter", icon: Calculator, color: "text-amber-600", bg: "bg-amber-600/10" },
+    { href: "/daily-reports", label: "Daily Report", icon: FileBarChart, color: "text-amber-600", bg: "bg-amber-600/10" },
+    { href: "/farmer-bills", label: "Farmer Bills", icon: FileText, color: "text-rose-600", bg: "bg-rose-600/10" },
     { href: "/buyers", label: "Buyers", icon: UserCheck, color: "text-indigo-600", bg: "bg-indigo-600/10" },
-    { href: "/reports", label: "Reports", icon: BarChart3, color: "text-emerald-600", bg: "bg-emerald-600/10" },
-    { href: "/settings", label: "Settings", icon: Settings, color: "text-slate-600", bg: "bg-slate-600/10" },
+    { href: "/reports", label: "Audit", icon: BarChart3, color: "text-emerald-600", bg: "bg-emerald-600/10" },
   ];
 
   return (

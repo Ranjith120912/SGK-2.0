@@ -27,7 +27,7 @@ import { format, endOfMonth, subMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import jsPDF from "jspdf";
+import jsPDF from "jsPDF";
 import "jspdf-autotable";
 
 export default function ReportsPage() {
@@ -93,17 +93,11 @@ export default function ReportsPage() {
   const { data: ratesConfig } = useDoc(settingsRef);
 
   const currentCycle = cycles[activeCycle];
-  
-  const filteredCycleEntries = useMemo(() => {
-    if (!allEntries || !selectedMonth || !currentCycle) return [];
-    return allEntries.filter(entry => {
-      if (!entry.date.startsWith(selectedMonth)) return false;
-      const day = parseInt(entry.date.split('-')[2]);
-      return day >= currentCycle.start && day <= currentCycle.end;
-    });
-  }, [allEntries, selectedMonth, currentCycle]);
 
-  // Unified Rate and Cost Resolution
+  /**
+   * Centralized Rate & Cost Resolution Engine
+   * Ensures 100% synchronization across all report tabs and PDFs.
+   */
   const resolveEntryCost = (entry: any, farmersList: any[], config: any) => {
     const qtyLitre = Number(entry.quantity) || 0;
     if (qtyLitre === 0) return 0;
@@ -120,13 +114,21 @@ export default function ReportsPage() {
         resolvedRate = Number(config?.cowRate) || 0;
       }
     } else {
-      // Fallback to entry rate if farmer profile is missing (legacy support)
       resolvedRate = Number(entry.rate) || 0;
     }
 
-    // Always recalculate to ensure correctness against current profile rates
+    // Always recalculate with 2-decimal precision for total synchronization
     return parseFloat((qtyLitre * resolvedRate).toFixed(2));
   };
+
+  const filteredCycleEntries = useMemo(() => {
+    if (!allEntries || !selectedMonth || !currentCycle) return [];
+    return allEntries.filter(entry => {
+      if (!entry.date.startsWith(selectedMonth)) return false;
+      const day = parseInt(entry.date.split('-')[2]);
+      return day >= currentCycle.start && day <= currentCycle.end;
+    });
+  }, [allEntries, selectedMonth, currentCycle]);
 
   const masterRoster = useMemo(() => {
     if (!farmers || !currentCycle) return [];
@@ -197,11 +199,11 @@ export default function ReportsPage() {
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
     
-    // Lock to April - March Fiscal Cycle
+    // April - March Fiscal Cycle
     const fiscalYearStart = currentMonth < 3 ? currentYear - 1 : currentYear;
     
     return Array.from({ length: 12 }).map((_, i) => {
-      const monthIdx = (3 + i) % 12; // Start from April (index 3)
+      const monthIdx = (3 + i) % 12; 
       const year = fiscalYearStart + (3 + i >= 12 ? 1 : 0);
       const d = new Date(year, monthIdx, 1);
       const monthStr = format(d, 'yyyy-MM');
@@ -242,6 +244,15 @@ export default function ReportsPage() {
     const endDateFormatted = `${cycleEnd.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year.toString().slice(-2)}`;
     const periodString = `${startDateFormatted} to ${endDateFormatted}`;
 
+    let resolvedRate = 0;
+    if (farmer.milkType === 'BUFFALO') {
+      resolvedRate = Number(farmer.customRate) > 0 
+        ? Number(farmer.customRate) 
+        : (Number(ratesConfig?.buffaloRate) || 0);
+    } else {
+      resolvedRate = Number(ratesConfig?.cowRate) || 0;
+    }
+
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
     doc.text(companyName, 105, 20, { align: 'center' });
@@ -251,15 +262,6 @@ export default function ReportsPage() {
 
     doc.setFontSize(10);
     let y = 45;
-    
-    let displayRate = 0;
-    if (farmer.milkType === 'BUFFALO') {
-      displayRate = Number(farmer.customRate) > 0 
-        ? Number(farmer.customRate) 
-        : (Number(ratesConfig?.buffaloRate) || 0);
-    } else {
-      displayRate = Number(ratesConfig?.cowRate) || 0;
-    }
 
     doc.setFont("helvetica", "normal");
     doc.text("NAME:", 20, y);
@@ -296,35 +298,33 @@ export default function ReportsPage() {
     doc.setFont("helvetica", "normal");
     doc.text("RATE (Rs):", 110, y);
     doc.setFont("helvetica", "bold");
-    doc.text(displayRate.toFixed(2), 135, y);
+    doc.text(resolvedRate.toFixed(2), 135, y);
     doc.line(135, y+1, 190, y+1);
 
     const cycleEntries = filteredCycleEntries.filter(e => e.farmerId === farmer.id);
-    const dateMap: Record<string, { morning: number, evening: number, rate: number }> = {};
+    const dateMap: Record<string, { morning: number, evening: number }> = {};
     for (let d = cycleStart; d <= cycleEnd; d++) {
       const dateStr = `${year}-${month.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`;
-      dateMap[dateStr] = { morning: 0, evening: 0, rate: displayRate };
+      dateMap[dateStr] = { morning: 0, evening: 0 };
     }
     
     cycleEntries.forEach(e => {
       if (dateMap[e.date]) {
         if (e.session === 'Morning') dateMap[e.date].morning += Number(e.quantity);
         else dateMap[e.date].evening += Number(e.quantity);
-        // Ensure accurate rate resolution per transaction day
-        dateMap[e.date].rate = displayRate;
       }
     });
 
     const tableRows = Object.keys(dateMap).sort().map(date => {
       const d = dateMap[date];
       const totalL = d.morning + d.evening;
-      const amt = parseFloat((totalL * d.rate).toFixed(2));
+      const amt = parseFloat((totalL * resolvedRate).toFixed(2));
       return [
         format(new Date(date), 'dd/MM/yy'), 
         d.morning.toFixed(2), 
         d.evening.toFixed(2), 
         totalL.toFixed(2), 
-        d.rate.toFixed(2), 
+        resolvedRate.toFixed(2), 
         amt.toFixed(2)
       ];
     });

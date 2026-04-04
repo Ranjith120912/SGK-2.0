@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -92,7 +91,7 @@ export default function FarmerBillsPage() {
       const fid = e.farmerId;
       const farmerProfile = farmers.find(f => f.id === fid);
       
-      const name = farmerProfile?.name || e.farmerName || "Farmer " + fid.slice(0, 4);
+      const name = farmerProfile?.name || e.farmerName || "Farmer";
       const can = farmerProfile?.canNumber || e.canNumber || "---";
       const milkType = farmerProfile?.milkType || e.milkType || "COW";
 
@@ -109,7 +108,6 @@ export default function FarmerBillsPage() {
 
       const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
       
-      // Buffalo Milk Rate Resolution (Custom > Global)
       let rate = 0;
       if (milkType === 'BUFFALO') {
         rate = farmerProfile && Number(farmerProfile.customRate) > 0 

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -48,12 +47,8 @@ export default function ReportsPage() {
 
   useEffect(() => {
     setIsClient(true);
-    setSelectedDate(format(new Date(), 'yyyy-MM-dd'));
     setSelectedMonth(format(new Date(), 'yyyy-MM'));
   }, []);
-
-  // Fix: dummy state to satisfy the build, but unused logic
-  const [selectedDate, setSelectedDate] = useState<string>("");
 
   const monthOptions = useMemo(() => {
     if (!isClient) return [];
@@ -119,7 +114,7 @@ export default function ReportsPage() {
       const fid = e.farmerId;
       const farmerProfile = farmers.find(f => f.id === fid);
       
-      const name = farmerProfile?.name || e.farmerName || "Farmer " + fid.slice(0, 4);
+      const name = farmerProfile?.name || e.farmerName || "Farmer";
       const can = farmerProfile?.canNumber || e.canNumber || "---";
       const milkType = farmerProfile?.milkType || e.milkType || "COW";
 

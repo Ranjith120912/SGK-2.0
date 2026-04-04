@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -71,8 +70,8 @@ export default function DailyReportsPage() {
       const fid = e.farmerId;
       const farmerProfile = farmers.find(f => f.id === fid);
       
-      // Resolution Strategy: Live Directory > Stored Metadata > Fallback
-      const name = farmerProfile?.name || e.farmerName || "Farmer " + fid.slice(0, 4);
+      // IDENTITY RESOLUTION: Prioritize Directory > Transaction Metadata
+      const name = farmerProfile?.name || e.farmerName || "Farmer";
       const can = farmerProfile?.canNumber || e.canNumber || "---";
       const milkType = farmerProfile?.milkType || e.milkType || "COW";
 
@@ -91,7 +90,7 @@ export default function DailyReportsPage() {
       const kg = Number(e.kgWeight) || 0;
       const ltr = kg * CONVERSION_RATE;
       
-      // Buffalo Milk Rate Resolution (Custom > Global)
+      // BUFFALO RATE RESOLUTION: Custom Farmer Rate > Global Buffalo Rate
       let rate = 0;
       if (milkType === 'BUFFALO') {
         rate = farmerProfile && Number(farmerProfile.customRate) > 0 

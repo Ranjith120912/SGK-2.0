@@ -80,7 +80,7 @@ export default function EntriesPage() {
     const existingEntry = entries?.find(e => e.farmerId === farmerId);
     const kgValue = kgStr !== undefined ? parseFloat(kgStr) : (existingEntry ? Number(existingEntry.kgWeight) : 0);
     
-    // STRICTOR Rate Logic: Prioritize Farmer Tab customRate for BUFFALO
+    // Rate Prioritization Logic
     let managedRate = 0;
     if (farmer.milkType === 'BUFFALO') {
       managedRate = Number(farmer.customRate) > 0 

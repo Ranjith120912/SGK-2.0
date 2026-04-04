@@ -103,17 +103,14 @@ export default function ReportsPage() {
     });
   }, [allEntries, selectedMonth, currentCycle]);
 
-  // Helper to resolve an entry's cost correctly
+  // Unified Rate and Cost Resolution
   const resolveEntryCost = (entry: any, farmersList: any[], config: any) => {
-    const qty = Number(entry.quantity) || 0;
-    if (qty === 0) return 0;
+    const qtyLitre = Number(entry.quantity) || 0;
+    if (qtyLitre === 0) return 0;
 
-    // Use saved total if it exists and is valid
-    if (Number(entry.totalAmount) > 0) return Number(entry.totalAmount);
-
-    // Dynamic resolution fallback
     const farmer = farmersList?.find(f => f.id === entry.farmerId);
     let resolvedRate = 0;
+    
     if (farmer) {
       if (farmer.milkType === 'BUFFALO') {
         resolvedRate = Number(farmer.customRate) > 0 
@@ -123,10 +120,12 @@ export default function ReportsPage() {
         resolvedRate = Number(config?.cowRate) || 0;
       }
     } else {
+      // Fallback to entry rate if farmer profile is missing (legacy support)
       resolvedRate = Number(entry.rate) || 0;
     }
 
-    return qty * resolvedRate;
+    // Always recalculate to ensure correctness against current profile rates
+    return parseFloat((qtyLitre * resolvedRate).toFixed(2));
   };
 
   const masterRoster = useMemo(() => {
@@ -197,12 +196,14 @@ export default function ReportsPage() {
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
-    const fiscalStartYear = currentMonth < 3 ? currentYear - 1 : currentYear;
+    
+    // Lock to April - March Fiscal Cycle
+    const fiscalYearStart = currentMonth < 3 ? currentYear - 1 : currentYear;
     
     return Array.from({ length: 12 }).map((_, i) => {
-      const monthIndex = (3 + i) % 12;
-      const year = fiscalStartYear + (3 + i >= 12 ? 1 : 0);
-      const d = new Date(year, monthIndex, 1);
+      const monthIdx = (3 + i) % 12; // Start from April (index 3)
+      const year = fiscalYearStart + (3 + i >= 12 ? 1 : 0);
+      const d = new Date(year, monthIdx, 1);
       const monthStr = format(d, 'yyyy-MM');
       const monthName = format(d, 'MMMM yyyy');
       
@@ -210,11 +211,7 @@ export default function ReportsPage() {
       const mSales = allSales.filter(s => s.date.startsWith(monthStr));
       
       const collectionL = mEntries.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
-      
-      const cost = mEntries.reduce((acc, curr) => {
-        return acc + resolveEntryCost(curr, farmers, ratesConfig);
-      }, 0);
-
+      const cost = mEntries.reduce((acc, curr) => acc + resolveEntryCost(curr, farmers, ratesConfig), 0);
       const revenue = mSales.reduce((acc, curr) => acc + (Number(curr.totalAmount) || 0), 0);
       const profit = revenue - cost;
       
@@ -236,66 +233,13 @@ export default function ReportsPage() {
   const cowTotals = calculateRosterTotals(cowRoster);
   const buffaloTotals = calculateRosterTotals(buffaloRoster);
 
-  const handleDownloadRosterPDF = () => {
-    const doc = new jsPDF('l', 'mm', 'a4');
-    const companyName = ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS";
-    const cycleLabel = currentCycle?.label || "";
-    const monthLabel = monthOptions.find(o => o.value === selectedMonth)?.label || "";
-
-    const addRosterSection = (title: string, roster: any[], startY: number, totals: any) => {
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text(title, 14, startY);
-
-      const tableData = roster.map(f => [
-        f.canNumber,
-        f.name,
-        f.bankAccountNumber || "—",
-        f.morningQty.toFixed(2),
-        f.eveningQty.toFixed(2),
-        f.totalQty.toFixed(2),
-        `Rs. ${f.totalAmount.toFixed(2)}`
-      ]);
-
-      (doc as any).autoTable({
-        startY: startY + 5,
-        head: [['CAN', 'FARMER NAME', 'BANK A/C', 'MORNING (L)', 'EVENING (L)', 'TOTAL L', 'PAYOUT (Rs.)']],
-        body: tableData,
-        theme: 'grid',
-        headStyles: { fillColor: [37, 99, 235], textColor: 255 },
-        foot: [['', 'Totals', '', totals.morning.toFixed(2), totals.evening.toFixed(2), totals.total.toFixed(2), `Rs. ${totals.amount.toFixed(2)}`]],
-        footStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' },
-        margin: { bottom: 20 }
-      });
-
-      return (doc as any).lastAutoTable.finalY + 15;
-    };
-
-    doc.setFontSize(18);
-    doc.text(companyName, 14, 20);
-    doc.setFontSize(12);
-    doc.text(`Master Roster: ${cycleLabel} - ${monthLabel}`, 14, 28);
-
-    let currentY = 35;
-    if (cowRoster.length > 0) {
-      currentY = addRosterSection("COW MILK ROSTER", cowRoster, currentY, cowTotals);
-    }
-    
-    if (buffaloRoster.length > 0) {
-      if (currentY > 160) { doc.addPage('l', 'mm', 'a4'); currentY = 20; }
-      addRosterSection("BUFFALO MILK ROSTER", buffaloRoster, currentY, buffaloTotals);
-    }
-
-    doc.save(`Master_Roster_${selectedMonth}_${cycleLabel}.pdf`);
-  };
-
   const generateSingleInvoice = (doc: jsPDF, farmer: any) => {
-    const companyName = (ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS").toUpperCase();
+    const companyName = (ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS").toUpperCase();
     const [year, month] = selectedMonth.split('-').map(Number);
     const cycleStart = currentCycle.start;
     const cycleEnd = currentCycle.end;
-    const startDateFormatted = `${cycleStart}/${month.toString().padStart(2, '0')}/${year.toString().slice(-2)}`;
-    const endDateFormatted = `${cycleEnd}/${month.toString().padStart(2, '0')}/${year.toString().slice(-2)}`;
+    const startDateFormatted = `${cycleStart.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year.toString().slice(-2)}`;
+    const endDateFormatted = `${cycleEnd.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year.toString().slice(-2)}`;
     const periodString = `${startDateFormatted} to ${endDateFormatted}`;
 
     doc.setFont("helvetica", "bold");
@@ -364,27 +308,29 @@ export default function ReportsPage() {
     
     cycleEntries.forEach(e => {
       if (dateMap[e.date]) {
-        if (e.session === 'Morning') dateMap[e.date].morning = Number(e.quantity);
-        else dateMap[e.date].evening = Number(e.quantity);
-        dateMap[e.date].rate = Number(e.rate) > 0 ? Number(e.rate) : displayRate;
+        if (e.session === 'Morning') dateMap[e.date].morning += Number(e.quantity);
+        else dateMap[e.date].evening += Number(e.quantity);
+        // Ensure accurate rate resolution per transaction day
+        dateMap[e.date].rate = displayRate;
       }
     });
 
     const tableRows = Object.keys(dateMap).sort().map(date => {
       const d = dateMap[date];
-      const total = d.morning + d.evening;
+      const totalL = d.morning + d.evening;
+      const amt = parseFloat((totalL * d.rate).toFixed(2));
       return [
         format(new Date(date), 'dd/MM/yy'), 
         d.morning.toFixed(2), 
         d.evening.toFixed(2), 
-        total.toFixed(2), 
+        totalL.toFixed(2), 
         d.rate.toFixed(2), 
-        (total * d.rate).toFixed(2)
+        amt.toFixed(2)
       ];
     });
 
     (doc as any).autoTable({
-      startY: y + 10,
+      startY: y + 15,
       head: [['DATE', 'MORNING (L)', 'EVENING (L)', 'TOTAL LITRES', 'RATE (Rs)', 'AMOUNT (Rs)']],
       body: tableRows,
       theme: 'grid',
@@ -405,6 +351,59 @@ export default function ReportsPage() {
     doc.text(farmer.totalAmount.toFixed(2), 185, finalY + 25, { align: 'right' });
     doc.setFontSize(9);
     doc.text("AUTHORIZED SIGNATURE", 140, 275);
+  };
+
+  const handleDownloadRosterPDF = () => {
+    const doc = new jsPDF('l', 'mm', 'a4');
+    const companyName = ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS";
+    const cycleLabel = currentCycle?.label || "";
+    const monthLabel = monthOptions.find(o => o.value === selectedMonth)?.label || "";
+
+    const addRosterSection = (title: string, roster: any[], startY: number, totals: any) => {
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text(title, 14, startY);
+
+      const tableData = roster.map(f => [
+        f.canNumber,
+        f.name,
+        f.bankAccountNumber || "—",
+        f.morningQty.toFixed(2),
+        f.eveningQty.toFixed(2),
+        f.totalQty.toFixed(2),
+        `Rs. ${f.totalAmount.toFixed(2)}`
+      ]);
+
+      (doc as any).autoTable({
+        startY: startY + 5,
+        head: [['CAN', 'FARMER NAME', 'BANK A/C', 'MORNING (L)', 'EVENING (L)', 'TOTAL L', 'PAYOUT (Rs.)']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [37, 99, 235], textColor: 255 },
+        foot: [['', 'Totals', '', totals.morning.toFixed(2), totals.evening.toFixed(2), totals.total.toFixed(2), `Rs. ${totals.amount.toFixed(2)}`]],
+        footStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' },
+        margin: { bottom: 20 }
+      });
+
+      return (doc as any).lastAutoTable.finalY + 15;
+    };
+
+    doc.setFontSize(18);
+    doc.text(companyName.toUpperCase(), 14, 20);
+    doc.setFontSize(12);
+    doc.text(`Master Roster: ${cycleLabel} - ${monthLabel}`, 14, 28);
+
+    let currentY = 35;
+    if (cowRoster.length > 0) {
+      currentY = addRosterSection("COW MILK ROSTER", cowRoster, currentY, cowTotals);
+    }
+    
+    if (buffaloRoster.length > 0) {
+      if (currentY > 160) { doc.addPage('l', 'mm', 'a4'); currentY = 20; }
+      addRosterSection("BUFFALO MILK ROSTER", buffaloRoster, currentY, buffaloTotals);
+    }
+
+    doc.save(`Master_Roster_${selectedMonth}_${cycleLabel}.pdf`);
   };
 
   const handleDownloadFarmerBillPDF = (farmerId: string) => {

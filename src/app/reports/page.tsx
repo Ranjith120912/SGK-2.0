@@ -265,10 +265,15 @@ export default function ReportsPage() {
     doc.setFontSize(10);
     let y = 45;
     
-    // Rate for display - prioritize farmer profile for Buffalo
-    const displayRate = farmer.milkType === 'BUFFALO' 
-      ? (Number(farmer.customRate) || Number(ratesConfig?.buffaloRate) || 0) 
-      : (Number(ratesConfig?.cowRate) || 0);
+    // STRICT Buffalo Rate Prioritization for Invoice Header
+    let displayRate = 0;
+    if (farmer.milkType === 'BUFFALO') {
+      displayRate = Number(farmer.customRate) > 0 
+        ? Number(farmer.customRate) 
+        : (Number(ratesConfig?.buffaloRate) || 0);
+    } else {
+      displayRate = Number(ratesConfig?.cowRate) || 0;
+    }
 
     doc.setFont("helvetica", "normal");
     doc.text("NAME:", 20, y);
@@ -319,7 +324,8 @@ export default function ReportsPage() {
       if (dateMap[e.date]) {
         if (e.session === 'Morning') dateMap[e.date].morning = Number(e.quantity);
         else dateMap[e.date].evening = Number(e.quantity);
-        dateMap[e.date].rate = Number(e.rate);
+        // Use the rate saved in the entry, or fall back to the resolved display rate
+        dateMap[e.date].rate = Number(e.rate) > 0 ? Number(e.rate) : displayRate;
       }
     });
 

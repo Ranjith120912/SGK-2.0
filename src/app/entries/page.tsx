@@ -78,21 +78,24 @@ export default function EntriesPage() {
     if (!farmer || !firestore) return;
 
     const existingEntry = entries?.find(e => e.farmerId === farmerId);
-    
-    // Determine the value to save: current input or existing value
     const kgValue = kgStr !== undefined ? parseFloat(kgStr) : (existingEntry ? Number(existingEntry.kgWeight) : 0);
     
-    // CRITICAL: Calculate rate based on Farmer Profile for Buffalo, fallback to global settings
-    const managedRate = farmer.milkType === 'BUFFALO' 
-      ? (Number(farmer.customRate) || Number(ratesConfig?.buffaloRate) || 0) 
-      : (Number(ratesConfig?.cowRate) || 0);
+    // STRICTOR Rate Logic: Prioritize Farmer Tab customRate for BUFFALO
+    let managedRate = 0;
+    if (farmer.milkType === 'BUFFALO') {
+      managedRate = Number(farmer.customRate) > 0 
+        ? Number(farmer.customRate) 
+        : (Number(ratesConfig?.buffaloRate) || 0);
+    } else {
+      managedRate = Number(ratesConfig?.cowRate) || 0;
+    }
 
     if (isNaN(kgValue) || kgValue < 0) return;
 
     setSavingStatus(prev => ({ ...prev, [farmerId]: 'saving' }));
 
-    const quantityLitre = kgValue * conversionRate;
-    const totalAmount = quantityLitre * managedRate;
+    const quantityLitre = parseFloat((kgValue * conversionRate).toFixed(2));
+    const totalAmount = parseFloat((quantityLitre * managedRate).toFixed(2));
 
     const entryId = `${farmerId}_${date}_${session}`;
     const docRef = doc(firestore, 'entries', entryId);
@@ -208,13 +211,18 @@ export default function EntriesPage() {
                   const kgNum = parseFloat(currentKgStr);
                   const previewLitre = !isNaN(kgNum) ? (kgNum * conversionRate).toFixed(2) : "0.00";
                   
-                  // Rate is managed in Farmer Management or Global Settings
-                  const managedRate = farmer.milkType === 'BUFFALO' 
-                    ? (Number(farmer.customRate) || Number(ratesConfig?.buffaloRate) || 0) 
-                    : (Number(ratesConfig?.cowRate) || 0);
+                  // Rate Prioritization Logic
+                  let managedRate = 0;
+                  const isBuffalo = farmer.milkType === 'BUFFALO';
+                  if (isBuffalo) {
+                    managedRate = Number(farmer.customRate) > 0 
+                      ? Number(farmer.customRate) 
+                      : (Number(ratesConfig?.buffaloRate) || 0);
+                  } else {
+                    managedRate = Number(ratesConfig?.cowRate) || 0;
+                  }
                   
                   const previewAmount = !isNaN(kgNum) ? (parseFloat(previewLitre) * managedRate).toFixed(2) : "0.00";
-                  
                   const status = savingStatus[farmer.id] || (existingEntry ? 'saved' : 'idle');
 
                   return (
@@ -224,7 +232,7 @@ export default function EntriesPage() {
                         <div className="flex flex-col gap-1">
                           <span className="font-bold text-base">{farmer.name}</span>
                           <div className="flex items-center gap-2">
-                            <Badge variant={farmer.milkType === 'BUFFALO' ? "secondary" : "outline"} className="text-[10px] h-4 rounded-full px-1.5">
+                            <Badge variant={isBuffalo ? "secondary" : "outline"} className="text-[10px] h-4 rounded-full px-1.5">
                               {farmer.milkType || 'COW'}
                             </Badge>
                           </div>
@@ -253,11 +261,11 @@ export default function EntriesPage() {
                       <TableCell>
                         <div className={cn(
                           "h-11 flex items-center justify-between px-4 rounded-xl border border-transparent font-bold text-sm bg-muted/30 text-muted-foreground",
-                          farmer.milkType === 'BUFFALO' && farmer.customRate && "bg-accent/5 text-accent border-accent/20"
+                          isBuffalo && Number(farmer.customRate) > 0 && "bg-accent/5 text-accent border-accent/20"
                         )}>
                           <span>₹ {managedRate.toFixed(2)}</span>
                           <Lock className="w-3 h-3 opacity-30" />
-                          {farmer.milkType === 'BUFFALO' && farmer.customRate && (
+                          {isBuffalo && Number(farmer.customRate) > 0 && (
                             <div className="absolute -top-3 left-2 bg-accent text-[8px] font-black text-white px-1.5 rounded-full uppercase tracking-widest">Fixed</div>
                           )}
                         </div>
@@ -279,7 +287,7 @@ export default function EntriesPage() {
               </TableBody>
             </Table>
             <div className="p-4 bg-muted/20 text-center text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] border-t">
-              Milk rates are managed in Settings and Farmer Management. Buffalo pricing prioritizes profile-specific custom rates.
+              Buffalo pricing prioritizes profile-specific custom rates set in Farmer Management.
             </div>
           </Card>
         </div>

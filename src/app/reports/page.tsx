@@ -38,7 +38,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import jsPDF from "jspdf";
+import jsPDF from "jsPDF";
 import "jspdf-autotable";
 import { utils, writeFile } from "xlsx";
 
@@ -116,19 +116,17 @@ export default function ReportsPage() {
    * Strictly 0.96 Conversion Standard
    */
   const resolveEntryFinancials = (entry: any, farmersList: any[], config: any) => {
-    const kg = Number(entry.kgWeight) || 0;
-    // Strictly re-calculate volume from weight using 0.96 standard
-    const quantity = parseFloat((kg * 0.96).toFixed(2));
-    
-    // Identity Priority: 
-    // 1. Saved Name in entry (Historical Persistence)
-    // 2. Live Directory Name (If it matches)
-    // 3. Fallback to "Supplier {CAN}"
     const farmerInDirectory = farmersList?.find(f => f.id === entry.farmerId);
     
-    const farmerName = entry.farmerName || farmerInDirectory?.name || "Supplier " + (entry.canNumber || "???");
-    const canNumber = entry.canNumber || farmerInDirectory?.canNumber || "???";
+    // Identity Priority: Directory > Saved Metadata > Fallback
+    const farmerName = farmerInDirectory?.name || entry.farmerName || "Supplier " + (entry.canNumber || "???");
+    const canNumber = farmerInDirectory?.canNumber || entry.canNumber || "???";
 
+    // Volume Calculation: Strictly 0.96
+    const kg = Number(entry.kgWeight) || 0;
+    const quantity = parseFloat((kg * 0.96).toFixed(2));
+    
+    // Rate Priority: Buffalo Custom > Buffalo Global > Cow Global
     let rate = Number(entry.rate) || 0;
     if (rate === 0 && farmerInDirectory) {
       if (farmerInDirectory.milkType === 'BUFFALO') {
@@ -140,7 +138,6 @@ export default function ReportsPage() {
       }
     }
 
-    // Amount recalculated with 2-decimal precision
     const amount = parseFloat((quantity * rate).toFixed(2));
     
     return { 
@@ -302,7 +299,7 @@ export default function ReportsPage() {
     };
   }, [masterRoster, allSales, selectedMonth, currentCycle, ratesConfig, buyers]);
 
-  // --- Exports (PDF & Excel) ---
+  // --- Exports ---
   const generateDailyPDF = () => {
     const pdf = new jsPDF('l', 'mm', 'a4');
     const company = (ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS").toUpperCase();

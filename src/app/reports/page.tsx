@@ -38,7 +38,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import jsPDF from "jsPDF";
+import jsPDF from "jspdf";
 import "jspdf-autotable";
 import { utils, writeFile } from "xlsx";
 
@@ -114,19 +114,20 @@ export default function ReportsPage() {
   /**
    * UNIFIED FINANCIAL RESOLUTION ENGINE
    * Strictly 0.96 Conversion Standard
+   * Prioritizes Live Directory, falls back to saved transaction metadata.
    */
   const resolveEntryFinancials = (entry: any, farmersList: any[], config: any) => {
     const farmerInDirectory = farmersList?.find(f => f.id === entry.farmerId);
     
-    // Identity Priority: Directory > Saved Metadata > Fallback
+    // Identity Priority: Directory > Saved Metadata
     const farmerName = farmerInDirectory?.name || entry.farmerName || "Supplier " + (entry.canNumber || "???");
     const canNumber = farmerInDirectory?.canNumber || entry.canNumber || "???";
 
-    // Volume Calculation: Strictly 0.96
+    // Volume Calculation: Strictly 0.96 (Prefer saved quantity if available)
     const kg = Number(entry.kgWeight) || 0;
-    const quantity = parseFloat((kg * 0.96).toFixed(2));
+    const quantity = entry.quantity !== undefined ? Number(entry.quantity) : parseFloat((kg * 0.96).toFixed(2));
     
-    // Rate Priority: Buffalo Custom > Buffalo Global > Cow Global
+    // Rate Priority: Saved Rate > Buffalo Custom > Buffalo Global > Cow Global
     let rate = Number(entry.rate) || 0;
     if (rate === 0 && farmerInDirectory) {
       if (farmerInDirectory.milkType === 'BUFFALO') {
@@ -138,7 +139,8 @@ export default function ReportsPage() {
       }
     }
 
-    const amount = parseFloat((quantity * rate).toFixed(2));
+    // Amount Priority: Saved Total > Calculated
+    const amount = entry.totalAmount !== undefined ? Number(entry.totalAmount) : parseFloat((quantity * rate).toFixed(2));
     
     return { 
       kgWeight: kg,
@@ -158,7 +160,7 @@ export default function ReportsPage() {
     if (rate === 0) {
       rate = sale.milkType === 'BUFFALO' ? (Number(config?.buffaloSellingRate) || 0) : (Number(config?.cowSellingRate) || 0);
     }
-    const amount = parseFloat((qty * rate).toFixed(2));
+    const amount = sale.totalAmount !== undefined ? Number(sale.totalAmount) : parseFloat((qty * rate).toFixed(2));
     const buyer = buyersList?.find(b => b.id === sale.buyerId);
     
     return { 
@@ -196,13 +198,14 @@ export default function ReportsPage() {
       }
       
       if (e.session === 'Morning') {
-        procMap[key].amKg = res.kgWeight;
-        procMap[key].amLtr = res.qtyLitre;
+        procMap[key].amKg += res.kgWeight;
+        procMap[key].amLtr += res.qtyLitre;
       } else {
-        procMap[key].pmKg = res.kgWeight;
-        procMap[key].pmLtr = res.qtyLitre;
+        procMap[key].pmKg += res.kgWeight;
+        procMap[key].pmLtr += res.qtyLitre;
       }
       
+      // Precision sum
       procMap[key].totalLtr = parseFloat((procMap[key].amLtr + procMap[key].pmLtr).toFixed(2));
       procMap[key].totalAmt = parseFloat((procMap[key].totalAmt + res.cost).toFixed(2));
     });

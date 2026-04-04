@@ -25,6 +25,7 @@ export default function EntriesPage() {
   const [session, setSession] = useState<'Morning' | 'Evening'>('Morning');
   const [searchTerm, setSearchTerm] = useState("");
   const [kgValues, setKgValues] = useState<Record<string, string>>({});
+  const [rateValues, setRateValues] = useState<Record<string, string>>({});
   const [savingStatus, setSavingStatus] = useState<Record<string, 'idle' | 'saving' | 'saved'>>({});
 
   useEffect(() => {
@@ -72,28 +73,34 @@ export default function EntriesPage() {
     setSavingStatus(prev => ({ ...prev, [farmerId]: 'idle' }));
   };
 
+  const handleRateChange = (farmerId: string, value: string) => {
+    setRateValues(prev => ({ ...prev, [farmerId]: value }));
+    setSavingStatus(prev => ({ ...prev, [farmerId]: 'idle' }));
+  };
+
   const handleAutoSave = (farmerId: string) => {
-    const value = kgValues[farmerId];
-    if (value === undefined || value === "") return;
-
-    const kgValue = parseFloat(value);
-    if (isNaN(kgValue) || kgValue < 0) return;
-
-    if (!firestore) return;
-
+    const kgStr = kgValues[farmerId];
     const farmer = farmers?.find(f => f.id === farmerId);
-    if (!farmer) return;
+    if (!farmer || !firestore) return;
+
+    const existingEntry = entries?.find(e => e.farmerId === farmerId);
+    
+    // Determine the value to save: current input or existing value
+    const kgValue = kgStr !== undefined ? parseFloat(kgStr) : (existingEntry ? existingEntry.kgWeight : 0);
+    
+    // Determine the rate to save: current input override, or setting default
+    const manualRate = rateValues[farmerId];
+    const defaultRate = farmer.milkType === 'BUFFALO' 
+      ? (ratesConfig?.buffaloRate || 0) 
+      : (ratesConfig?.cowRate || 0);
+    const finalRate = manualRate !== undefined && manualRate !== "" ? parseFloat(manualRate) : (existingEntry ? existingEntry.rate : defaultRate);
+
+    if (isNaN(kgValue) || kgValue < 0 || isNaN(finalRate)) return;
 
     setSavingStatus(prev => ({ ...prev, [farmerId]: 'saving' }));
 
     const quantityLitre = kgValue * conversionRate;
-    
-    // Determine rate based on milk type and settings
-    const currentRate = farmer.milkType === 'BUFFALO' 
-      ? (ratesConfig?.buffaloRate || 0) 
-      : (ratesConfig?.cowRate || 0);
-    
-    const totalAmount = quantityLitre * currentRate;
+    const totalAmount = quantityLitre * finalRate;
 
     const entryId = `${farmerId}_${date}_${session}`;
     const docRef = doc(firestore, 'entries', entryId);
@@ -107,7 +114,7 @@ export default function EntriesPage() {
       conversionRate: conversionRate,
       fat: 0,
       snf: 0,
-      rate: currentRate,
+      rate: finalRate,
       totalAmount: totalAmount,
       updatedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
@@ -182,8 +189,8 @@ export default function EntriesPage() {
             <div className="flex items-center gap-3 px-4 py-2 bg-accent/5 rounded-2xl border border-accent/10">
               <IndianRupee className="w-5 h-5 text-accent" />
               <div className="text-xs">
-                <p className="font-bold text-accent">Current Rates Applied</p>
-                <p className="text-muted-foreground">Cow: ₹{ratesConfig?.cowRate || 0} | Buf: ₹{ratesConfig?.buffaloRate || 0}</p>
+                <p className="font-bold text-accent">Default Rates</p>
+                <p className="text-muted-foreground">Cow: ₹{ratesConfig?.cowRate || 0} | Buffalo: ₹{ratesConfig?.buffaloRate || 0}</p>
               </div>
             </div>
           </div>
@@ -194,9 +201,10 @@ export default function EntriesPage() {
                 <TableRow>
                   <TableHead className="w-[80px] font-bold py-4 pl-6">CAN</TableHead>
                   <TableHead className="font-bold">Farmer Details</TableHead>
-                  <TableHead className="w-[150px] font-bold">Calculation</TableHead>
-                  <TableHead className="w-[180px] font-bold">Entry (Kg)</TableHead>
-                  <TableHead className="w-[150px] font-bold">Amount (₹)</TableHead>
+                  <TableHead className="w-[120px] font-bold">Calculation</TableHead>
+                  <TableHead className="w-[150px] font-bold">Entry (Kg)</TableHead>
+                  <TableHead className="w-[120px] font-bold">Rate (₹/L)</TableHead>
+                  <TableHead className="w-[120px] font-bold">Amount (₹)</TableHead>
                   <TableHead className="w-[80px] text-right pr-6 font-bold">Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -209,13 +217,19 @@ export default function EntriesPage() {
                   
                   const kgNum = parseFloat(currentKgStr);
                   const previewLitre = !isNaN(kgNum) ? (kgNum * conversionRate).toFixed(2) : "0.00";
-                  const status = savingStatus[farmer.id] || (existingEntry ? 'saved' : 'idle');
                   
-                  // Live amount preview
-                  const currentRate = farmer.milkType === 'BUFFALO' 
+                  const defaultRate = farmer.milkType === 'BUFFALO' 
                     ? (ratesConfig?.buffaloRate || 0) 
                     : (ratesConfig?.cowRate || 0);
-                  const previewAmount = !isNaN(kgNum) ? (parseFloat(previewLitre) * currentRate).toFixed(2) : "0.00";
+                  
+                  const currentRateStr = rateValues[farmer.id] !== undefined
+                    ? rateValues[farmer.id]
+                    : (existingEntry ? existingEntry.rate.toString() : defaultRate.toString());
+                  
+                  const currentRateNum = parseFloat(currentRateStr) || 0;
+                  const previewAmount = !isNaN(kgNum) ? (parseFloat(previewLitre) * currentRateNum).toFixed(2) : "0.00";
+                  
+                  const status = savingStatus[farmer.id] || (existingEntry ? 'saved' : 'idle');
 
                   return (
                     <TableRow key={farmer.id} className={cn(existingEntry && "bg-primary/5")}>
@@ -234,7 +248,6 @@ export default function EntriesPage() {
                         <div className="flex items-center gap-1 text-sm font-bold text-primary/70">
                           <Droplets className="w-3 h-3" /> {previewLitre} L
                         </div>
-                        <div className="text-[9px] text-muted-foreground uppercase tracking-wider font-bold">@ ₹{currentRate}/L</div>
                       </TableCell>
                       <TableCell>
                         <div className="relative group">
@@ -249,6 +262,20 @@ export default function EntriesPage() {
                             onKeyDown={(e) => e.key === 'Enter' && handleAutoSave(farmer.id)}
                           />
                           <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground uppercase tracking-tighter">KG</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="relative">
+                          <Input 
+                            type="number" 
+                            placeholder={defaultRate.toString()}
+                            step="0.1"
+                            className="h-11 rounded-xl pr-6 font-medium text-sm border-primary/10 focus:border-primary"
+                            value={currentRateStr}
+                            onChange={(e) => handleRateChange(farmer.id, e.target.value)}
+                            onBlur={() => handleAutoSave(farmer.id)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAutoSave(farmer.id)}
+                          />
                         </div>
                       </TableCell>
                       <TableCell>
@@ -268,7 +295,7 @@ export default function EntriesPage() {
               </TableBody>
             </Table>
             <div className="p-4 bg-muted/20 text-center text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] border-t">
-              Auto-save active: Payment amounts are calculated based on Milk Type rates in Settings
+              Buffalo milk rates and weights are editable per entry. System auto-saves all changes.
             </div>
           </Card>
         </div>

@@ -26,6 +26,7 @@ export default function SalesPage() {
   const [session, setSession] = useState<'Morning' | 'Evening'>('Morning');
   const [searchTerm, setSearchTerm] = useState("");
   const [quantityValues, setQuantityValues] = useState<Record<string, string>>({});
+  const [rateValues, setRateValues] = useState<Record<string, string>>({});
   const [milkTypes, setMilkTypes] = useState<Record<string, 'COW' | 'BUFFALO'>>({});
   const [savingStatus, setSavingStatus] = useState<Record<string, 'idle' | 'saving' | 'saved'>>({});
 
@@ -66,31 +67,36 @@ export default function SalesPage() {
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'idle' }));
   };
 
+  const handleRateChange = (buyerId: string, value: string) => {
+    setRateValues(prev => ({ ...prev, [buyerId]: value }));
+    setSavingStatus(prev => ({ ...prev, [buyerId]: 'idle' }));
+  };
+
   const handleMilkTypeChange = (buyerId: string, type: 'COW' | 'BUFFALO') => {
     setMilkTypes(prev => ({ ...prev, [buyerId]: type }));
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'idle' }));
   };
 
   const handleAutoSave = (buyerId: string) => {
-    const value = quantityValues[buyerId];
-    if (value === undefined || value === "") return;
-
-    const qty = parseFloat(value);
-    if (isNaN(qty) || qty < 0) return;
-
+    const qtyStr = quantityValues[buyerId];
+    const milkType = milkTypes[buyerId] || 'COW';
     if (!firestore) return;
 
-    const milkType = milkTypes[buyerId] || 'COW';
-    setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
-
-    const currentRate = milkType === 'BUFFALO' 
+    const existingSale = sales?.find(s => s.buyerId === buyerId && s.milkType === milkType);
+    
+    const qty = qtyStr !== undefined ? parseFloat(qtyStr) : (existingSale ? existingSale.quantity : 0);
+    
+    const manualRate = rateValues[buyerId];
+    const defaultRate = milkType === 'BUFFALO' 
       ? (ratesConfig?.buffaloSellingRate || 0) 
       : (ratesConfig?.cowSellingRate || 0);
-    
-    const totalAmount = qty * currentRate;
+    const finalRate = manualRate !== undefined && manualRate !== "" ? parseFloat(manualRate) : (existingSale ? existingSale.rate : defaultRate);
 
-    // Use a composite ID that includes milk type to allow multiple types per buyer if needed
-    // But for now keeping it simple: one type per session per buyer as requested
+    if (isNaN(qty) || qty < 0 || isNaN(finalRate)) return;
+
+    setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
+    const totalAmount = qty * finalRate;
+
     const saleId = `${buyerId}_${date}_${session}_${milkType}`;
     const docRef = doc(firestore, 'sales', saleId);
 
@@ -100,7 +106,7 @@ export default function SalesPage() {
       session,
       milkType,
       quantity: qty,
-      rate: currentRate,
+      rate: finalRate,
       totalAmount: totalAmount,
       updatedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
@@ -142,15 +148,8 @@ export default function SalesPage() {
             <div className="flex items-center gap-3 px-4 py-2 bg-primary/5 rounded-2xl border border-primary/10">
               <IndianRupee className="w-5 h-5 text-primary" />
               <div>
-                <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Cow Sell Rate</p>
-                <p className="text-lg font-black">₹ {ratesConfig?.cowSellingRate || 0}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 px-4 py-2 bg-accent/5 rounded-2xl border border-accent/10">
-              <IndianRupee className="w-5 h-5 text-accent" />
-              <div>
-                <p className="text-[10px] font-bold text-accent uppercase tracking-widest">Buffalo Sell Rate</p>
-                <p className="text-lg font-black">₹ {ratesConfig?.buffaloSellingRate || 0}</p>
+                <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Default Sell Rates</p>
+                <p className="text-xs font-black">Cow: ₹{ratesConfig?.cowSellingRate || 0} | Buf: ₹{ratesConfig?.buffaloSellingRate || 0}</p>
               </div>
             </div>
           </div>
@@ -161,8 +160,9 @@ export default function SalesPage() {
                 <TableRow>
                   <TableHead className="w-[80px] font-bold pl-6">Code</TableHead>
                   <TableHead className="font-bold">Buyer Name</TableHead>
-                  <TableHead className="w-[150px] font-bold">Milk Type</TableHead>
-                  <TableHead className="w-[180px] font-bold">Quantity (Litre)</TableHead>
+                  <TableHead className="w-[120px] font-bold">Milk Type</TableHead>
+                  <TableHead className="w-[150px] font-bold">Quantity (L)</TableHead>
+                  <TableHead className="w-[120px] font-bold">Rate (₹/L)</TableHead>
                   <TableHead className="w-[120px] font-bold text-right">Amount (₹)</TableHead>
                   <TableHead className="w-[80px] text-right pr-6 font-bold">Status</TableHead>
                 </TableRow>
@@ -171,13 +171,21 @@ export default function SalesPage() {
                 {filteredBuyers?.map((buyer) => {
                   const currentMilkType = milkTypes[buyer.id] || 'COW';
                   const existingSale = sales?.find(s => s.buyerId === buyer.id && s.milkType === currentMilkType);
-                  const currentQty = quantityValues[buyer.id] !== undefined ? quantityValues[buyer.id] : (existingSale ? existingSale.quantity.toString() : "");
-                  const status = savingStatus[buyer.id] || (existingSale ? 'saved' : 'idle');
                   
-                  const activeRate = currentMilkType === 'BUFFALO' 
+                  const currentQtyStr = quantityValues[buyer.id] !== undefined ? quantityValues[buyer.id] : (existingSale ? existingSale.quantity.toString() : "");
+                  
+                  const defaultRate = currentMilkType === 'BUFFALO' 
                     ? (ratesConfig?.buffaloSellingRate || 0) 
                     : (ratesConfig?.cowSellingRate || 0);
-                  const previewAmount = (parseFloat(currentQty) || 0) * activeRate;
+                    
+                  const currentRateStr = rateValues[buyer.id] !== undefined
+                    ? rateValues[buyer.id]
+                    : (existingSale ? existingSale.rate.toString() : defaultRate.toString());
+                  
+                  const activeRateNum = parseFloat(currentRateStr) || 0;
+                  const previewAmount = (parseFloat(currentQtyStr) || 0) * activeRateNum;
+                  
+                  const status = savingStatus[buyer.id] || (existingSale ? 'saved' : 'idle');
 
                   return (
                     <TableRow key={buyer.id} className={cn(existingSale && "bg-primary/5")}>
@@ -200,13 +208,24 @@ export default function SalesPage() {
                             type="number" 
                             placeholder="0.00" 
                             className="h-11 rounded-xl pr-10 font-bold" 
-                            value={currentQty} 
+                            value={currentQtyStr} 
                             onChange={(e) => handleQuantityChange(buyer.id, e.target.value)}
                             onBlur={() => handleAutoSave(buyer.id)}
                             onKeyDown={(e) => e.key === 'Enter' && handleAutoSave(buyer.id)}
                           />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black opacity-30">L</span>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <Input 
+                          type="number" 
+                          placeholder={defaultRate.toString()}
+                          className="h-11 rounded-xl font-medium text-sm" 
+                          value={currentRateStr} 
+                          onChange={(e) => handleRateChange(buyer.id, e.target.value)}
+                          onBlur={() => handleAutoSave(buyer.id)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleAutoSave(buyer.id)}
+                        />
                       </TableCell>
                       <TableCell className="text-right font-black">₹ {previewAmount.toFixed(2)}</TableCell>
                       <TableCell className="text-right pr-6">

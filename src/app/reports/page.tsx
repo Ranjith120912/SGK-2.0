@@ -43,9 +43,6 @@ export default function ReportsPage() {
     setSelectedMonth(format(new Date(), 'yyyy-MM'));
   }, []);
 
-  // Standard locked conversion
-  const STANDARD_CONVERSION = 0.96;
-
   const monthOptions = useMemo(() => {
     if (!isClient) return [];
     const now = new Date();
@@ -95,43 +92,40 @@ export default function ReportsPage() {
   const currentCycle = cycles[activeCycle];
 
   /**
-   * UNIFIED FINANCIAL RESOLUTION ENGINE (REPORTS VERSION)
-   * This is the single source of truth for ALL report math.
+   * UNIFIED FINANCIAL RESOLUTION ENGINE
+   * Strictly 0.96 Conversion Standard
    */
-  const resolveEntryData = (entry: any, farmersList: any[], config: any) => {
-    // Volume: Standard 0.96 conversion from KgWeight
+  const resolveEntryFinancials = (entry: any, farmersList: any[], config: any) => {
     const kg = Number(entry.kgWeight) || 0;
-    const qtyLitre = Number(entry.quantity) || parseFloat((kg * STANDARD_CONVERSION).toFixed(2));
+    // Strictly follow user's 0.96 conversion setting
+    const quantity = Number(entry.quantity) || parseFloat((kg * 0.96).toFixed(2));
     
-    // Rate: Buffalo Custom > Global Config
     const farmer = farmersList?.find(f => f.id === entry.farmerId);
-    let resolvedRate = Number(entry.rate) || 0;
+    let rate = Number(entry.rate) || 0;
     
-    if (resolvedRate === 0 && farmer) {
+    if (rate === 0 && farmer) {
       if (farmer.milkType === 'BUFFALO') {
-        resolvedRate = Number(farmer.customRate) > 0 ? Number(farmer.customRate) : (Number(config?.buffaloRate) || 0);
+        rate = Number(farmer.customRate) > 0 ? Number(farmer.customRate) : (Number(config?.buffaloRate) || 0);
       } else {
-        resolvedRate = Number(config?.cowRate) || 0;
+        rate = Number(config?.cowRate) || 0;
       }
     }
 
-    // Amount: Precision Locked multiplication
-    const cost = Number(entry.totalAmount) || parseFloat((qtyLitre * resolvedRate).toFixed(2));
+    const amount = Number(entry.totalAmount) || parseFloat((quantity * rate).toFixed(2));
     
-    return { qtyLitre, cost, resolvedRate };
+    return { qtyLitre: quantity, cost: amount, appliedRate: rate };
   };
 
-  const resolveSaleData = (sale: any, config: any) => {
+  const resolveSaleFinancials = (sale: any, config: any) => {
     const qty = Number(sale.quantity) || 0;
     let rate = Number(sale.rate) || 0;
     if (rate === 0) {
       rate = sale.milkType === 'BUFFALO' ? (Number(config?.buffaloSellingRate) || 0) : (Number(config?.cowSellingRate) || 0);
     }
-    const revenue = Number(sale.totalAmount) || parseFloat((qty * rate).toFixed(2));
-    return { qty, revenue, rate };
+    const amount = Number(sale.totalAmount) || parseFloat((qty * rate).toFixed(2));
+    return { qty, cost: amount, appliedRate: rate };
   };
 
-  // 1. MASTER ROSTER (Source of Truth for Cycle)
   const masterRoster = useMemo(() => {
     if (!allEntries || !farmers || !ratesConfig || !selectedMonth || !currentCycle) return [];
     
@@ -158,10 +152,10 @@ export default function ReportsPage() {
         };
       }
 
-      const { qtyLitre, cost } = resolveEntryData(entry, farmers, ratesConfig);
-      if (entry.session === 'Morning') farmerMap[fId].morningQty += qtyLitre;
-      else farmerMap[fId].eveningQty += qtyLitre;
-      farmerMap[fId].totalAmount += cost;
+      const res = resolveEntryFinancials(entry, farmers, ratesConfig);
+      if (entry.session === 'Morning') farmerMap[fId].morningQty += res.qtyLitre;
+      else farmerMap[fId].eveningQty += res.qtyLitre;
+      farmerMap[fId].totalAmount += res.cost;
     });
 
     return Object.values(farmerMap).map(f => ({
@@ -173,13 +167,9 @@ export default function ReportsPage() {
     })).sort((a, b) => parseInt(a.canNumber) - parseInt(b.canNumber));
   }, [allEntries, farmers, ratesConfig, selectedMonth, currentCycle]);
 
-  const cowRoster = masterRoster.filter(f => f.milkType === 'COW');
-  const buffaloRoster = masterRoster.filter(f => f.milkType === 'BUFFALO');
-
-  // 2. CYCLE STATS (Overview Sync - Derived from Roster)
   const cycleStats = useMemo(() => {
-    const totalEntryAmt = masterRoster.reduce((acc, curr) => acc + curr.totalAmount, 0);
-    const totalEntryQty = masterRoster.reduce((acc, curr) => acc + curr.totalQty, 0);
+    const totalProcurementAmt = masterRoster.reduce((acc, curr) => acc + curr.totalAmount, 0);
+    const totalProcurementQty = masterRoster.reduce((acc, curr) => acc + curr.totalQty, 0);
 
     let totalSaleAmt = 0;
     let totalSaleQty = 0;
@@ -191,21 +181,20 @@ export default function ReportsPage() {
     }) || [];
 
     cycleSales.forEach(s => {
-      const { revenue, qty } = resolveSaleData(s, ratesConfig);
-      totalSaleAmt += revenue;
-      totalSaleQty += qty;
+      const res = resolveSaleFinancials(s, ratesConfig);
+      totalSaleAmt += res.cost;
+      totalSaleQty += res.qty;
     });
 
     return {
-      totalEntryQty: parseFloat(totalEntryQty.toFixed(2)),
+      totalEntryQty: parseFloat(totalProcurementQty.toFixed(2)),
       totalSaleQty: parseFloat(totalSaleQty.toFixed(2)),
-      totalEntryAmt: parseFloat(totalEntryAmt.toFixed(2)),
+      totalEntryAmt: parseFloat(totalProcurementAmt.toFixed(2)),
       totalSaleAmt: parseFloat(totalSaleAmt.toFixed(2)),
-      profit: parseFloat((totalSaleAmt - totalEntryAmt).toFixed(2))
+      profit: parseFloat((totalSaleAmt - totalProcurementAmt).toFixed(2))
     };
   }, [masterRoster, allSales, selectedMonth, currentCycle, ratesConfig]);
 
-  // 3. MONTHLY SUMMARY & AUDIT (Synchronized reduction)
   const monthStats = useMemo(() => {
     if (!allEntries || !allSales || !selectedMonth || !farmers || !ratesConfig) {
       return { totalEntryQty: 0, totalSaleQty: 0, totalEntryAmt: 0, totalSaleAmt: 0, profit: 0 };
@@ -217,15 +206,15 @@ export default function ReportsPage() {
     let tEntryQty = 0, tEntryAmt = 0, tSaleQty = 0, tSaleAmt = 0;
 
     mEntries.forEach(e => {
-      const res = resolveEntryData(e, farmers, ratesConfig);
+      const res = resolveEntryFinancials(e, farmers, ratesConfig);
       tEntryQty += res.qtyLitre;
       tEntryAmt += res.cost;
     });
 
     mSales.forEach(s => {
-      const res = resolveSaleData(s, ratesConfig);
+      const res = resolveSaleFinancials(s, ratesConfig);
       tSaleQty += res.qty;
-      tSaleAmt += res.revenue;
+      tSaleAmt += res.cost;
     });
 
     return {
@@ -240,14 +229,11 @@ export default function ReportsPage() {
   const monthlyAuditSummary = useMemo(() => {
     if (!allEntries || !allSales || !isClient || !farmers || !ratesConfig || !selectedMonth) return [];
     
-    const [yearPart] = selectedMonth.split('-').map(Number);
-    const monthOfSelection = parseInt(selectedMonth.split('-')[1]);
-    // Fiscal Year April to March
-    const fiscalYearStart = monthOfSelection <= 3 ? yearPart - 1 : yearPart;
+    const yearPart = parseInt(selectedMonth.split('-')[0]);
     
     return Array.from({ length: 12 }).map((_, i) => {
-      const monthIdx = (3 + i) % 12; // Start from April
-      const year = fiscalYearStart + (3 + i >= 12 ? 1 : 0);
+      const monthIdx = (3 + i) % 12; 
+      const year = yearPart + (3 + i >= 12 ? 1 : 0);
       const d = new Date(year, monthIdx, 1);
       const mStr = format(d, 'yyyy-MM');
       
@@ -257,14 +243,14 @@ export default function ReportsPage() {
       let collL = 0, cost = 0, rev = 0;
 
       mEntries.forEach(e => {
-        const res = resolveEntryData(e, farmers, ratesConfig);
+        const res = resolveEntryFinancials(e, farmers, ratesConfig);
         collL += res.qtyLitre;
         cost += res.cost;
       });
 
       mSales.forEach(s => {
-        const res = resolveSaleData(s, ratesConfig);
-        rev += res.revenue;
+        const res = resolveSaleFinancials(s, ratesConfig);
+        rev += res.cost;
       });
       
       return { 
@@ -286,66 +272,153 @@ export default function ReportsPage() {
     amount: r.reduce((acc, c) => acc + c.totalAmount, 0)
   });
 
-  const cowTotals = rosterTotals(cowRoster);
-  const buffaloTotals = rosterTotals(buffaloRoster);
-
-  // 4. PDF ENGINE (Fully Synchronized)
   const generateSingleInvoice = (pdf: jsPDF, f: any) => {
     const company = (ratesConfig?.companyName || "SRI GOPALA KRISHNA MILK DISTRIBUTIONS").toUpperCase();
     const [y_part, m_part] = selectedMonth.split('-').map(Number);
-    const range = `${currentCycle.start.toString().padStart(2, '0')}/${m_part.toString().padStart(2, '0')} to ${currentCycle.end.toString().padStart(2, '0')}/${m_part.toString().padStart(2, '0')}/${y_part.toString().slice(-2)}`;
+    const range = `${currentCycle.start.toString().padStart(2, '0')}/${m_part.toString().padStart(2, '0')}/${y_part.toString().slice(-2)} to ${currentCycle.end.toString().padStart(2, '0')}/${m_part.toString().padStart(2, '0')}/${y_part.toString().slice(-2)}`;
+    const todayStr = format(new Date(), 'dd/MM/yyyy');
 
+    // --- Header Styling ---
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(16);
     pdf.text(company, 105, 20, { align: 'center' });
-    pdf.setFontSize(11);
-    pdf.text("SUPPLIER MILK PAYMENT BILL", 105, 26, { align: 'center' });
-    pdf.line(20, 30, 190, 30);
+    pdf.setFontSize(13);
+    pdf.text("MILK INVOICE", 105, 28, { align: 'center' });
+    pdf.setLineWidth(0.1);
+    pdf.line(90, 30, 120, 30); 
 
+    // --- Farmer Info Grid ---
     pdf.setFontSize(9);
-    let y = 40;
-    pdf.setFont("helvetica", "normal"); pdf.text("NAME:", 20, y); pdf.setFont("helvetica", "bold"); pdf.text(f.name.toUpperCase(), 45, y);
-    pdf.setFont("helvetica", "normal"); pdf.text("PERIOD:", 110, y); pdf.setFont("helvetica", "bold"); pdf.text(range, 135, y);
+    pdf.setFont("helvetica", "normal");
+    const labelX1 = 20;
+    const valueX1 = 45;
+    const labelX2 = 110;
+    const valueX2 = 135;
+    const lineW = 60;
+
+    let y = 45;
     
-    y += 8;
-    pdf.setFont("helvetica", "normal"); pdf.text("CAN NO:", 20, y); pdf.setFont("helvetica", "bold"); pdf.text(f.canNumber, 45, y);
-    pdf.setFont("helvetica", "normal"); pdf.text("A/C NO:", 110, y); pdf.setFont("helvetica", "bold"); pdf.text(f.bankAccountNumber || "—", 135, y);
+    // Row 1
+    pdf.text("NAME:", labelX1, y);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(f.name.toUpperCase(), valueX1, y);
+    pdf.line(valueX1, y+1, valueX1 + lineW, y+1);
+    
+    pdf.setFont("helvetica", "normal");
+    pdf.text("DATE:", labelX2, y);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(todayStr, valueX2, y);
+    pdf.line(valueX2, y+1, valueX2 + lineW, y+1);
 
-    y += 8;
-    pdf.setFont("helvetica", "normal"); pdf.text("TYPE:", 20, y); pdf.setFont("helvetica", "bold"); pdf.text(f.milkType, 45, y);
+    y += 10;
+    // Row 2
+    pdf.setFont("helvetica", "normal");
+    pdf.text("A/C NO:", labelX1, y);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(f.bankAccountNumber || "—", valueX1, y);
+    pdf.line(valueX1, y+1, valueX1 + lineW, y+1);
 
+    pdf.setFont("helvetica", "normal");
+    pdf.text("PERIOD:", labelX2, y);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(range, valueX2, y);
+    pdf.line(valueX2, y+1, valueX2 + lineW, y+1);
+
+    y += 10;
+    // Row 3
+    pdf.setFont("helvetica", "normal");
+    pdf.text("CAN NO:", labelX1, y);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(f.canNumber, valueX1, y);
+    pdf.line(valueX1, y+1, valueX1 + lineW, y+1);
+
+    pdf.setFont("helvetica", "normal");
+    pdf.text("RATE (₹):", labelX2, y);
+    pdf.setFont("helvetica", "bold");
+    const effectiveRate = f.customRate > 0 ? f.customRate : (f.milkType === 'BUFFALO' ? ratesConfig?.buffaloRate : ratesConfig?.cowRate);
+    pdf.text(Number(effectiveRate || 0).toFixed(2), valueX2, y);
+    pdf.line(valueX2, y+1, valueX2 + lineW, y+1);
+
+    // --- Transaction Table ---
     const fEntries = allEntries!.filter(e => e.farmerId === f.id && e.date.startsWith(selectedMonth) && parseInt(e.date.split('-')[2]) >= currentCycle.start && parseInt(e.date.split('-')[2]) <= currentCycle.end);
     
     const rows = fEntries.sort((a, b) => a.date.localeCompare(b.date)).map(e => {
-      const res = resolveEntryData(e, farmers!, ratesConfig);
+      const res = resolveEntryFinancials(e, farmers!, ratesConfig!);
       return [
-        format(new Date(e.date), 'dd/MM'),
-        e.session === 'Morning' ? res.qtyLitre.toFixed(2) : "-",
-        e.session === 'Evening' ? res.qtyLitre.toFixed(2) : "-",
+        format(new Date(e.date), 'dd/MM/yy'),
+        e.session === 'Morning' ? res.qtyLitre.toFixed(2) : "0.00",
+        e.session === 'Evening' ? res.qtyLitre.toFixed(2) : "0.00",
         res.qtyLitre.toFixed(2),
-        res.resolvedRate.toFixed(2),
+        res.appliedRate.toFixed(2),
         res.cost.toFixed(2)
       ];
     });
 
     (pdf as any).autoTable({
       startY: y + 10,
-      head: [['DATE', 'MORNING', 'EVENING', 'TOTAL L', 'RATE', 'AMOUNT']],
+      head: [['DATE', 'MORNING (L)', 'EVENING (L)', 'TOTAL LITRES', 'RATE (₹)', 'AMOUNT (₹)']],
       body: rows,
       theme: 'grid',
-      headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold', halign: 'center' },
-      bodyStyles: { textColor: 0, halign: 'center' },
+      headStyles: { 
+        fillColor: [255, 255, 255], 
+        textColor: [0, 0, 0], 
+        fontStyle: 'bold', 
+        halign: 'center', 
+        lineWidth: 0.1, 
+        lineColor: [0, 0, 0] 
+      },
+      bodyStyles: { 
+        textColor: [0, 0, 0], 
+        halign: 'center',
+        lineWidth: 0.1,
+        lineColor: [0, 0, 0]
+      },
+      alternateRowStyles: {
+        fillColor: [252, 252, 252]
+      },
       margin: { left: 20, right: 20 }
     });
 
-    const finalY = (pdf as any).lastAutoTable.finalY + 8;
-    pdf.setFontSize(12);
-    pdf.text(`TOTAL VOLUME: ${f.totalQty.toFixed(2)} L`, 20, finalY);
-    pdf.text(`TOTAL PAYOUT: Rs. ${f.totalAmount.toFixed(2)}`, 190, finalY, { align: 'right' });
-    pdf.line(20, finalY + 2, 190, finalY + 2);
+    const finalY = (pdf as any).lastAutoTable.finalY;
+
+    // --- Footer Totals ---
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("TOTAL", 20, finalY + 10);
+    pdf.text(f.totalQty.toFixed(2), 118, finalY + 10, { align: 'center' }); 
+    pdf.text(f.totalAmount.toFixed(2), 190, finalY + 10, { align: 'right' });
+
+    let summaryY = finalY + 25;
+    pdf.setFont("helvetica", "normal");
+    pdf.text("Total Litres:", 160, summaryY, { align: 'right' });
+    pdf.setFont("helvetica", "bold");
+    pdf.text(f.totalQty.toFixed(2), 190, summaryY, { align: 'right' });
+
+    summaryY += 8;
+    pdf.setFont("helvetica", "normal");
+    pdf.text("Total Amount (₹):", 160, summaryY, { align: 'right' });
+    pdf.setFont("helvetica", "bold");
+    pdf.text(f.totalAmount.toFixed(2), 190, summaryY, { align: 'right' });
+
+    // --- Signature & System Info ---
+    pdf.setFontSize(7);
+    pdf.setFont("helvetica", "italic");
+    pdf.setTextColor(120, 120, 120);
+    pdf.text(`Generated by ${company} Management System`, 20, 280);
     
     pdf.setFontSize(8);
-    pdf.text("Authorized Signature", 160, 270);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(0, 0, 0);
+    pdf.line(140, 280, 190, 280);
+    pdf.text("AUTHORIZED SIGNATURE", 165, 284, { align: 'center' });
+
+    // Stylized check watermark
+    pdf.setDrawColor(240, 245, 255);
+    pdf.setFillColor(250, 252, 255);
+    pdf.circle(180, 255, 6, 'FD');
+    pdf.setDrawColor(200, 220, 255);
+    pdf.line(178, 255, 180, 257);
+    pdf.line(180, 257, 183, 253);
   };
 
   const downloadRosterPDF = () => {
@@ -363,7 +436,8 @@ export default function ReportsPage() {
         startY: y + 4,
         head: [['CAN', 'FARMER NAME', 'MORNING', 'EVENING', 'TOTAL L', 'PAYOUT (Rs)']],
         body: r.map(f => [f.canNumber, f.name, f.morningQty.toFixed(2), f.eveningQty.toFixed(2), f.totalQty.toFixed(2), f.totalAmount.toFixed(2)]),
-        theme: 'striped',
+        theme: 'grid',
+        headStyles: { fillColor: [240, 240, 240], textColor: 0 },
         foot: [['', 'TOTALS', tot.morning.toFixed(2), tot.evening.toFixed(2), tot.total.toFixed(2), tot.amount.toFixed(2)]],
         margin: { bottom: 20 }
       });
@@ -371,13 +445,16 @@ export default function ReportsPage() {
     };
 
     let curY = 35;
-    if (cowRoster.length) curY = addSect("COW MILK PROCUREMENT", cowRoster, curY, cowTotals);
-    if (buffaloRoster.length) addSect("BUFFALO MILK PROCUREMENT", buffaloRoster, curY, buffaloTotals);
+    const cowRoster = masterRoster.filter(f => f.milkType === 'COW');
+    const buffaloRoster = masterRoster.filter(f => f.milkType === 'BUFFALO');
+    
+    if (cowRoster.length) curY = addSect("COW MILK PROCUREMENT", cowRoster, curY, rosterTotals(cowRoster));
+    if (buffaloRoster.length) addSect("BUFFALO MILK PROCUREMENT", buffaloRoster, curY, rosterTotals(buffaloRoster));
 
     pdf.save(`Roster_${selectedMonth}_${currentCycle.label}.pdf`);
   };
 
-  if (!isClient) return null;
+  if (!isClient) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -427,7 +504,7 @@ export default function ReportsPage() {
             <TabsContent value="overview" className="space-y-12">
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-primary font-black uppercase tracking-widest text-xs">
-                  <CalendarDays className="w-4 h-4" /> Cycle Performance ({currentCycle.label})
+                  <CalendarDays className="w-4 h-4" /> Cycle Performance ({currentCycle?.label})
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   <Card className="rounded-[2rem] bg-primary text-white p-8 shadow-xl">
@@ -448,34 +525,14 @@ export default function ReportsPage() {
                   </Card>
                 </div>
               </div>
-
-              <div className="space-y-4 pt-8 border-t">
-                <div className="flex items-center gap-2 text-muted-foreground font-black uppercase tracking-widest text-xs">
-                  <PieChart className="w-4 h-4" /> Monthly Snapshot
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="p-6 bg-muted/30 rounded-3xl border flex justify-between items-center">
-                    <span className="text-[10px] font-black uppercase text-muted-foreground">Volume</span>
-                    <span className="text-2xl font-black text-primary">{monthStats.totalEntryQty.toFixed(2)} L</span>
-                  </div>
-                  <div className="p-6 bg-muted/30 rounded-3xl border flex justify-between items-center">
-                    <span className="text-[10px] font-black uppercase text-muted-foreground">Procurement</span>
-                    <span className="text-2xl font-black text-destructive">₹{monthStats.totalEntryAmt.toFixed(2)}</span>
-                  </div>
-                  <div className="p-6 bg-muted/30 rounded-3xl border flex justify-between items-center">
-                    <span className="text-[10px] font-black uppercase text-muted-foreground">Profit</span>
-                    <span className={cn("text-2xl font-black", monthStats.profit >= 0 ? "text-green-600" : "text-destructive")}>₹{monthStats.profit.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
             </TabsContent>
 
             <TabsContent value="cycle" className="space-y-6">
               <div className="flex justify-end">
                 <Button onClick={() => {
-                  const doc = new jsPDF();
-                  activeInvoices.forEach((f, i) => { if (i > 0) doc.addPage(); generateSingleInvoice(doc, f); });
-                  doc.save(`Bulk_Bills_${selectedMonth}_${currentCycle.label}.pdf`);
+                  const pdf = new jsPDF();
+                  activeInvoices.forEach((f, i) => { if (i > 0) pdf.addPage(); generateSingleInvoice(pdf, f); });
+                  pdf.save(`Bulk_Bills_${selectedMonth}_${currentCycle.label}.pdf`);
                 }} disabled={activeInvoices.length === 0} className="rounded-full bg-red-600 hover:bg-red-700 h-12 px-8">
                   <Download className="w-4 h-4 mr-2" /> Download All Bills
                 </Button>
@@ -504,7 +561,7 @@ export default function ReportsPage() {
                             generateSingleInvoice(pdf, f);
                             pdf.save(`Bill_${f.canNumber}_${f.name}.pdf`);
                           }} className="text-red-600 font-black uppercase text-[10px]">
-                            <Download className="w-3 h-3 mr-2" /> PDF
+                            <Download className="w-3 h-3 mr-2" /> PDF Bill
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -521,53 +578,9 @@ export default function ReportsPage() {
                   <p className="text-3xl font-black text-primary">₹{cycleStats.totalEntryAmt.toFixed(2)}</p>
                 </div>
                 <Button onClick={downloadRosterPDF} className="rounded-full h-12 px-10 font-black uppercase">
-                  <FileDown className="w-4 h-4 mr-2" /> Export PDF Summary
+                  <FileDown className="w-4 h-4 mr-2" /> Export Roster PDF
                 </Button>
               </div>
-
-              {[
-                { label: "Cow Milk Procurement", roster: cowRoster, tot: cowTotals, color: "text-blue-600" },
-                { label: "Buffalo Milk Procurement", roster: buffaloRoster, tot: buffaloTotals, color: "text-indigo-600" }
-              ].map(s => s.roster.length > 0 && (
-                <div key={s.label} className="space-y-4">
-                  <h2 className={cn("text-xl font-black uppercase", s.color)}>{s.label}</h2>
-                  <Card className="rounded-3xl overflow-hidden border-none shadow-lg">
-                    <Table>
-                      <TableHeader className="bg-muted/50">
-                        <TableRow>
-                          <TableHead className="pl-8 font-black text-[10px] uppercase py-4">CAN</TableHead>
-                          <TableHead className="font-black text-[10px] uppercase">Farmer Name</TableHead>
-                          <TableHead className="text-center font-black text-[10px] uppercase">Morning</TableHead>
-                          <TableHead className="text-center font-black text-[10px] uppercase">Evening</TableHead>
-                          <TableHead className="text-center font-black text-[10px] uppercase">Total L</TableHead>
-                          <TableHead className="text-right pr-8 font-black text-[10px] uppercase">Payout Rs</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {s.roster.map(f => (
-                          <TableRow key={f.id}>
-                            <TableCell className="pl-8 font-black text-primary text-lg">{f.canNumber}</TableCell>
-                            <TableCell className="font-bold uppercase text-xs">{f.name}</TableCell>
-                            <TableCell className="text-center">{f.morningQty.toFixed(2)}</TableCell>
-                            <TableCell className="text-center">{f.eveningQty.toFixed(2)}</TableCell>
-                            <TableCell className="text-center font-black">{f.totalQty.toFixed(2)}</TableCell>
-                            <TableCell className="text-right pr-8 font-black text-primary">₹{f.totalAmount.toFixed(2)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                      <tfoot className="bg-muted/30 border-t font-black">
-                        <TableRow>
-                          <TableCell colSpan={2} className="pl-8 uppercase text-xs">Subtotals</TableCell>
-                          <TableCell className="text-center">{s.tot.morning.toFixed(2)}</TableCell>
-                          <TableCell className="text-center">{s.tot.evening.toFixed(2)}</TableCell>
-                          <TableCell className="text-center">{s.tot.total.toFixed(2)} L</TableCell>
-                          <TableCell className="text-right pr-8 text-primary">₹{s.tot.amount.toFixed(2)}</TableCell>
-                        </TableRow>
-                      </tfoot>
-                    </Table>
-                  </Card>
-                </div>
-              ))}
             </TabsContent>
 
             <TabsContent value="audit" className="space-y-8">
@@ -577,7 +590,7 @@ export default function ReportsPage() {
                     <TableRow>
                       <TableHead className="pl-10 font-black text-[10px] uppercase py-5">Month</TableHead>
                       <TableHead className="text-center font-black text-[10px] uppercase py-5">Volume (L)</TableHead>
-                      <TableHead className="text-center font-black text-[10px] uppercase py-5">Procurement (Rs)</TableHead>
+                      <TableHead className="text-center font-black text-[10px] uppercase py-5">Cost (Rs)</TableHead>
                       <TableHead className="text-center font-black text-[10px] uppercase py-5">Revenue (Rs)</TableHead>
                       <TableHead className="text-right pr-10 font-black text-[10px] uppercase py-5">Profit (Rs)</TableHead>
                     </TableRow>

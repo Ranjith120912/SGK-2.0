@@ -75,7 +75,7 @@ export default function EntriesPage() {
   const handleAutoSave = (farmerId: string) => {
     const kgStr = kgValues[farmerId];
     const farmer = farmers?.find(f => f.id === farmerId);
-    if (!farmer || !firestore) return;
+    if (!farmer || !firestore || !ratesConfig) return;
 
     const existingEntry = entries?.find(e => e.farmerId === farmerId);
     const kgValue = kgStr !== undefined && kgStr !== "" ? parseFloat(kgStr) : (existingEntry ? Number(existingEntry.kgWeight) : 0);
@@ -101,7 +101,7 @@ export default function EntriesPage() {
     const entryId = `${farmerId}_${date}_${session}`;
     const docRef = doc(firestore, 'entries', entryId);
 
-    // Save with Metadata Persistence (LOCK IDENTITY TO TRANSACTION)
+    // Save with Metadata Persistence
     setDocumentNonBlocking(docRef, {
       farmerId,
       farmerName: farmer.name,
@@ -241,6 +241,7 @@ export default function EntriesPage() {
                             type="number" 
                             placeholder="0.00"
                             step="0.01"
+                            disabled={!ratesConfig}
                             className="h-11 rounded-xl pr-12 font-bold text-lg border-primary/10 focus:border-primary"
                             value={currentKgStr}
                             onChange={(e) => handleKgChange(farmer.id, e.target.value)}
@@ -278,9 +279,6 @@ export default function EntriesPage() {
                 })}
               </TableBody>
             </Table>
-            <div className="p-4 bg-muted/20 text-center text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] border-t">
-              Business standard enforcement: 1 Kg = 0.96 Litres • Accuracy locked to 2 decimals.
-            </div>
           </Card>
         </div>
       </main>

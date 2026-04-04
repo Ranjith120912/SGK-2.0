@@ -22,7 +22,8 @@ import {
   Users,
   CheckCircle2,
   Lock,
-  ChevronRight
+  ChevronRight,
+  Milk
 } from "lucide-react";
 import { format, endOfMonth, subMonths, startOfMonth, addDays, isSameDay } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -105,13 +106,15 @@ export default function ReportsPage() {
     filteredEntries.forEach(e => {
       const fid = e.farmerId;
       const farmerDir = farmers?.find(f => f.id === fid);
-      const name = farmerDir?.name || e.farmerName || "Farmer";
+      const name = farmerDir?.name || e.farmerName || "Unknown Farmer";
       const can = farmerDir?.canNumber || e.canNumber || "---";
+      const milkType = farmerDir?.milkType || e.milkType || "COW";
       
       if (!map[fid]) {
         map[fid] = {
           can,
           name,
+          milkType,
           amKg: 0, amLtr: 0,
           pmKg: 0, pmLtr: 0,
           totalLtr: 0, totalAmt: 0
@@ -134,7 +137,12 @@ export default function ReportsPage() {
       map[fid].totalAmt += amt;
     });
 
-    return Object.values(map).sort((a: any, b: any) => parseInt(a.can) - parseInt(b.can));
+    return Object.values(map).sort((a: any, b: any) => {
+      const aNum = parseInt(a.can);
+      const bNum = parseInt(b.can);
+      if (isNaN(aNum) || isNaN(bNum)) return a.can.localeCompare(b.can);
+      return aNum - bNum;
+    });
   }, [allEntries, farmers, selectedDailyDate]);
 
   // Master Roster / Cycle Aggregation
@@ -151,14 +159,16 @@ export default function ReportsPage() {
     cycleEntries.forEach(e => {
       const fid = e.farmerId;
       const farmerDir = farmers?.find(f => f.id === fid);
-      const name = farmerDir?.name || e.farmerName || "Farmer";
+      const name = farmerDir?.name || e.farmerName || "Unknown Farmer";
       const can = farmerDir?.canNumber || e.canNumber || "---";
+      const milkType = farmerDir?.milkType || e.milkType || "COW";
 
       if (!map[fid]) {
         map[fid] = {
           id: fid,
           can,
           name,
+          milkType,
           morningQty: 0, eveningQty: 0, totalQty: 0, totalAmount: 0
         };
       }
@@ -173,7 +183,12 @@ export default function ReportsPage() {
       map[fid].totalAmount += amt;
     });
 
-    return Object.values(map).sort((a: any, b: any) => parseInt(a.can) - parseInt(b.can));
+    return Object.values(map).sort((a: any, b: any) => {
+      const aNum = parseInt(a.can);
+      const bNum = parseInt(b.can);
+      if (isNaN(aNum) || isNaN(bNum)) return a.can.localeCompare(b.can);
+      return aNum - bNum;
+    });
   }, [allEntries, farmers, selectedMonth, currentCycle]);
 
   const cycleStats = useMemo(() => {
@@ -211,7 +226,7 @@ export default function ReportsPage() {
     pdf.text("MILK INVOICE", 105, 27, { align: 'center' });
     pdf.line(93, 28, 117, 28); // Underline for title
 
-    // Farmer Info Section (Underlined layout)
+    // Farmer Info Section
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "normal");
     
@@ -274,7 +289,7 @@ export default function ReportsPage() {
 
     const finalY = (pdf as any).lastAutoTable.finalY;
     
-    // Total Row in Table Style
+    // Total Row
     pdf.setFont("helvetica", "bold");
     pdf.line(20, finalY, 190, finalY);
     pdf.text("TOTAL", 25, finalY + 6);
@@ -282,7 +297,7 @@ export default function ReportsPage() {
     pdf.text(f.totalAmount.toFixed(2), 178, finalY + 6, { align: 'center' });
     pdf.line(20, finalY + 10, 190, finalY + 10);
 
-    // Summary Right Side
+    // Summary
     let summaryY = finalY + 25;
     pdf.setFont("helvetica", "normal");
     pdf.text("Total Litres:", 140, summaryY);
@@ -311,6 +326,7 @@ export default function ReportsPage() {
     const data = dailyData.map((p: any) => ({
       "CAN": p.can,
       "FARMER NAME": p.name,
+      "TYPE": p.milkType,
       "AM-KG": p.amKg.toFixed(2),
       "AM-LITRE": p.amLtr.toFixed(2),
       "PM-KG": p.pmKg.toFixed(2),
@@ -336,7 +352,7 @@ export default function ReportsPage() {
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Reports & Audit</h1>
               <p className="text-muted-foreground font-medium flex items-center gap-2">
                 <Users className="w-4 h-4" /> 
-                System Records for 45 Active Farmers
+                System Records for Active Farmers
               </p>
             </div>
             <div className="flex gap-4">
@@ -415,8 +431,8 @@ export default function ReportsPage() {
                     pdf.text(`DAILY PROCUREMENT REPORT - ${format(new Date(selectedDailyDate), 'dd/MM/yyyy')}`, 148, 28, { align: 'center' });
                     (pdf as any).autoTable({
                       startY: 35,
-                      head: [['CAN', 'FARMER NAME', 'AM-KG', 'AM-L', 'PM-KG', 'PM-L', 'TOT-L', 'AMOUNT (Rs)']],
-                      body: dailyData.map(p => [p.can, p.name, p.amKg.toFixed(2), p.amLtr.toFixed(2), p.pmKg.toFixed(2), p.pmLtr.toFixed(2), p.totalLtr.toFixed(2), p.totalAmt.toFixed(2)]),
+                      head: [['CAN', 'FARMER NAME', 'TYPE', 'AM-KG', 'AM-L', 'PM-KG', 'PM-L', 'TOT-L', 'AMOUNT (Rs)']],
+                      body: dailyData.map(p => [p.can, p.name, p.milkType, p.amKg.toFixed(2), p.amLtr.toFixed(2), p.pmKg.toFixed(2), p.pmLtr.toFixed(2), p.totalLtr.toFixed(2), p.totalAmt.toFixed(2)]),
                       theme: 'grid',
                       headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' },
                       bodyStyles: { halign: 'center' }
@@ -434,12 +450,14 @@ export default function ReportsPage() {
                     <TableRow>
                       <TableHead className="font-black text-[10px] text-center border-r w-[80px]">CAN</TableHead>
                       <TableHead className="font-black text-[10px] border-r">Farmer Name</TableHead>
+                      <TableHead className="font-black text-[10px] border-r text-center">Type</TableHead>
                       <TableHead colSpan={2} className="text-center font-black text-[10px] border-r bg-primary/5 uppercase tracking-widest">AM (Morning)</TableHead>
                       <TableHead colSpan={2} className="text-center font-black text-[10px] border-r bg-accent/5 uppercase tracking-widest">PM (Evening)</TableHead>
                       <TableHead className="text-center font-black text-[10px] border-r">Total L</TableHead>
                       <TableHead className="text-right font-black text-[10px] pr-6">Amount (Rs)</TableHead>
                     </TableRow>
                     <TableRow className="bg-muted/30">
+                      <TableHead className="border-r"></TableHead>
                       <TableHead className="border-r"></TableHead>
                       <TableHead className="border-r"></TableHead>
                       <TableHead className="text-center text-[8px] font-black border-r">KG</TableHead>
@@ -452,12 +470,17 @@ export default function ReportsPage() {
                   </TableHeader>
                   <TableBody>
                     {dailyData.length === 0 ? (
-                      <TableRow><TableCell colSpan={8} className="text-center py-20 italic text-muted-foreground font-medium uppercase text-[10px] tracking-widest">No procurement records for this date.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={9} className="text-center py-20 italic text-muted-foreground font-medium uppercase text-[10px] tracking-widest">No procurement records for this date.</TableCell></TableRow>
                     ) : (
                       dailyData.map((p: any, i) => (
                         <TableRow key={i} className="hover:bg-primary/5 group transition-colors">
                           <TableCell className="text-center font-black border-r text-primary text-base">{p.can}</TableCell>
                           <TableCell className="font-bold border-r uppercase text-sm">{p.name}</TableCell>
+                          <TableCell className="text-center border-r">
+                            <Badge variant={p.milkType === 'BUFFALO' ? "secondary" : "outline"} className="text-[8px] rounded-full px-2 font-black">
+                              {p.milkType}
+                            </Badge>
+                          </TableCell>
                           <TableCell className="text-center border-r text-xs text-muted-foreground">{p.amKg.toFixed(2)}</TableCell>
                           <TableCell className="text-center border-r font-black text-primary">{p.amLtr.toFixed(2)}</TableCell>
                           <TableCell className="text-center border-r text-xs text-muted-foreground">{p.pmKg.toFixed(2)}</TableCell>
@@ -469,9 +492,6 @@ export default function ReportsPage() {
                     )}
                   </TableBody>
                 </Table>
-                <div className="p-4 bg-muted/20 text-center text-[9px] text-muted-foreground font-black uppercase tracking-[0.3em]">
-                  Strictly Derived from Daily Collection Inputs • 0.96 Conversion Enforced
-                </div>
               </Card>
             </TabsContent>
 
@@ -492,6 +512,7 @@ export default function ReportsPage() {
                     <TableRow>
                       <TableHead className="pl-10 font-black text-[10px] uppercase">CAN</TableHead>
                       <TableHead className="font-black text-[10px] uppercase">Farmer Name</TableHead>
+                      <TableHead className="font-black text-[10px] uppercase">Type</TableHead>
                       <TableHead className="text-right font-black text-[10px] uppercase">Volume (L)</TableHead>
                       <TableHead className="text-right font-black text-[10px] uppercase">Payout (Rs)</TableHead>
                       <TableHead className="text-right pr-10 font-black text-[10px] uppercase">Action</TableHead>
@@ -502,6 +523,11 @@ export default function ReportsPage() {
                       <TableRow key={f.id} className="hover:bg-primary/5 transition-colors group">
                         <TableCell className="pl-10 font-black text-primary text-lg">{f.can}</TableCell>
                         <TableCell className="font-bold uppercase text-sm">{f.name}</TableCell>
+                        <TableCell>
+                          <Badge variant={f.milkType === 'BUFFALO' ? "secondary" : "outline"} className="text-[9px] rounded-full px-2 font-black">
+                            {f.milkType}
+                          </Badge>
+                        </TableCell>
                         <TableCell className="text-right font-bold text-base">{f.totalQty.toFixed(2)}</TableCell>
                         <TableCell className="text-right font-black text-primary text-base">₹ {f.totalAmount.toFixed(2)}</TableCell>
                         <TableCell className="text-right pr-10">
@@ -535,8 +561,8 @@ export default function ReportsPage() {
                   pdf.text(`MASTER PROCUREMENT ROSTER - ${currentCycle.label} (${selectedMonth})`, 14, 28);
                   (pdf as any).autoTable({
                     startY: 35,
-                    head: [['CAN', 'FARMER NAME', 'MORNING QTY', 'EVENING QTY', 'TOTAL LITRES', 'PAYOUT (Rs)']],
-                    body: masterRoster.map(f => [f.can, f.name, f.morningQty.toFixed(2), f.eveningQty.toFixed(2), f.totalQty.toFixed(2), f.totalAmount.toFixed(2)]),
+                    head: [['CAN', 'FARMER NAME', 'TYPE', 'MORNING QTY', 'EVENING QTY', 'TOTAL LITRES', 'PAYOUT (Rs)']],
+                    body: masterRoster.map(f => [f.can, f.name, f.milkType, f.morningQty.toFixed(2), f.eveningQty.toFixed(2), f.totalQty.toFixed(2), f.totalAmount.toFixed(2)]),
                     theme: 'grid',
                     headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' },
                     bodyStyles: { halign: 'center' }

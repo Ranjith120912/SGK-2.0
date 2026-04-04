@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -94,32 +93,18 @@ export default function ReportsPage() {
 
   const currentCycle = cycles[activeCycle];
 
-  // --- UNIFIED FINANCIAL RESOLUTION ENGINE ---
   const resolveEntryFinancials = (entry: any, farmersList: any[]) => {
     const f = farmersList?.find(item => item.id === entry.farmerId);
-    
-    // Priority: Live Directory Name > Saved Transaction Name > Default Label
     const name = f?.name || entry.farmerName || "Farmer";
     const can = f?.canNumber || entry.canNumber || "---";
-    
-    // Strict 0.96 Standard
     const kg = Number(entry.kgWeight) || 0;
     const ltr = entry.quantity !== undefined ? Number(entry.quantity) : parseFloat((kg * 0.96).toFixed(2));
     const rate = Number(entry.rate) || 0;
     const amount = entry.totalAmount !== undefined ? Number(entry.totalAmount) : parseFloat((ltr * rate).toFixed(2));
     
-    return {
-      can,
-      name,
-      kg,
-      ltr,
-      rate,
-      amount,
-      session: entry.session || "Morning"
-    };
+    return { can, name, kg, ltr, rate, amount, session: entry.session || "Morning" };
   };
 
-  // --- DAILY REPORT (SESSION GROUPED HORIZONTALLY) ---
   const dailyData = useMemo(() => {
     const map: Record<string, any> = {};
     const filteredEntries = allEntries?.filter(e => e.date === selectedDailyDate) || [];
@@ -146,38 +131,18 @@ export default function ReportsPage() {
         map[fid].pmLtr += res.ltr;
       }
       
-      // Precision recalculation for the combined row
       map[fid].totalLtr = parseFloat((map[fid].amLtr + map[fid].pmLtr).toFixed(2));
       map[fid].totalAmt = parseFloat((map[fid].totalAmt + res.amount).toFixed(2));
     });
 
-    const procurement = Object.values(map).sort((a: any, b: any) => {
+    return Object.values(map).sort((a: any, b: any) => {
       const aNum = parseInt(a.can);
       const bNum = parseInt(b.can);
       if (isNaN(aNum) || isNaN(bNum)) return a.can.localeCompare(b.can);
       return aNum - bNum;
     });
+  }, [allEntries, farmers, selectedDailyDate]);
 
-    const sales = allSales
-      ?.filter(s => s.date === selectedDailyDate)
-      .map(s => ({
-        buyerName: s.buyerName || "Distribution",
-        session: s.session,
-        milkType: s.milkType,
-        qty: Number(s.quantity) || 0,
-        rate: Number(s.rate) || 0,
-        amount: Number(s.totalAmount) || 0
-      })) || [];
-
-    return {
-      procurement,
-      sales,
-      totalProc: procurement.reduce((acc, c: any) => acc + c.totalAmt, 0),
-      totalSale: sales.reduce((acc, c: any) => acc + c.amount, 0)
-    };
-  }, [allEntries, allSales, farmers, selectedDailyDate]);
-
-  // --- MASTER ROSTER & CYCLE STATS ---
   const masterRoster = useMemo(() => {
     if (!allEntries || !selectedMonth || !currentCycle) return [];
     
@@ -250,7 +215,7 @@ export default function ReportsPage() {
     pdf.setFontSize(12);
     pdf.text(`DAILY PROCUREMENT REPORT - ${dateStr}`, 148, 28, { align: 'center' });
 
-    const procRows = dailyData.procurement.map((p: any) => [
+    const procRows = dailyData.map((p: any) => [
       p.can, p.name, p.amKg.toFixed(2), p.amLtr.toFixed(2), p.pmKg.toFixed(2), p.pmLtr.toFixed(2), p.totalLtr.toFixed(2), p.totalAmt.toFixed(2)
     ]);
 
@@ -266,7 +231,7 @@ export default function ReportsPage() {
   };
 
   const handleExportDailyExcel = () => {
-    const data = dailyData.procurement.map((p: any) => ({
+    const data = dailyData.map((p: any) => ({
       "CAN": p.can,
       "FARMER NAME": p.name,
       "AM-KG": p.amKg, "AM-LITRE": p.amLtr,
@@ -357,7 +322,7 @@ export default function ReportsPage() {
             <div>
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Reports & Audit</h1>
               <Badge variant="outline" className="rounded-full mt-1 border-primary/20 text-primary">
-                <Users className="w-3 h-3 mr-2" /> {farmers?.length || 0} Management Farmers
+                <Users className="w-3 h-3 mr-2" /> {farmers?.length || 0} Registered Farmers
               </Badge>
             </div>
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
@@ -446,10 +411,10 @@ export default function ReportsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {dailyData.procurement.length === 0 ? (
+                    {dailyData.length === 0 ? (
                       <TableRow><TableCell colSpan={8} className="text-center py-20 italic text-muted-foreground">No collections recorded for this date.</TableCell></TableRow>
                     ) : (
-                      dailyData.procurement.map((p: any, i) => (
+                      dailyData.map((p: any, i) => (
                         <TableRow key={i} className="hover:bg-primary/5">
                           <TableCell className="text-center font-black border-r text-primary">{p.can}</TableCell>
                           <TableCell className="font-bold border-r">{p.name}</TableCell>

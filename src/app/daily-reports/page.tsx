@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -53,15 +54,17 @@ export default function DailyReportsPage() {
   const { data: ratesConfig } = useDoc(settingsRef);
 
   const dailyData = useMemo(() => {
-    if (!allEntries || !selectedDate) return [];
+    if (!allEntries || !selectedDate || !farmers) return [];
     
     const map: Record<string, any> = {};
     const filteredEntries = allEntries.filter(e => e.date === selectedDate);
     
     filteredEntries.forEach(e => {
       const fid = e.farmerId;
-      const farmerProfile = farmers?.find(f => f.id === fid);
-      const name = farmerProfile?.name || e.farmerName || "Farmer " + (e.canNumber || fid);
+      // Precision Resolution: Prioritize directory lookup to fix "Farmer [ID]" bug
+      const farmerProfile = farmers.find(f => f.id === fid);
+      
+      const name = farmerProfile?.name || e.farmerName || "Farmer (CAN: " + (e.canNumber || "---") + ")";
       const can = farmerProfile?.canNumber || e.canNumber || "---";
       const milkType = farmerProfile?.milkType || e.milkType || "COW";
       

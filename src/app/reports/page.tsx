@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -95,14 +96,15 @@ export default function ReportsPage() {
   const currentCycle = cycles[activeCycle];
 
   const dailyData = useMemo(() => {
-    if (!allEntries || !selectedDailyDate) return [];
+    if (!allEntries || !selectedDailyDate || !farmers) return [];
     const map: Record<string, any> = {};
     const filteredEntries = allEntries.filter(e => e.date === selectedDailyDate);
     
     filteredEntries.forEach(e => {
       const fid = e.farmerId;
-      const farmerProfile = farmers?.find(f => f.id === fid);
-      const name = farmerProfile?.name || e.farmerName || "Farmer " + (e.canNumber || fid);
+      // Precision Resolution: Prioritize directory lookup
+      const farmerProfile = farmers.find(f => f.id === fid);
+      const name = farmerProfile?.name || e.farmerName || "Farmer (CAN: " + (e.canNumber || "---") + ")";
       const can = farmerProfile?.canNumber || e.canNumber || "---";
       const milkType = farmerProfile?.milkType || e.milkType || "COW";
       
@@ -143,7 +145,7 @@ export default function ReportsPage() {
   }, [allEntries, farmers, selectedDailyDate]);
 
   const masterRoster = useMemo(() => {
-    if (!allEntries || !selectedMonth || !currentCycle) return [];
+    if (!allEntries || !selectedMonth || !currentCycle || !farmers) return [];
     
     const map: Record<string, any> = {};
     const cycleEntries = allEntries.filter(e => {
@@ -154,8 +156,9 @@ export default function ReportsPage() {
 
     cycleEntries.forEach(e => {
       const fid = e.farmerId;
-      const farmerProfile = farmers?.find(f => f.id === fid);
-      const name = farmerProfile?.name || e.farmerName || "Farmer " + (e.canNumber || fid);
+      // Precision Resolution: Prioritize directory lookup
+      const farmerProfile = farmers.find(f => f.id === fid);
+      const name = farmerProfile?.name || e.farmerName || "Farmer (CAN: " + (e.canNumber || "---") + ")";
       const can = farmerProfile?.canNumber || e.canNumber || "---";
       const milkType = farmerProfile?.milkType || e.milkType || "COW";
 

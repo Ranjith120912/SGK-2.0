@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -77,7 +78,7 @@ export default function FarmerBillsPage() {
   const currentCycle = cycles[activeCycle];
 
   const masterRoster = useMemo(() => {
-    if (!allEntries || !selectedMonth || !currentCycle) return [];
+    if (!allEntries || !selectedMonth || !currentCycle || !farmers) return [];
     
     const map: Record<string, any> = {};
     const cycleEntries = allEntries.filter(e => {
@@ -88,8 +89,10 @@ export default function FarmerBillsPage() {
 
     cycleEntries.forEach(e => {
       const fid = e.farmerId;
-      const farmerProfile = farmers?.find(f => f.id === fid);
-      const name = farmerProfile?.name || e.farmerName || "Farmer " + (e.canNumber || fid);
+      // Precision Resolution: Prioritize directory lookup to fix "Farmer [ID]" bug
+      const farmerProfile = farmers.find(f => f.id === fid);
+      
+      const name = farmerProfile?.name || e.farmerName || "Farmer (CAN: " + (e.canNumber || "---") + ")";
       const can = farmerProfile?.canNumber || e.canNumber || "---";
       const milkType = farmerProfile?.milkType || e.milkType || "COW";
 

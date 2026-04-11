@@ -92,7 +92,6 @@ export default function FarmerBillsPage() {
       const fid = e.farmerId;
       const farmerProfile = farmers.find(f => f.id === fid || f.canNumber === e.canNumber);
       
-      // STRICT DIRECTORY FILTER: Only include if farmer exists in directory
       if (!farmerProfile) return;
 
       const name = farmerProfile.name;
@@ -139,13 +138,15 @@ export default function FarmerBillsPage() {
     const periodStartStr = `${currentCycle.start}/${month}/${year.toString().slice(-2)}`;
     const periodEndStr = `${currentCycle.end}/${month}/${year.toString().slice(-2)}`;
     const period = `${periodStartStr} to ${periodEndStr}`;
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
     
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(16);
-    pdf.text(company, 105, 20, { align: 'center' });
+    pdf.text(company, pageWidth / 2, 20, { align: 'center' });
     pdf.setFontSize(12);
-    pdf.text("MILK INVOICE", 105, 27, { align: 'center' });
-    pdf.line(93, 28, 117, 28); 
+    pdf.text("MILK INVOICE", pageWidth / 2, 27, { align: 'center' });
+    pdf.line(pageWidth / 2 - 12, 28, pageWidth / 2 + 12, 28); 
 
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "normal");
@@ -227,21 +228,22 @@ export default function FarmerBillsPage() {
     pdf.text(f.totalAmount.toFixed(2), 178, finalY + 7, { align: 'center' });
     pdf.line(20, finalY + 11, 190, finalY + 11);
 
-    // BUSINESS STAMP INTEGRATION
+    // SIGNATORY FOOTER SECTION - Absolute bottom placement
+    const sigLineY = pageHeight - 20;
+    const sigTextY = pageHeight - 15;
+    const stampY = sigLineY - 22; // Height 20mm + 2mm gap
+
     if (ratesConfig?.stampUrl) {
       try {
-        // Position stamp above the authorized signature line
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        pdf.addImage(ratesConfig.stampUrl, 'PNG', 150, finalY + 15, 40, 20);
+        pdf.addImage(ratesConfig.stampUrl, 'PNG', pageWidth - 65, stampY, 40, 20);
       } catch (e) {
         console.error("Failed to add stamp to PDF:", e);
       }
     }
 
-    const pageHeight = pdf.internal.pageSize.getHeight();
     pdf.setFontSize(10);
-    pdf.text("AUTHORIZED SIGNATURE", 190, pageHeight - 15, { align: 'right' });
-    pdf.line(140, pageHeight - 17, 190, pageHeight - 17);
+    pdf.text("AUTHORIZED SIGNATURE", pageWidth - 20, sigTextY, { align: 'right' });
+    pdf.line(pageWidth - 70, sigLineY, pageWidth - 20, sigLineY);
   };
 
   if (!isClient) return null;

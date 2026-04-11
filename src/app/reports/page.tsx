@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -25,7 +24,7 @@ import { format, endOfMonth, subMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import jsPDF from "jsPDF";
+import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import { utils, writeFile } from "xlsx";
 import { useToast } from "@/hooks/use-toast";
@@ -118,7 +117,6 @@ export default function ReportsPage() {
       const fid = e.farmerId;
       const farmerProfile = farmers.find(f => f.id === fid || f.canNumber === e.canNumber);
       
-      // STRICT DIRECTORY FILTER
       if (!farmerProfile) return;
 
       const name = farmerProfile.name;
@@ -137,10 +135,10 @@ export default function ReportsPage() {
 
       const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
       
-      // PRECISION RATE RESOLUTION: Custom > Default
+      // PRECISION RATE RESOLUTION: Prioritize custom rates (default Cow 35)
       let rate = Number(farmerProfile.customRate) > 0 
         ? Number(farmerProfile.customRate) 
-        : (milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 0));
+        : (milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 35));
 
       const amt = ltr * rate;
       if (e.session === 'Morning') map[fid].morningQty += ltr;
@@ -166,7 +164,6 @@ export default function ReportsPage() {
       const fid = e.farmerId;
       const farmerProfile = farmers.find(f => f.id === fid || f.canNumber === e.canNumber);
       
-      // STRICT DIRECTORY FILTER
       if (!farmerProfile) return;
 
       const name = farmerProfile.name;
@@ -185,10 +182,9 @@ export default function ReportsPage() {
 
       const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
       
-      // PRECISION RATE RESOLUTION
       let rate = Number(farmerProfile.customRate) > 0 
         ? Number(farmerProfile.customRate) 
-        : (milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 0));
+        : (milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 35));
 
       const amt = ltr * rate;
       if (e.session === 'Morning') map[fid].morningQty += ltr;
@@ -223,10 +219,9 @@ export default function ReportsPage() {
         if (!f) return;
         const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
         
-        // PRECISION RATE RESOLUTION
         let rate = Number(f.customRate) > 0 
           ? Number(f.customRate) 
-          : (f.milkType === 'BUFFALO' ? (Number(ratesConfig?.buffaloRate) || 0) : (Number(ratesConfig?.cowRate) || 0));
+          : (f.milkType === 'BUFFALO' ? (Number(ratesConfig?.buffaloRate) || 0) : (Number(ratesConfig?.cowRate) || 35));
 
         tCost += (ltr * rate);
         tQty += ltr;
@@ -299,7 +294,6 @@ export default function ReportsPage() {
       headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' }
     });
 
-    // BUSINESS STAMP INTEGRATION
     if (ratesConfig?.stampUrl) {
       try {
         const pageHeight = pdf.internal.pageSize.getHeight();

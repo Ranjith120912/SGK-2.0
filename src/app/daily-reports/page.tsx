@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -19,7 +18,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
-import jsPDF from "jsPDF";
+import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import { utils, writeFile } from "xlsx";
 import {
@@ -93,10 +92,10 @@ export default function DailyReportsPage() {
       const kg = Number(e.kgWeight) || 0;
       const ltr = kg * CONVERSION_RATE;
       
-      // PRECISION RATE RESOLUTION
+      // PRECISION RATE RESOLUTION: Prioritize custom rate for both Cow and Buffalo
       const rate = Number(farmerProfile.customRate) > 0 
         ? Number(farmerProfile.customRate) 
-        : (milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 0));
+        : (milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 35));
 
       const amt = ltr * rate;
 
@@ -168,14 +167,13 @@ export default function DailyReportsPage() {
       bodyStyles: { halign: 'center' }
     });
 
-    // BUSINESS STAMP INTEGRATION - Absolute Footer Placement (25mm above signature/bottom area)
     if (ratesConfig?.stampUrl) {
       try {
         const formatMatch = ratesConfig.stampUrl.match(/^data:image\/([a-zA-Z+]+);base64,/);
         const imageFormat = formatMatch ? formatMatch[1].toUpperCase() : 'PNG';
         const finalFormat = imageFormat.includes('JP') ? 'JPEG' : 'PNG';
         
-        pdf.addImage(ratesConfig.stampUrl, finalFormat, pageWidth - 60, pageHeight - 35, 40, 20);
+        pdf.addImage(ratesConfig.stampUrl, finalFormat, pageWidth - 60, pageHeight - 45, 40, 20);
       } catch (e) {
         console.error("Failed to add stamp to report PDF:", e);
       }

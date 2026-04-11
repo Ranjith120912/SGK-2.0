@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -20,7 +19,7 @@ import { format, endOfMonth, subMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import jsPDF from "jsPDF";
+import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 
 export default function FarmerBillsPage() {
@@ -111,10 +110,10 @@ export default function FarmerBillsPage() {
 
       const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
       
-      // PRECISION RATE RESOLUTION
+      // PRECISION RATE RESOLUTION: Prioritize custom rates for Cow (35 default) and Buffalo
       let rate = Number(farmerProfile.customRate) > 0 
         ? Number(farmerProfile.customRate) 
-        : (milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 0));
+        : (milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 35));
 
       map[fid].totalQty += ltr;
       map[fid].totalAmount += (ltr * rate);
@@ -183,10 +182,9 @@ export default function FarmerBillsPage() {
       const eQty = Number(eKg) * CONVERSION_RATE;
       const tQty = mQty + eQty;
 
-      // PRECISION RATE RESOLUTION
       let rate = farmerProfile && Number(farmerProfile.customRate) > 0 
         ? Number(farmerProfile.customRate) 
-        : (f.milkType === 'BUFFALO' ? (Number(ratesConfig?.buffaloRate) || 0) : (Number(ratesConfig?.cowRate) || 0));
+        : (f.milkType === 'BUFFALO' ? (Number(ratesConfig?.buffaloRate) || 0) : (Number(ratesConfig?.cowRate) || 35));
 
       const amt = tQty * rate;
 
@@ -220,10 +218,10 @@ export default function FarmerBillsPage() {
     pdf.text(f.totalAmount.toFixed(2), 178, finalY + 7, { align: 'center' });
     pdf.line(20, finalY + 11, 190, finalY + 11);
 
-    // SIGNATORY FOOTER SECTION - Precision Lock (25mm above signature line)
-    const footerY = pageHeight - 20;
-    const sigLineY = footerY - 5;
-    const stampY = sigLineY - 30; // 25mm Gap: sigLineY at pageHeight-25, stamp at pageHeight-50
+    // SIGNATORY FOOTER: Precision Locked exactly 25mm above the line
+    const sigLineY = pageHeight - 25;
+    const stampHeight = 25;
+    const stampY = sigLineY - 50; // Bottom of stamp will be at sigLineY - 25
 
     if (ratesConfig?.stampUrl) {
       try {
@@ -231,7 +229,7 @@ export default function FarmerBillsPage() {
         const imageFormat = formatMatch ? formatMatch[1].toUpperCase() : 'PNG';
         const finalFormat = imageFormat.includes('JP') ? 'JPEG' : 'PNG';
         
-        pdf.addImage(ratesConfig.stampUrl, finalFormat, pageWidth - 70, stampY, 50, 25);
+        pdf.addImage(ratesConfig.stampUrl, finalFormat, pageWidth - 70, stampY, 50, stampHeight);
       } catch (e) {
         console.error("Failed to add stamp to PDF:", e);
       }
@@ -239,7 +237,7 @@ export default function FarmerBillsPage() {
 
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(10);
-    pdf.text("AUTHORIZED SIGNATURE", pageWidth - 20, footerY, { align: 'right' });
+    pdf.text("AUTHORIZED SIGNATURE", pageWidth - 20, pageHeight - 20, { align: 'right' });
     pdf.line(pageWidth - 75, sigLineY, pageWidth - 20, sigLineY);
   };
 

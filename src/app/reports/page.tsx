@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -116,6 +117,8 @@ export default function ReportsPage() {
     cycleEntries.forEach(e => {
       const fid = e.farmerId;
       const farmerProfile = farmers.find(f => f.id === fid || f.canNumber === e.canNumber);
+      
+      // STRICT DIRECTORY FILTER
       if (!farmerProfile) return;
 
       const name = farmerProfile.name;
@@ -160,6 +163,8 @@ export default function ReportsPage() {
     monthEntries.forEach(e => {
       const fid = e.farmerId;
       const farmerProfile = farmers.find(f => f.id === fid || f.canNumber === e.canNumber);
+      
+      // STRICT DIRECTORY FILTER
       if (!farmerProfile) return;
 
       const name = farmerProfile.name;
@@ -264,7 +269,8 @@ export default function ReportsPage() {
   const handleExportPDF = (roster: any[], title: string) => {
     const pdf = new jsPDF('l', 'mm', 'a4');
     pdf.setFontSize(18);
-    pdf.text((ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS").toUpperCase(), 14, 20);
+    const company = (ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS").toUpperCase();
+    pdf.text(company, 14, 20);
     pdf.setFontSize(12);
     pdf.text(`${title.toUpperCase()} - ${selectedMonth}`, 14, 28);
     
@@ -284,11 +290,15 @@ export default function ReportsPage() {
       headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' }
     });
 
+    // BUSINESS STAMP INTEGRATION
     if (ratesConfig?.stampUrl) {
       try {
         const pageHeight = pdf.internal.pageSize.getHeight();
-        pdf.addImage(ratesConfig.stampUrl, 'PNG', 240, pageHeight - 35, 35, 15);
-      } catch (e) {}
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        pdf.addImage(ratesConfig.stampUrl, 'PNG', pageWidth - 55, pageHeight - 35, 40, 20);
+      } catch (e) {
+        console.error("Failed to add stamp to audit PDF:", e);
+      }
     }
 
     pdf.save(`${title.replace(/\s+/g, '_')}_${selectedMonth}.pdf`);

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -91,6 +92,7 @@ export default function FarmerBillsPage() {
       const fid = e.farmerId;
       const farmerProfile = farmers.find(f => f.id === fid || f.canNumber === e.canNumber);
       
+      // STRICT DIRECTORY FILTER: Only include if farmer exists in directory
       if (!farmerProfile) return;
 
       const name = farmerProfile.name;
@@ -225,11 +227,14 @@ export default function FarmerBillsPage() {
     pdf.text(f.totalAmount.toFixed(2), 178, finalY + 7, { align: 'center' });
     pdf.line(20, finalY + 11, 190, finalY + 11);
 
+    // BUSINESS STAMP INTEGRATION
     if (ratesConfig?.stampUrl) {
       try {
-        pdf.addImage(ratesConfig.stampUrl, 'PNG', 155, finalY + 15, 35, 15);
+        // Position stamp above the authorized signature line
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        pdf.addImage(ratesConfig.stampUrl, 'PNG', 150, finalY + 15, 40, 20);
       } catch (e) {
-        console.error("Error adding stamp to PDF", e);
+        console.error("Failed to add stamp to PDF:", e);
       }
     }
 

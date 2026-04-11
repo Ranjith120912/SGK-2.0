@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -70,6 +71,7 @@ export default function DailyReportsPage() {
       const fid = e.farmerId;
       const farmerProfile = farmers.find(f => f.id === fid || f.canNumber === e.canNumber);
       
+      // STRICT DIRECTORY FILTER
       if (!farmerProfile) return;
 
       const name = farmerProfile.name;
@@ -167,11 +169,15 @@ export default function DailyReportsPage() {
       bodyStyles: { halign: 'center' }
     });
 
+    // BUSINESS STAMP INTEGRATION
     if (ratesConfig?.stampUrl) {
       try {
         const pageHeight = pdf.internal.pageSize.getHeight();
-        pdf.addImage(ratesConfig.stampUrl, 'PNG', 240, pageHeight - 35, 35, 15);
-      } catch (e) {}
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        pdf.addImage(ratesConfig.stampUrl, 'PNG', pageWidth - 55, pageHeight - 35, 40, 20);
+      } catch (e) {
+        console.error("Failed to add stamp to report PDF:", e);
+      }
     }
     
     pdf.save(`Daily_Procurement_${selectedDate}.pdf`);

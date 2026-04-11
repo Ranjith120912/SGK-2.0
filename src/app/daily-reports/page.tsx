@@ -71,6 +71,7 @@ export default function DailyReportsPage() {
       const fid = e.farmerId;
       const farmerProfile = farmers.find(f => f.id === fid || f.canNumber === e.canNumber);
       
+      // STRICT DIRECTORY FILTER
       if (!farmerProfile) return;
 
       const name = farmerProfile.name;
@@ -171,10 +172,10 @@ export default function DailyReportsPage() {
       bodyStyles: { halign: 'center' }
     });
 
-    // BUSINESS STAMP INTEGRATION - Positioned bottom right
+    // BUSINESS STAMP INTEGRATION - Absolute Footer Placement
     if (ratesConfig?.stampUrl) {
       try {
-        pdf.addImage(ratesConfig.stampUrl, 'PNG', pageWidth - 55, pageHeight - 35, 40, 20);
+        pdf.addImage(ratesConfig.stampUrl, 'PNG', pageWidth - 60, pageHeight - 35, 40, 20);
       } catch (e) {
         console.error("Failed to add stamp to report PDF:", e);
       }

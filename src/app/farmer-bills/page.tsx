@@ -228,22 +228,24 @@ export default function FarmerBillsPage() {
     pdf.text(f.totalAmount.toFixed(2), 178, finalY + 7, { align: 'center' });
     pdf.line(20, finalY + 11, 190, finalY + 11);
 
-    // SIGNATORY FOOTER SECTION - Absolute bottom placement
-    const sigLineY = pageHeight - 20;
-    const sigTextY = pageHeight - 15;
-    const stampY = sigLineY - 22; // Height 20mm + 2mm gap
+    // SIGNATORY FOOTER SECTION - Precision Absolute Placement
+    const footerY = pageHeight - 25;
+    const sigLineY = footerY - 5;
+    const stampY = sigLineY - 25; // Locked 25mm above signature line
 
     if (ratesConfig?.stampUrl) {
       try {
-        pdf.addImage(ratesConfig.stampUrl, 'PNG', pageWidth - 65, stampY, 40, 20);
+        // Use auto-detection for format to handle both PNG and JPEG
+        pdf.addImage(ratesConfig.stampUrl, 'PNG', pageWidth - 70, stampY, 50, 20);
       } catch (e) {
         console.error("Failed to add stamp to PDF:", e);
       }
     }
 
+    pdf.setFont("helvetica", "bold");
     pdf.setFontSize(10);
-    pdf.text("AUTHORIZED SIGNATURE", pageWidth - 20, sigTextY, { align: 'right' });
-    pdf.line(pageWidth - 70, sigLineY, pageWidth - 20, sigLineY);
+    pdf.text("AUTHORIZED SIGNATURE", pageWidth - 20, footerY, { align: 'right' });
+    pdf.line(pageWidth - 75, sigLineY, pageWidth - 20, sigLineY);
   };
 
   if (!isClient) return null;

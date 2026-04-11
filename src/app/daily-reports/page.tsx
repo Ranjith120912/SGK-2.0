@@ -6,7 +6,7 @@ import { Footer } from "@/components/footer";
 import { useCollection, useDoc, useMemoFirebase, useFirestore } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
 import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { 
   FileBarChart, 
@@ -92,7 +92,7 @@ export default function DailyReportsPage() {
       const kg = Number(e.kgWeight) || 0;
       const ltr = kg * CONVERSION_RATE;
       
-      // PRECISION RATE RESOLUTION: Prioritize custom rate for both Cow and Buffalo
+      // PRECISION RATE RESOLUTION: Custom Rate Priority (for both COW and BUFFALO)
       const rate = Number(farmerProfile.customRate) > 0 
         ? Number(farmerProfile.customRate) 
         : (milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 35));
@@ -119,6 +119,17 @@ export default function DailyReportsPage() {
     });
   }, [allEntries, farmers, selectedDate, ratesConfig]);
 
+  const totals = useMemo(() => {
+    return dailyData.reduce((acc, curr) => ({
+      amKg: acc.amKg + curr.amKg,
+      amLtr: acc.amLtr + curr.amLtr,
+      pmKg: acc.pmKg + curr.pmKg,
+      pmLtr: acc.pmLtr + curr.pmLtr,
+      totalLtr: acc.totalLtr + curr.totalLtr,
+      totalAmt: acc.totalAmt + curr.totalAmt,
+    }), { amKg: 0, amLtr: 0, pmKg: 0, pmLtr: 0, totalLtr: 0, totalAmt: 0 });
+  }, [dailyData]);
+
   const handleExportExcel = () => {
     const data = dailyData.map((p: any) => ({
       "CAN": p.can,
@@ -131,6 +142,20 @@ export default function DailyReportsPage() {
       "TOTAL LITRES": p.totalLtr.toFixed(2),
       "PAYOUT (Rs)": p.totalAmt.toFixed(2)
     }));
+    
+    // Add Totals Row
+    data.push({
+      "CAN": "TOTAL",
+      "FARMER NAME": "",
+      "MILK TYPE": "",
+      "AM-KG": totals.amKg.toFixed(2),
+      "AM-LITRE": totals.amLtr.toFixed(2),
+      "PM-KG": totals.pmKg.toFixed(2),
+      "PM-LITRE": totals.pmLtr.toFixed(2),
+      "TOTAL LITRES": totals.totalLtr.toFixed(2),
+      "PAYOUT (Rs)": totals.totalAmt.toFixed(2)
+    } as any);
+
     const ws = utils.json_to_sheet(data);
     const wb = utils.book_new();
     utils.book_append_sheet(wb, ws, "Daily Procurement");
@@ -148,23 +173,44 @@ export default function DailyReportsPage() {
     pdf.setFontSize(12);
     pdf.text(`DAILY PROCUREMENT REPORT - ${format(new Date(selectedDate), 'dd/MM/yyyy')}`, pageWidth / 2, 28, { align: 'center' });
     
+    const bodyRows = dailyData.map(p => [
+      p.can, 
+      p.name, 
+      p.milkType, 
+      p.amKg.toFixed(2), 
+      p.amLtr.toFixed(2), 
+      p.pmKg.toFixed(2), 
+      p.pmLtr.toFixed(2), 
+      p.totalLtr.toFixed(2), 
+      p.totalAmt.toFixed(2)
+    ]);
+
+    // Add Totals Row
+    bodyRows.push([
+      'TOTAL',
+      '',
+      '',
+      totals.amKg.toFixed(2),
+      totals.amLtr.toFixed(2),
+      totals.pmKg.toFixed(2),
+      totals.pmLtr.toFixed(2),
+      totals.totalLtr.toFixed(2),
+      totals.totalAmt.toFixed(2)
+    ]);
+    
     (pdf as any).autoTable({
       startY: 35,
       head: [['CAN', 'FARMER NAME', 'TYPE', 'AM-KG', 'AM-L', 'PM-KG', 'PM-L', 'TOT-L', 'PAYOUT (Rs)']],
-      body: dailyData.map(p => [
-        p.can, 
-        p.name, 
-        p.milkType, 
-        p.amKg.toFixed(2), 
-        p.amLtr.toFixed(2), 
-        p.pmKg.toFixed(2), 
-        p.pmLtr.toFixed(2), 
-        p.totalLtr.toFixed(2), 
-        p.totalAmt.toFixed(2)
-      ]),
+      body: bodyRows,
       theme: 'grid',
       headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' },
-      bodyStyles: { halign: 'center' }
+      bodyStyles: { halign: 'center' },
+      didParseCell: function (data: any) {
+        if (data.row.index === bodyRows.length - 1) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fillColor = [245, 245, 245];
+        }
+      }
     });
 
     if (ratesConfig?.stampUrl) {
@@ -287,6 +333,21 @@ export default function DailyReportsPage() {
                   ))
                 )}
               </TableBody>
+              {dailyData.length > 0 && (
+                <TableFooter className="bg-muted/50 border-t-2 font-black">
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell className="border-r"></TableCell>
+                    <TableCell className="border-r text-center uppercase text-[10px] tracking-widest">Grand Total</TableCell>
+                    <TableCell className="border-r"></TableCell>
+                    <TableCell className="text-center border-r text-xs text-muted-foreground/70">{totals.amKg.toFixed(2)}</TableCell>
+                    <TableCell className="text-center border-r text-primary text-base">{totals.amLtr.toFixed(2)}</TableCell>
+                    <TableCell className="text-center border-r text-xs text-muted-foreground/70">{totals.pmKg.toFixed(2)}</TableCell>
+                    <TableCell className="text-center border-r text-accent text-base">{totals.pmLtr.toFixed(2)}</TableCell>
+                    <TableCell className="text-center border-r text-primary bg-primary/5 text-lg">{totals.totalLtr.toFixed(2)} L</TableCell>
+                    <TableCell className="text-right pr-8 text-foreground text-xl">₹ {totals.totalAmt.toFixed(2)}</TableCell>
+                  </TableRow>
+                </TableFooter>
+              )}
             </Table>
           </Card>
         </div>

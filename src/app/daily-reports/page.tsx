@@ -175,7 +175,11 @@ export default function DailyReportsPage() {
     // BUSINESS STAMP INTEGRATION - Absolute Footer Placement
     if (ratesConfig?.stampUrl) {
       try {
-        pdf.addImage(ratesConfig.stampUrl, 'PNG', pageWidth - 60, pageHeight - 35, 40, 20);
+        const formatMatch = ratesConfig.stampUrl.match(/^data:image\/([a-zA-Z+]+);base64,/);
+        const imageFormat = formatMatch ? formatMatch[1].toUpperCase() : 'PNG';
+        const finalFormat = imageFormat.includes('JP') ? 'JPEG' : 'PNG';
+        
+        pdf.addImage(ratesConfig.stampUrl, finalFormat, pageWidth - 60, pageHeight - 35, 40, 20);
       } catch (e) {
         console.error("Failed to add stamp to report PDF:", e);
       }

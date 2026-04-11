@@ -229,14 +229,17 @@ export default function FarmerBillsPage() {
     pdf.line(20, finalY + 11, 190, finalY + 11);
 
     // SIGNATORY FOOTER SECTION - Precision Absolute Placement
-    const footerY = pageHeight - 25;
+    const footerY = pageHeight - 20;
     const sigLineY = footerY - 5;
-    const stampY = sigLineY - 25; // Locked 25mm above signature line
+    const stampY = sigLineY - 30; // Precision Lock: Exactly 25mm above signature line (sigLineY is at y-5, stamp at y-30)
 
     if (ratesConfig?.stampUrl) {
       try {
-        // Use auto-detection for format to handle both PNG and JPEG
-        pdf.addImage(ratesConfig.stampUrl, 'PNG', pageWidth - 70, stampY, 50, 20);
+        const formatMatch = ratesConfig.stampUrl.match(/^data:image\/([a-zA-Z+]+);base64,/);
+        const imageFormat = formatMatch ? formatMatch[1].toUpperCase() : 'PNG';
+        const finalFormat = imageFormat.includes('JP') ? 'JPEG' : 'PNG';
+        
+        pdf.addImage(ratesConfig.stampUrl, finalFormat, pageWidth - 70, stampY, 50, 25);
       } catch (e) {
         console.error("Failed to add stamp to PDF:", e);
       }

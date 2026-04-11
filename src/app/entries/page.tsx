@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -101,14 +102,10 @@ export default function EntriesPage() {
     const existingEntry = entries?.find(e => e.farmerId === farmerId);
     const kgValue = kgStr !== undefined && kgStr !== "" ? parseFloat(kgStr) : (existingEntry ? Number(existingEntry.kgWeight) : 0);
     
-    let managedRate = 0;
-    if (farmer.milkType === 'BUFFALO') {
-      managedRate = Number(farmer.customRate) > 0 
-        ? Number(farmer.customRate) 
-        : (Number(ratesConfig?.buffaloRate) || 0);
-    } else {
-      managedRate = Number(ratesConfig?.cowRate) || 0;
-    }
+    // PRECISION RATE RESOLUTION: Custom Rate > Global Default
+    let managedRate = Number(farmer.customRate) > 0 
+      ? Number(farmer.customRate) 
+      : (farmer.milkType === 'BUFFALO' ? (Number(ratesConfig?.buffaloRate) || 0) : (Number(ratesConfig?.cowRate) || 0));
 
     if (isNaN(kgValue) || kgValue < 0) return;
 
@@ -205,7 +202,7 @@ export default function EntriesPage() {
               <IndianRupee className="w-5 h-5 text-accent" />
               <div className="text-xs">
                 <p className="font-bold text-accent uppercase">Current Procurement Rates</p>
-                <p className="text-muted-foreground font-black">Cow: ₹{Number(ratesConfig?.cowRate || 0).toFixed(2)} | Buffalo: ₹{Number(ratesConfig?.buffaloRate || 0).toFixed(2)}</p>
+                <p className="text-muted-foreground font-black">Cow: ₹{Number(ratesConfig?.cowRate || 35).toFixed(2)} | Buffalo: ₹{Number(ratesConfig?.buffaloRate || 0).toFixed(2)}</p>
               </div>
             </div>
           </div>
@@ -233,15 +230,10 @@ export default function EntriesPage() {
                   const kgNum = parseFloat(currentKgStr);
                   const previewLitre = !isNaN(kgNum) ? (kgNum * CONVERSION_RATE).toFixed(2) : "0.00";
                   
-                  let managedRate = 0;
-                  const isBuffalo = farmer.milkType === 'BUFFALO';
-                  if (isBuffalo) {
-                    managedRate = Number(farmer.customRate) > 0 
-                      ? Number(farmer.customRate) 
-                      : (Number(ratesConfig?.buffaloRate) || 0);
-                  } else {
-                    managedRate = Number(ratesConfig?.cowRate) || 0;
-                  }
+                  // PRECISION RATE RESOLUTION: Custom Rate > Global Default
+                  let managedRate = Number(farmer.customRate) > 0 
+                    ? Number(farmer.customRate) 
+                    : (farmer.milkType === 'BUFFALO' ? (Number(ratesConfig?.buffaloRate) || 0) : (Number(ratesConfig?.cowRate) || 0));
                   
                   const previewAmount = !isNaN(kgNum) ? (parseFloat(previewLitre) * managedRate).toFixed(2) : "0.00";
                   const status = savingStatus[farmer.id] || (existingEntry ? 'saved' : 'idle');
@@ -252,7 +244,7 @@ export default function EntriesPage() {
                       <TableCell>
                         <div className="flex flex-col gap-1">
                           <span className="font-bold text-base uppercase">{farmer.name}</span>
-                          <Badge variant={isBuffalo ? "secondary" : "outline"} className="text-[10px] w-fit h-4 rounded-full font-black">
+                          <Badge variant={farmer.milkType === 'BUFFALO' ? "secondary" : "outline"} className="text-[10px] w-fit h-4 rounded-full font-black">
                             {farmer.milkType || 'COW'}
                           </Badge>
                         </div>
@@ -281,12 +273,15 @@ export default function EntriesPage() {
                       <TableCell>
                         <div className={cn(
                           "h-11 flex items-center justify-between px-4 rounded-xl border border-transparent font-black text-sm bg-muted/30 text-muted-foreground",
-                          isBuffalo && Number(farmer.customRate) > 0 && "bg-accent/10 text-accent border-accent/20"
+                          Number(farmer.customRate) > 0 && (farmer.milkType === 'BUFFALO' ? "bg-accent/10 text-accent border-accent/20" : "bg-primary/10 text-primary border-primary/20")
                         )}>
                           <span>₹ {managedRate.toFixed(2)}</span>
                           <Lock className="w-3 h-3 opacity-30" />
-                          {isBuffalo && Number(farmer.customRate) > 0 && (
-                            <div className="absolute -top-3 left-2 bg-accent text-[8px] font-black text-white px-1.5 rounded-full uppercase tracking-widest shadow-sm">Fixed</div>
+                          {Number(farmer.customRate) > 0 && (
+                            <div className={cn(
+                              "absolute -top-3 left-2 text-[8px] font-black text-white px-1.5 rounded-full uppercase tracking-widest shadow-sm",
+                              farmer.milkType === 'BUFFALO' ? "bg-accent" : "bg-primary"
+                            )}>Fixed</div>
                           )}
                         </div>
                       </TableCell>

@@ -20,7 +20,7 @@ import { format, endOfMonth, subMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import jsPDF from "jspdf";
+import jsPDF from "jsPDF";
 import "jspdf-autotable";
 
 export default function FarmerBillsPage() {
@@ -111,14 +111,10 @@ export default function FarmerBillsPage() {
 
       const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
       
-      let rate = 0;
-      if (milkType === 'BUFFALO') {
-        rate = Number(farmerProfile.customRate) > 0 
-          ? Number(farmerProfile.customRate) 
-          : (Number(ratesConfig.buffaloRate) || 0);
-      } else {
-        rate = Number(ratesConfig.cowRate) || 0;
-      }
+      // PRECISION RATE RESOLUTION
+      let rate = Number(farmerProfile.customRate) > 0 
+        ? Number(farmerProfile.customRate) 
+        : (milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 0));
 
       map[fid].totalQty += ltr;
       map[fid].totalAmount += (ltr * rate);
@@ -187,14 +183,10 @@ export default function FarmerBillsPage() {
       const eQty = Number(eKg) * CONVERSION_RATE;
       const tQty = mQty + eQty;
 
-      let rate = 0;
-      if (f.milkType === 'BUFFALO') {
-        rate = farmerProfile && Number(farmerProfile.customRate) > 0 
-          ? Number(farmerProfile.customRate) 
-          : (Number(ratesConfig?.buffaloRate) || 0);
-      } else {
-        rate = Number(ratesConfig?.cowRate) || 0;
-      }
+      // PRECISION RATE RESOLUTION
+      let rate = farmerProfile && Number(farmerProfile.customRate) > 0 
+        ? Number(farmerProfile.customRate) 
+        : (f.milkType === 'BUFFALO' ? (Number(ratesConfig?.buffaloRate) || 0) : (Number(ratesConfig?.cowRate) || 0));
 
       const amt = tQty * rate;
 
@@ -228,10 +220,10 @@ export default function FarmerBillsPage() {
     pdf.text(f.totalAmount.toFixed(2), 178, finalY + 7, { align: 'center' });
     pdf.line(20, finalY + 11, 190, finalY + 11);
 
-    // SIGNATORY FOOTER SECTION - Precision Absolute Placement
+    // SIGNATORY FOOTER SECTION - Precision Lock (25mm above signature line)
     const footerY = pageHeight - 20;
     const sigLineY = footerY - 5;
-    const stampY = sigLineY - 30; // Precision Lock: Exactly 25mm above signature line (sigLineY is at y-5, stamp at y-30)
+    const stampY = sigLineY - 30; // 25mm Gap: sigLineY at pageHeight-25, stamp at pageHeight-50
 
     if (ratesConfig?.stampUrl) {
       try {

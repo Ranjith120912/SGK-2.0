@@ -93,14 +93,10 @@ export default function DailyReportsPage() {
       const kg = Number(e.kgWeight) || 0;
       const ltr = kg * CONVERSION_RATE;
       
-      let rate = 0;
-      if (milkType === 'BUFFALO') {
-        rate = Number(farmerProfile.customRate) > 0 
-          ? Number(farmerProfile.customRate) 
-          : (Number(ratesConfig.buffaloRate) || 0);
-      } else {
-        rate = Number(ratesConfig.cowRate) || 0;
-      }
+      // PRECISION RATE RESOLUTION
+      const rate = Number(farmerProfile.customRate) > 0 
+        ? Number(farmerProfile.customRate) 
+        : (milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 0));
 
       const amt = ltr * rate;
 
@@ -172,7 +168,7 @@ export default function DailyReportsPage() {
       bodyStyles: { halign: 'center' }
     });
 
-    // BUSINESS STAMP INTEGRATION - Absolute Footer Placement
+    // BUSINESS STAMP INTEGRATION - Absolute Footer Placement (25mm above signature/bottom area)
     if (ratesConfig?.stampUrl) {
       try {
         const formatMatch = ratesConfig.stampUrl.match(/^data:image\/([a-zA-Z+]+);base64,/);

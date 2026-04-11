@@ -103,7 +103,7 @@ export default function FarmersPage() {
     addDocumentNonBlocking(collection(firestore, 'farmers'), {
       ...newFarmer,
       canNumber: newFarmer.canNumber.toString().padStart(3, '0'),
-      customRate: newFarmer.milkType === 'BUFFALO' ? parseFloat(newFarmer.customRate) || 0 : 0,
+      customRate: parseFloat(newFarmer.customRate) || 0,
       active: true,
       createdAt: serverTimestamp(),
     });
@@ -124,7 +124,7 @@ export default function FarmersPage() {
     updateDocumentNonBlocking(doc(firestore, 'farmers', editingFarmer.id), {
       ...editingFarmer,
       canNumber: editingFarmer.canNumber.toString().padStart(3, '0'),
-      customRate: editingFarmer.milkType === 'BUFFALO' ? parseFloat(editingFarmer.customRate) || 0 : 0,
+      customRate: parseFloat(editingFarmer.customRate) || 0,
       updatedAt: serverTimestamp(),
     });
 
@@ -202,7 +202,7 @@ export default function FarmersPage() {
       const bankAccountNumber = item['Bank Account Number'] || item['Account Number'] || item.bankAccountNumber || normalizedItem.bankaccountnumber || normalizedItem.accountnumber || normalizedItem.account;
       const ifscCode = item['IFSC Code'] || item.ifscCode || normalizedItem.ifsccode || normalizedItem.ifsc;
       const milkTypeRaw = item['Milk Type'] || item.milkType || normalizedItem.milktype || normalizedItem.type;
-      const customRateRaw = item['Buffalo Rate'] || item.customRate || normalizedItem.buffalorate || normalizedItem.customrate;
+      const customRateRaw = item['Custom Rate'] || item['Buffalo Rate'] || item.customRate || normalizedItem.customrate || normalizedItem.buffalorate;
       
       let milkType = "COW";
       if (milkTypeRaw?.toString().toUpperCase().includes("BUFFALO")) milkType = "BUFFALO";
@@ -214,7 +214,7 @@ export default function FarmersPage() {
           bankAccountNumber: (bankAccountNumber || "").toString(),
           ifscCode: (ifscCode || "").toString(),
           milkType: milkType,
-          customRate: milkType === 'BUFFALO' ? parseFloat(customRateRaw) || 0 : 0,
+          customRate: parseFloat(customRateRaw) || 0,
           active: true,
           createdAt: serverTimestamp(),
         });
@@ -288,8 +288,8 @@ export default function FarmersPage() {
 
   const downloadExcelTemplate = () => {
     const templateData = [
-      { "Name": "Rajesh Kumar", "Can Number": "101", "Bank Account Number": "9876543210", "IFSC Code": "SBIN0001234", "Milk Type": "COW", "Buffalo Rate": "" },
-      { "Name": "Suresh Singh", "Can Number": "102", "Bank Account Number": "1234567890", "IFSC Code": "HDFC0005678", "Milk Type": "BUFFALO", "Buffalo Rate": "55.50" }
+      { "Name": "Rajesh Kumar", "Can Number": "101", "Bank Account Number": "9876543210", "IFSC Code": "SBIN0001234", "Milk Type": "COW", "Custom Rate": "35.00" },
+      { "Name": "Suresh Singh", "Can Number": "102", "Bank Account Number": "1234567890", "IFSC Code": "HDFC0005678", "Milk Type": "BUFFALO", "Custom Rate": "55.50" }
     ];
     const ws = utils.json_to_sheet(templateData);
     const wb = utils.book_new();
@@ -378,7 +378,7 @@ export default function FarmersPage() {
                         Or Paste Data
                       </label>
                       <Textarea 
-                        placeholder="Name, Can Number, Account, IFSC, Milk Type, Buffalo Rate..." 
+                        placeholder="Name, Can Number, Account, IFSC, Milk Type, Custom Rate..." 
                         value={importData}
                         onChange={(e) => setImportData(e.target.value)}
                         className="min-h-[120px] font-mono text-xs rounded-2xl border-primary/20 bg-background/50"
@@ -448,21 +448,28 @@ export default function FarmersPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  {newFarmer.milkType === 'BUFFALO' && (
-                    <div className="space-y-2 animate-in slide-in-from-left-2">
-                      <label className="text-[10px] font-black text-accent uppercase tracking-[0.2em]">Buffalo Rate (₹)</label>
-                      <div className="relative">
-                        <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-accent" />
-                        <Input 
-                          type="number"
-                          placeholder="e.g. 55.00" 
-                          value={newFarmer.customRate}
-                          onChange={(e) => setNewFarmer({...newFarmer, customRate: e.target.value})}
-                          className="rounded-xl h-11 border-accent/20 pl-8 font-bold"
-                        />
-                      </div>
+                  <div className="space-y-2">
+                    <label className={cn(
+                      "text-[10px] font-black uppercase tracking-[0.2em]",
+                      newFarmer.milkType === 'BUFFALO' ? "text-accent" : "text-primary"
+                    )}>Custom Rate (₹)</label>
+                    <div className="relative">
+                      <IndianRupee className={cn(
+                        "absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3",
+                        newFarmer.milkType === 'BUFFALO' ? "text-accent" : "text-primary"
+                      )} />
+                      <Input 
+                        type="number"
+                        placeholder={newFarmer.milkType === 'COW' ? "35.00" : "55.00"} 
+                        value={newFarmer.customRate}
+                        onChange={(e) => setNewFarmer({...newFarmer, customRate: e.target.value})}
+                        className={cn(
+                          "rounded-xl h-11 pl-8 font-bold",
+                          newFarmer.milkType === 'BUFFALO' ? "border-accent/20" : "border-primary/20"
+                        )}
+                      />
                     </div>
-                  )}
+                  </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Account Number</label>
                     <Input 
@@ -513,7 +520,7 @@ export default function FarmersPage() {
                   <TableHead className="w-[100px] font-black text-primary py-5 uppercase text-[10px] tracking-widest">CAN</TableHead>
                   <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Farmer Name</TableHead>
                   <TableHead className="w-[120px] font-black text-primary uppercase text-[10px] tracking-widest">Milk Type</TableHead>
-                  <TableHead className="w-[120px] font-black text-accent uppercase text-[10px] tracking-widest">Rate (₹)</TableHead>
+                  <TableHead className="w-[120px] font-black text-primary uppercase text-[10px] tracking-widest">Rate (₹)</TableHead>
                   <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Bank Details</TableHead>
                   <TableHead className="text-right pr-6 font-black text-primary uppercase text-[10px] tracking-widest">Actions</TableHead>
                 </TableRow>
@@ -548,8 +555,11 @@ export default function FarmersPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {farmer.milkType === 'BUFFALO' && farmer.customRate ? (
-                          <div className="flex items-center gap-1 font-black text-accent">
+                        {farmer.customRate ? (
+                          <div className={cn(
+                            "flex items-center gap-1 font-black",
+                            farmer.milkType === 'BUFFALO' ? "text-accent" : "text-primary"
+                          )}>
                             <IndianRupee className="w-3 h-3" />
                             {parseFloat(farmer.customRate).toFixed(2)}
                           </div>
@@ -635,21 +645,28 @@ export default function FarmersPage() {
                   </SelectContent>
                 </Select>
               </div>
-              {editingFarmer.milkType === 'BUFFALO' && (
-                <div className="space-y-2 animate-in slide-in-from-top-2">
-                  <label className="text-[10px] font-black text-accent uppercase tracking-widest">Buffalo Rate (₹)</label>
-                  <div className="relative">
-                    <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-accent" />
-                    <Input 
-                      type="number"
-                      step="0.01"
-                      value={editingFarmer.customRate} 
-                      onChange={(e) => setEditingFarmer({...editingFarmer, customRate: e.target.value})}
-                      className="rounded-xl pl-8 font-bold border-accent/20"
-                    />
-                  </div>
+              <div className="space-y-2">
+                <label className={cn(
+                  "text-[10px] font-black uppercase tracking-widest",
+                  editingFarmer.milkType === 'BUFFALO' ? "text-accent" : "text-primary"
+                )}>Custom Rate (₹)</label>
+                <div className="relative">
+                  <IndianRupee className={cn(
+                    "absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3",
+                    editingFarmer.milkType === 'BUFFALO' ? "text-accent" : "text-primary"
+                  )} />
+                  <Input 
+                    type="number"
+                    step="0.01"
+                    value={editingFarmer.customRate} 
+                    onChange={(e) => setEditingFarmer({...editingFarmer, customRate: e.target.value})}
+                    className={cn(
+                      "rounded-xl pl-8 font-bold",
+                      editingFarmer.milkType === 'BUFFALO' ? "border-accent/20" : "border-primary/20"
+                    )}
+                  />
                 </div>
-              )}
+              </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Bank Account Number</label>
                 <Input 

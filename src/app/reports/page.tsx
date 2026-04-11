@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -104,7 +103,6 @@ export default function ReportsPage() {
   const CONVERSION_RATE = 0.96;
   const currentCycle = cycles[activeCycle];
 
-  // CYCLE REPORT LOGIC
   const cycleRoster = useMemo(() => {
     if (!allEntries || !selectedMonth || !currentCycle || !farmers || !ratesConfig) return [];
     
@@ -153,7 +151,6 @@ export default function ReportsPage() {
     });
   }, [allEntries, farmers, selectedMonth, activeCycle, ratesConfig, currentCycle]);
 
-  // MONTHLY REPORT LOGIC
   const monthlyRoster = useMemo(() => {
     if (!allEntries || !selectedMonth || !farmers || !ratesConfig) return [];
     
@@ -286,6 +283,14 @@ export default function ReportsPage() {
       theme: 'grid',
       headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' }
     });
+
+    if (ratesConfig?.stampUrl) {
+      try {
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        pdf.addImage(ratesConfig.stampUrl, 'PNG', 240, pageHeight - 35, 35, 15);
+      } catch (e) {}
+    }
+
     pdf.save(`${title.replace(/\s+/g, '_')}_${selectedMonth}.pdf`);
   };
 

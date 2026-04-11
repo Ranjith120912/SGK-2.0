@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
-import jsPDF from "jspdf";
+import jsPDF from "jsPDF";
 import "jspdf-autotable";
 import { utils, writeFile } from "xlsx";
 import {
@@ -68,10 +68,9 @@ export default function DailyReportsPage() {
     
     filteredEntries.forEach(e => {
       const fid = e.farmerId;
-      // DIRECTORY VALIDATION: Only include entries where the farmer exists in Management
       const farmerProfile = farmers.find(f => f.id === fid || f.canNumber === e.canNumber);
       
-      if (!farmerProfile) return; // SKIP entries for farmers not in the directory
+      if (!farmerProfile) return;
 
       const name = farmerProfile.name;
       const can = farmerProfile.canNumber;
@@ -92,7 +91,6 @@ export default function DailyReportsPage() {
       const kg = Number(e.kgWeight) || 0;
       const ltr = kg * CONVERSION_RATE;
       
-      // BUFFALO RATE RESOLUTION: Priority is Farmer Custom Rate > Global Rate
       let rate = 0;
       if (milkType === 'BUFFALO') {
         rate = Number(farmerProfile.customRate) > 0 
@@ -168,6 +166,13 @@ export default function DailyReportsPage() {
       headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' },
       bodyStyles: { halign: 'center' }
     });
+
+    if (ratesConfig?.stampUrl) {
+      try {
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        pdf.addImage(ratesConfig.stampUrl, 'PNG', 240, pageHeight - 35, 35, 15);
+      } catch (e) {}
+    }
     
     pdf.save(`Daily_Procurement_${selectedDate}.pdf`);
   };

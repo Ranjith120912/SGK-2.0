@@ -89,10 +89,9 @@ export default function FarmerBillsPage() {
 
     cycleEntries.forEach(e => {
       const fid = e.farmerId;
-      // STRICT DIRECTORY VALIDATION: Only include entries for validated farmers in directory
       const farmerProfile = farmers.find(f => f.id === fid || f.canNumber === e.canNumber);
       
-      if (!farmerProfile) return; // SKIP entries for farmers not in the directory
+      if (!farmerProfile) return;
 
       const name = farmerProfile.name;
       const can = farmerProfile.canNumber;
@@ -111,7 +110,6 @@ export default function FarmerBillsPage() {
 
       const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
       
-      // BUFFALO RATE RESOLUTION: Priority is Farmer Custom Rate > Global Rate
       let rate = 0;
       if (milkType === 'BUFFALO') {
         rate = Number(farmerProfile.customRate) > 0 
@@ -227,7 +225,16 @@ export default function FarmerBillsPage() {
     pdf.text(f.totalAmount.toFixed(2), 178, finalY + 7, { align: 'center' });
     pdf.line(20, finalY + 11, 190, finalY + 11);
 
+    if (ratesConfig?.stampUrl) {
+      try {
+        pdf.addImage(ratesConfig.stampUrl, 'PNG', 155, finalY + 15, 35, 15);
+      } catch (e) {
+        console.error("Error adding stamp to PDF", e);
+      }
+    }
+
     const pageHeight = pdf.internal.pageSize.getHeight();
+    pdf.setFontSize(10);
     pdf.text("AUTHORIZED SIGNATURE", 190, pageHeight - 15, { align: 'right' });
     pdf.line(140, pageHeight - 17, 190, pageHeight - 17);
   };

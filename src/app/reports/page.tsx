@@ -172,12 +172,13 @@ export default function ReportsPage() {
     const cost = cycleRoster.reduce((acc, c) => acc + c.totalAmount, 0);
     const qty = cycleRoster.reduce((acc, c) => acc + c.totalQty, 0);
     
-    // RECONCILIATION: Sum unique buyer sales amounts for active buyers
+    // RECONCILIATION: Sum unique buyer sales amounts for active buyers in CURRENT CYCLE
     let rev = 0;
     if (allSales && activeBuyerIds.size > 0) {
       const uniqueSales = new Map<string, number>();
       allSales.forEach(s => {
         if (s.month === selectedMonth && s.cycleId === activeCycle && activeBuyerIds.has(s.buyerId)) {
+          // Identify unique buyer amount (ignores duplicates/ghosts)
           uniqueSales.set(s.buyerId, Number(s.totalAmount) || 0);
         }
       });
@@ -203,7 +204,7 @@ export default function ReportsPage() {
         tQty += ltr;
       });
 
-      // RECONCILIATION: Monthly revenue sum across cycles
+      // RECONCILIATION: Monthly revenue sum across cycles (grouped by buyerId+cycleId)
       const mSales = allSales.filter(s => s.month === opt.value && activeBuyerIds.has(s.buyerId));
       const uniqueSales = new Map<string, number>();
       mSales.forEach(s => {

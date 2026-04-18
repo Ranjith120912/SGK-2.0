@@ -118,6 +118,7 @@ export default function CycleSalesPage() {
 
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
 
+    // USE STABLE ID to prevent duplicates (buyerId + month + cycle)
     const saleId = `${buyerId}_${selectedMonth}_C${activeCycle}`;
     const docRef = doc(firestore, 'sales', saleId);
 
@@ -143,16 +144,16 @@ export default function CycleSalesPage() {
   const dynamicGrandTotal = useMemo(() => {
     if (!buyers) return 0;
     
-    // RECONCILIATION: Addition of amounts entered for each buyer
+    // DYNAMIC RECONCILIATION: Addition of amounts entered/stored for each UNIQUE active buyer
     const revenueMap = new Map<string, number>();
     
     buyers.forEach(buyer => {
       const localAmt = amountValues[buyer.id];
       if (localAmt !== undefined) {
-        // Use local entry (can be 0 if cleared)
+        // Use local entry as source of truth for dynamic updates
         revenueMap.set(buyer.id, localAmt === "" ? 0 : parseFloat(localAmt) || 0);
       } else {
-        // Fallback to DB
+        // Fallback to DB stored value
         const dbSale = sales?.find(s => s.buyerId === buyer.id);
         revenueMap.set(buyer.id, dbSale ? Number(dbSale.totalAmount) || 0 : 0);
       }

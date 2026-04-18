@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { jsPDF } from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 
 export default function FarmerBillsPage() {
   const firestore = useFirestore();
@@ -174,7 +174,7 @@ export default function FarmerBillsPage() {
       rows.push([format(new Date(year, month - 1, d), 'dd/MM/yy'), mQ.toFixed(2), eQ.toFixed(2), tQ.toFixed(2), rate.toFixed(2), (tQ * rate).toFixed(2)]);
     }
 
-    (pdf as any).autoTable({
+    autoTable(pdf, {
       startY: 75,
       head: [['DATE', 'MORNING (L)', 'EVENING (L)', 'TOTAL (L)', 'RATE (Rs)', 'AMOUNT (Rs)']],
       body: rows,
@@ -184,7 +184,7 @@ export default function FarmerBillsPage() {
       margin: { left: 20, right: 20 }
     });
 
-    const finalY = (pdf as any).lastAutoTable.finalY;
+    const finalY = (pdf as any).lastAutoTable?.finalY || 150;
     pdf.setFont("helvetica", "bold");
     pdf.text("TOTAL", 25, finalY + 7);
     pdf.text(f.totalQty.toFixed(2), 115, finalY + 7, { align: 'center' });

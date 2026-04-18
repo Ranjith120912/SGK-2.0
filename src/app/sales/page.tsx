@@ -103,7 +103,7 @@ export default function CycleSalesPage() {
 
     const existingSale = sales?.find(s => s.buyerId === buyerId);
     
-    // RECONCILIATION: Strict priority logic for amount/quantity
+    // RECONCILIATION: Priority logic to ensure manual input is used correctly
     const qtyNum = qtyStr !== undefined 
       ? (qtyStr === "" ? 0 : parseFloat(qtyStr)) 
       : (existingSale ? Number(existingSale.quantity) : 0);
@@ -116,7 +116,7 @@ export default function CycleSalesPage() {
 
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
 
-    // STABLE COMPOSITE ID: Ensures only one record per buyer per cycle
+    // STABLE COMPOSITE ID: Ensures only one record per buyer per cycle exists
     const saleId = `${buyerId}_${selectedMonth}_C${activeCycle}`;
     const docRef = doc(firestore, 'sales', saleId);
 
@@ -142,7 +142,7 @@ export default function CycleSalesPage() {
   const dynamicGrandTotal = useMemo(() => {
     if (!buyers) return 0;
     
-    // DYNAMIC ADDITION: Aggregates total based on real-time screen values for unique buyers
+    // DYNAMIC ADDITION: Aggregates total based on unique buyers only
     const revenueMap = new Map<string, number>();
     
     buyers.forEach(buyer => {

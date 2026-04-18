@@ -111,8 +111,6 @@ export default function ReportsPage() {
   const CONVERSION_RATE = 0.96;
   const currentCycle = cycles[activeCycle];
 
-  const activeBuyerIds = useMemo(() => new Set(buyers?.map(b => b.id) || []), [buyers]);
-
   const cycleRoster = useMemo(() => {
     if (!allEntries || !selectedMonth || !currentCycle || !farmers || !ratesConfig) return [];
     
@@ -172,13 +170,15 @@ export default function ReportsPage() {
     const cost = cycleRoster.reduce((acc, c) => acc + c.totalAmount, 0);
     const qty = cycleRoster.reduce((acc, c) => acc + c.totalQty, 0);
     
-    // RECONCILIATION: Sum unique buyer sales amounts for active buyers in CURRENT CYCLE
+    // RECONCILIATION: Map by buyerId to ensure only one valid sale record per unique buyer
     let rev = 0;
-    if (allSales && activeBuyerIds.size > 0) {
+    if (allSales && buyers) {
+      const activeIds = new Set(buyers.map(b => b.id));
       const uniqueSales = new Map<string, number>();
+      
       allSales.forEach(s => {
-        if (s.month === selectedMonth && Number(s.cycleId) === activeCycle && activeBuyerIds.has(s.buyerId)) {
-          // Identify unique buyer amount (ignores duplicates/ghosts by overwriting with latest)
+        if (s.month === selectedMonth && Number(s.cycleId) === activeCycle && activeIds.has(s.buyerId)) {
+          // Identify the single valid entry for this buyer in the cycle
           uniqueSales.set(s.buyerId, Number(s.totalAmount) || 0);
         }
       });
@@ -186,11 +186,13 @@ export default function ReportsPage() {
     }
 
     return { qty, cost, rev, profit: rev - cost };
-  }, [cycleRoster, allSales, selectedMonth, activeCycle, activeBuyerIds]);
+  }, [cycleRoster, allSales, selectedMonth, activeCycle, buyers]);
 
   const auditData = useMemo(() => {
     if (!allEntries || !allSales || !farmers || !ratesConfig || !buyers) return [];
     
+    const activeIds = new Set(buyers.map(b => b.id));
+
     return monthOptions.map((opt) => {
       const mEntries = allEntries.filter(e => e.date.startsWith(opt.value));
       
@@ -204,8 +206,8 @@ export default function ReportsPage() {
         tQty += ltr;
       });
 
-      // RECONCILIATION: Monthly revenue sum across cycles (grouped by buyerId+cycleId for uniqueness)
-      const mSales = allSales.filter(s => s.month === opt.value && activeBuyerIds.has(s.buyerId));
+      // RECONCILIATION: Monthly revenue sum across cycles for unique buyers
+      const mSales = allSales.filter(s => s.month === opt.value && activeIds.has(s.buyerId));
       const uniqueSales = new Map<string, number>();
       mSales.forEach(s => {
         const key = `${s.buyerId}_${s.cycleId}`;
@@ -215,7 +217,7 @@ export default function ReportsPage() {
 
       return { label: opt.label, value: opt.value, qty: tQty, cost: tCost, revenue: tRev, profit: tRev - tCost };
     });
-  }, [allEntries, allSales, farmers, ratesConfig, monthOptions, buyers, activeBuyerIds]);
+  }, [allEntries, allSales, farmers, ratesConfig, monthOptions, buyers]);
 
   const handleExportExcel = (roster: any[], title: string) => {
     const data = roster.map(f => ({ CAN: f.can, Name: f.name, Type: f.milkType, Morning: f.morningQty.toFixed(2), Evening: f.eveningQty.toFixed(2), Total: f.totalQty.toFixed(2), Payout: f.totalAmount.toFixed(2) }));

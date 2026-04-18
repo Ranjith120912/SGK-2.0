@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { format, endOfMonth, subMonths } from "date-fns";
-import { Search, ShoppingCart, IndianRupee, Loader2, CheckCircle2, Calendar as CalendarIcon, ChevronRight } from "lucide-react";
+import { Search, ShoppingCart, IndianRupee, Loader2, CheckCircle2, Calendar as CalendarIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -25,7 +25,7 @@ export default function CycleSalesPage() {
   const [activeCycle, setActiveCycle] = useState<number>(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [quantityValues, setQuantityValues] = useState<Record<string, string>>({});
-  const [rateValues, setRateValues] = useState<Record<string, string>>({});
+  const [amountValues, setAmountValues] = useState<Record<string, string>>({});
   const [milkTypes, setMilkTypes] = useState<Record<string, 'COW' | 'BUFFALO'>>({});
   const [savingStatus, setSavingStatus] = useState<Record<string, 'idle' | 'saving' | 'saved'>>({});
   const [isClient, setIsClient] = useState(false);
@@ -89,8 +89,8 @@ export default function CycleSalesPage() {
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'idle' }));
   };
 
-  const handleRateChange = (buyerId: string, value: string) => {
-    setRateValues(prev => ({ ...prev, [buyerId]: value }));
+  const handleAmountChange = (buyerId: string, value: string) => {
+    setAmountValues(prev => ({ ...prev, [buyerId]: value }));
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'idle' }));
   };
 
@@ -105,20 +105,20 @@ export default function CycleSalesPage() {
     if (!firestore || !selectedMonth) return;
 
     const existingSale = sales?.find(s => s.buyerId === buyerId && s.milkType === milkType);
-    const qty = qtyStr !== undefined ? parseFloat(qtyStr) : (existingSale ? existingSale.quantity : 0);
+    const qty = qtyStr !== undefined && qtyStr !== "" ? parseFloat(qtyStr) : (existingSale ? existingSale.quantity : 0);
     
-    const manualRate = rateValues[buyerId];
-    const defaultRate = milkType === 'BUFFALO' 
-      ? (ratesConfig?.buffaloSellingRate || 0) 
-      : (ratesConfig?.cowSellingRate || 0);
-    const finalRate = manualRate !== undefined && manualRate !== "" ? parseFloat(manualRate) : (existingSale ? existingSale.rate : defaultRate);
+    const manualAmountStr = amountValues[buyerId];
+    const finalAmount = manualAmountStr !== undefined && manualAmountStr !== "" 
+      ? parseFloat(manualAmountStr) 
+      : (existingSale ? existingSale.totalAmount : 0);
 
-    if (isNaN(qty) || qty < 0 || isNaN(finalRate)) return;
+    if (isNaN(qty) || isNaN(finalAmount) || qty < 0 || finalAmount < 0) return;
+
+    // Calculate effective rate for reporting metadata
+    const effectiveRate = qty > 0 ? parseFloat((finalAmount / qty).toFixed(2)) : 0;
 
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
-    const totalAmount = parseFloat((qty * finalRate).toFixed(2));
 
-    // ID is based on Month and Cycle for Bulk Sales
     const saleId = `${buyerId}_${selectedMonth}_C${activeCycle}_${milkType}`;
     const docRef = doc(firestore, 'sales', saleId);
 
@@ -127,11 +127,11 @@ export default function CycleSalesPage() {
       month: selectedMonth,
       cycleId: activeCycle,
       cycleLabel: cycles[activeCycle]?.label,
-      date: `${selectedMonth}-${cycles[activeCycle]?.start.toString().padStart(2, '0')}`, // Reference date for sorting
+      date: `${selectedMonth}-${cycles[activeCycle]?.start.toString().padStart(2, '0')}`,
       milkType,
       quantity: qty,
-      rate: finalRate,
-      totalAmount: totalAmount,
+      totalAmount: finalAmount,
+      rate: effectiveRate,
       updatedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
     }, { merge: true });
@@ -155,7 +155,7 @@ export default function CycleSalesPage() {
                 <span className="text-xs font-black uppercase tracking-widest">Business Distribution</span>
               </div>
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Cycle Sales</h1>
-              <p className="text-muted-foreground font-medium">Record bulk sales for 10-day distribution periods.</p>
+              <p className="text-muted-foreground font-medium">Record bulk sales amounts for 10-day distribution periods.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
@@ -174,7 +174,7 @@ export default function CycleSalesPage() {
                     onClick={() => {
                       setActiveCycle(i);
                       setQuantityValues({});
-                      setRateValues({});
+                      setAmountValues({});
                       setSavingStatus({});
                     }} 
                     className={cn(
@@ -189,7 +189,7 @@ export default function CycleSalesPage() {
             </div>
           </header>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input 
@@ -199,15 +199,6 @@ export default function CycleSalesPage() {
                 onChange={(e) => setSearchTerm(e.target.value)} 
               />
             </div>
-            <Card className="flex items-center gap-4 px-6 py-2 bg-primary/5 rounded-2xl border border-primary/10 shadow-sm">
-              <div className="p-2 bg-primary/10 rounded-xl">
-                <IndianRupee className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-[10px] font-black text-primary/60 uppercase tracking-widest">Current Sell Rates</p>
-                <p className="text-sm font-black">Cow: ₹{ratesConfig?.cowSellingRate || 0} | Buf: ₹{ratesConfig?.buffaloSellingRate || 0}</p>
-              </div>
-            </Card>
             <Card className="flex items-center gap-4 px-6 py-2 bg-accent/5 rounded-2xl border border-accent/10 shadow-sm">
               <div className="p-2 bg-accent/10 rounded-xl">
                 <CalendarIcon className="w-5 h-5 text-accent" />
@@ -226,20 +217,16 @@ export default function CycleSalesPage() {
                   <TableHead className="w-[100px] font-black text-primary pl-10 py-5 uppercase text-[10px] tracking-widest">Code</TableHead>
                   <TableHead className="font-black text-primary uppercase text-[10px] tracking-widest">Buyer Name</TableHead>
                   <TableHead className="w-[140px] font-black text-primary uppercase text-[10px] tracking-widest">Milk Type</TableHead>
-                  <TableHead className="w-[180px] font-black text-primary uppercase text-[10px] tracking-widest">Total Qty (L)</TableHead>
-                  <TableHead className="w-[140px] font-black text-primary uppercase text-[10px] tracking-widest">Rate (₹/L)</TableHead>
-                  <TableHead className="w-[140px] font-black text-primary text-right uppercase text-[10px] tracking-widest">Total (₹)</TableHead>
+                  <TableHead className="w-[200px] font-black text-primary uppercase text-[10px] tracking-widest">Total Qty (L)</TableHead>
+                  <TableHead className="w-[240px] font-black text-primary uppercase text-[10px] tracking-widest">Sales Amount (₹)</TableHead>
                   <TableHead className="w-[100px] text-right pr-10 font-black text-primary uppercase text-[10px] tracking-widest">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredBuyers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-20">
-                      <div className="flex flex-col items-center gap-3">
-                        <Loader2 className="w-8 h-8 animate-spin text-primary/20" />
-                        <p className="text-muted-foreground font-semibold">No buyers found in directory.</p>
-                      </div>
+                    <TableCell colSpan={6} className="text-center py-20 text-muted-foreground font-semibold">
+                      No buyers found in directory.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -248,17 +235,7 @@ export default function CycleSalesPage() {
                     const existingSale = sales?.find(s => s.buyerId === buyer.id && s.milkType === currentMilkType);
                     
                     const currentQtyStr = quantityValues[buyer.id] !== undefined ? quantityValues[buyer.id] : (existingSale ? existingSale.quantity.toString() : "");
-                    
-                    const defaultRate = currentMilkType === 'BUFFALO' 
-                      ? (ratesConfig?.buffaloSellingRate || 0) 
-                      : (ratesConfig?.cowSellingRate || 0);
-                      
-                    const currentRateStr = rateValues[buyer.id] !== undefined
-                      ? rateValues[buyer.id]
-                      : (existingSale ? existingSale.rate.toString() : defaultRate.toString());
-                    
-                    const activeRateNum = parseFloat(currentRateStr) || 0;
-                    const previewAmount = (parseFloat(currentQtyStr) || 0) * activeRateNum;
+                    const currentAmountStr = amountValues[buyer.id] !== undefined ? amountValues[buyer.id] : (existingSale ? existingSale.totalAmount.toString() : "");
                     
                     const status = savingStatus[buyer.id] || (existingSale ? 'saved' : 'idle');
 
@@ -295,19 +272,14 @@ export default function CycleSalesPage() {
                           <div className="relative">
                             <Input 
                               type="number" 
-                              placeholder={defaultRate.toString()}
-                              className="h-12 rounded-xl pl-8 font-bold text-sm border-primary/10" 
-                              value={currentRateStr} 
-                              onChange={(e) => handleRateChange(buyer.id, e.target.value)}
+                              placeholder="0.00"
+                              className="h-12 rounded-xl pl-10 font-black text-lg border-primary/20 focus:border-primary bg-primary/5" 
+                              value={currentAmountStr} 
+                              onChange={(e) => handleAmountChange(buyer.id, e.target.value)}
                               onBlur={() => handleAutoSave(buyer.id)}
                               onKeyDown={(e) => e.key === 'Enter' && handleAutoSave(buyer.id)}
                             />
-                            <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground/50" />
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="text-lg font-black text-primary">
-                            ₹ {previewAmount.toFixed(2)}
+                            <IndianRupee className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
                           </div>
                         </TableCell>
                         <TableCell className="text-right pr-10">
@@ -323,7 +295,7 @@ export default function CycleSalesPage() {
               </TableBody>
             </Table>
             <div className="p-5 bg-muted/20 text-center text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] border-t">
-              Cycle Grand Total Revenue: ₹ {filteredBuyers.reduce((acc, b) => {
+              Cycle Grand Total Distribution Revenue: ₹ {filteredBuyers.reduce((acc, b) => {
                 const milkType = milkTypes[b.id] || 'COW';
                 const s = sales?.find(sale => sale.buyerId === b.id && sale.milkType === milkType);
                 return acc + (Number(s?.totalAmount) || 0);

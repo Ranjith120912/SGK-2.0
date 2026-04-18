@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import { useCollection, useDoc, useMemoFirebase, useFirestore } from "@/firebase";
+import { useCollection, useMemoFirebase, useFirestore } from "@/firebase";
 import { collection, query, where, serverTimestamp, doc } from "firebase/firestore";
 import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { Button } from "@/components/ui/button";
@@ -91,6 +91,7 @@ export default function CycleSalesPage() {
   const handleMilkTypeChange = (buyerId: string, type: 'COW' | 'BUFFALO') => {
     setMilkTypes(prev => ({ ...prev, [buyerId]: type }));
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'idle' }));
+    // Auto save type change immediately
     setTimeout(() => handleAutoSave(buyerId), 100);
   };
 
@@ -115,6 +116,7 @@ export default function CycleSalesPage() {
 
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
 
+    // COMPOSITE ID: buyerId_month_cycleId
     const saleId = `${buyerId}_${selectedMonth}_C${activeCycle}`;
     const docRef = doc(firestore, 'sales', saleId);
 
@@ -137,18 +139,23 @@ export default function CycleSalesPage() {
     }, 500);
   };
 
+  // DYNAMIC REVENUE CALCULATION: Reconciles local edits with DB for 100% accuracy
   const dynamicGrandTotal = useMemo(() => {
     if (!buyers) return 0;
     const revenueMap = new Map<string, number>();
+    
     buyers.forEach(buyer => {
       const localAmt = amountValues[buyer.id];
       if (localAmt !== undefined) {
+        // User is currently editing or has edited this row
         revenueMap.set(buyer.id, localAmt === "" ? 0 : parseFloat(localAmt) || 0);
       } else {
+        // Use persisted DB value
         const dbSale = sales?.find(s => s.buyerId === buyer.id);
         revenueMap.set(buyer.id, dbSale ? Number(dbSale.totalAmount) || 0 : 0);
       }
     });
+    
     return Array.from(revenueMap.values()).reduce((acc, val) => acc + val, 0);
   }, [buyers, sales, amountValues]);
 

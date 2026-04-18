@@ -111,6 +111,7 @@ export default function ReportsPage() {
   const CONVERSION_RATE = 0.96;
   const currentCycle = cycles[activeCycle];
 
+  // CYCLE PROCUREMENT ROSTER
   const cycleRoster = useMemo(() => {
     if (!allEntries || !selectedMonth || !currentCycle || !farmers || !ratesConfig) return [];
     
@@ -153,6 +154,7 @@ export default function ReportsPage() {
     return Object.values(map).sort((a: any, b: any) => parseInt(a.can) - parseInt(b.can));
   }, [allEntries, farmers, selectedMonth, activeCycle, ratesConfig, currentCycle]);
 
+  // MONTHLY PROCUREMENT ROSTER
   const monthlyRoster = useMemo(() => {
     if (!allEntries || !selectedMonth || !farmers || !ratesConfig) return [];
     const map: Record<string, any> = {};
@@ -190,7 +192,7 @@ export default function ReportsPage() {
     return Object.values(map).sort((a: any, b: any) => parseInt(a.can) - parseInt(b.can));
   }, [allEntries, farmers, selectedMonth, ratesConfig]);
 
-  // RECONCILED FINANCIALS: Strictly identifies unique active buyer entries per cycle
+  // RECONCILED CYCLE FINANCIALS
   const cycleStats = useMemo(() => {
     const cost = cycleRoster.reduce((acc, c) => acc + c.totalAmount, 0);
     const qty = cycleRoster.reduce((acc, c) => acc + c.totalQty, 0);
@@ -199,13 +201,14 @@ export default function ReportsPage() {
     if (allSales && buyers) {
       const uniqueSales = new Map<string, number>();
       allSales.forEach(s => {
+        // Ensure strictly matching cycle and month
         if (s.month === selectedMonth && 
             s.cycleId !== undefined && 
             Number(s.cycleId) === activeCycle) {
           
           const buyerExists = buyers.find(b => b.id === s.buyerId);
           if (buyerExists) {
-            // Overwrite ensures only latest/unique entry per buyer is reconciled
+            // Priority unique map per buyer prevents "ghost" duplication
             uniqueSales.set(s.buyerId, Number(s.totalAmount) || 0);
           }
         }
@@ -216,6 +219,7 @@ export default function ReportsPage() {
     return { qty, cost, rev, profit: rev - cost };
   }, [cycleRoster, allSales, selectedMonth, activeCycle, buyers]);
 
+  // MASTER AUDIT LOG (MONTHLY)
   const auditData = useMemo(() => {
     if (!allEntries || !allSales || !farmers || !ratesConfig || !buyers) return [];
     
@@ -239,6 +243,7 @@ export default function ReportsPage() {
       mSales.forEach(s => {
         const buyerExists = buyers.find(b => b.id === s.buyerId);
         if (buyerExists) {
+          // Unique key: buyer + cycle ensures no double-counting
           const key = `${s.buyerId}_${s.cycleId}`;
           uniqueSales.set(key, Number(s.totalAmount) || 0);
         }

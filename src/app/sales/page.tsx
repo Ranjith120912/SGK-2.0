@@ -97,7 +97,6 @@ export default function CycleSalesPage() {
   const handleMilkTypeChange = (buyerId: string, type: 'COW' | 'BUFFALO') => {
     setMilkTypes(prev => ({ ...prev, [buyerId]: type }));
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'idle' }));
-    // Trigger save immediately on type change to ensure record integrity
     setTimeout(() => handleAutoSave(buyerId), 0);
   };
 
@@ -107,10 +106,7 @@ export default function CycleSalesPage() {
     if (!firestore || !selectedMonth) return;
 
     const existingSale = sales?.find(s => s.buyerId === buyerId);
-    
-    // Explicitly handle empty strings as 0 to clear records
     const qty = (qtyStr !== undefined && qtyStr !== "") ? parseFloat(qtyStr) : (existingSale ? existingSale.quantity : 0);
-    
     const manualAmountStr = amountValues[buyerId];
     const finalAmount = (manualAmountStr !== undefined && manualAmountStr !== "") 
       ? parseFloat(manualAmountStr) 
@@ -122,7 +118,6 @@ export default function CycleSalesPage() {
 
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
 
-    // FIXED: Use a stable ID per buyer/cycle to prevent ghost records from different milk types
     const saleId = `${buyerId}_${selectedMonth}_C${activeCycle}`;
     const docRef = doc(firestore, 'sales', saleId);
 
@@ -148,10 +143,17 @@ export default function CycleSalesPage() {
   const totalCycleRevenue = useMemo(() => {
     if (!sales || !buyers) return 0;
     const activeBuyerIds = new Set(buyers.map(b => b.id));
-    // Correctly sum only the most recent records per buyer using the active sales list
-    return sales
-      .filter(s => activeBuyerIds.has(s.buyerId))
-      .reduce((acc, s) => acc + (Number(s.totalAmount) || 0), 0);
+    
+    // RECONCILIATION: Use a Map to ensure only ONE record per buyer is counted
+    // This removes "Ghost" duplicates from previous historical records
+    const reconciledSales: Record<string, number> = {};
+    sales.forEach(s => {
+      if (activeBuyerIds.has(s.buyerId)) {
+        reconciledSales[s.buyerId] = Number(s.totalAmount) || 0;
+      }
+    });
+
+    return Object.values(reconciledSales).reduce((acc, val) => acc + val, 0);
   }, [sales, buyers]);
 
   if (!isClient) return null;

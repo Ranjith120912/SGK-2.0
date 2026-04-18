@@ -196,14 +196,13 @@ export default function ReportsPage() {
     const cost = cycleRoster.reduce((acc, c) => acc + c.totalAmount, 0);
     const qty = cycleRoster.reduce((acc, c) => acc + c.totalQty, 0);
     
-    // PRECISION REVENUE RECONCILIATION: Group by buyerId to prevent double-counting of ghost milk-type records
+    // RECONCILIATION: Group by buyerId to ensure only ONE record per buyer is counted
     const buyerSalesMap: Record<string, number> = {};
     allSales?.filter(s => 
       s.month === selectedMonth && 
       s.cycleId === activeCycle && 
       activeBuyerIds.has(s.buyerId)
     ).forEach(s => {
-      // In a reconciled audit, we only take the most recent amount per buyer
       buyerSalesMap[s.buyerId] = Number(s.totalAmount) || 0;
     });
     
@@ -232,14 +231,12 @@ export default function ReportsPage() {
         tQty += ltr;
       });
 
-      // Grouped monthly revenue to prevent duplicates
-      const monthlyBuyerMap: Record<string, number> = {};
+      const monthlyBuyerCycleMap: Record<string, number> = {};
       mSales.forEach(s => {
-        // Aggregate across all cycles for that buyer in that month
         const key = `${s.buyerId}_${s.cycleId}`;
-        monthlyBuyerMap[key] = Number(s.totalAmount) || 0;
+        monthlyBuyerCycleMap[key] = Number(s.totalAmount) || 0;
       });
-      const tRev = Object.values(monthlyBuyerMap).reduce((acc, val) => acc + val, 0);
+      const tRev = Object.values(monthlyBuyerCycleMap).reduce((acc, val) => acc + val, 0);
 
       return { 
         label: opt.label, 

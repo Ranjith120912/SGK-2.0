@@ -194,6 +194,7 @@ export default function ReportsPage() {
     const cost = cycleRoster.reduce((acc, c) => acc + c.totalAmount, 0);
     const qty = cycleRoster.reduce((acc, c) => acc + c.totalQty, 0);
     
+    // RECONCILE REVENUE: Strictly use one entry per active buyer
     let rev = 0;
     if (allSales && buyers) {
       const activeIds = new Set(buyers.map(b => b.id));
@@ -204,6 +205,7 @@ export default function ReportsPage() {
             s.cycleId !== undefined && 
             Number(s.cycleId) === activeCycle && 
             activeIds.has(s.buyerId)) {
+          // By using buyerId as key, we ensure only the intended record is counted
           uniqueSales.set(s.buyerId, Number(s.totalAmount) || 0);
         }
       });

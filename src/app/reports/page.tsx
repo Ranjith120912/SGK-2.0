@@ -194,7 +194,7 @@ export default function ReportsPage() {
     const cost = cycleRoster.reduce((acc, c) => acc + c.totalAmount, 0);
     const qty = cycleRoster.reduce((acc, c) => acc + c.totalQty, 0);
     
-    // RECONCILE REVENUE: Use Map to identify unique buyer records per cycle
+    // RECONCILE REVENUE: Use Map to identify unique buyer records per cycle for active buyers only
     let rev = 0;
     if (allSales && buyers) {
       const uniqueSales = new Map<string, number>();
@@ -202,8 +202,12 @@ export default function ReportsPage() {
         if (s.month === selectedMonth && 
             s.cycleId !== undefined && 
             Number(s.cycleId) === activeCycle) {
-          // Key by buyerId ensures exactly one record per buyer is added
-          uniqueSales.set(s.buyerId, Number(s.totalAmount) || 0);
+          
+          // Verify buyer exists in current roster to exclude ghost records from deleted buyers
+          const buyerExists = buyers.find(b => b.id === s.buyerId);
+          if (buyerExists) {
+            uniqueSales.set(s.buyerId, Number(s.totalAmount) || 0);
+          }
         }
       });
       rev = Array.from(uniqueSales.values()).reduce((a, b) => a + b, 0);
@@ -230,12 +234,15 @@ export default function ReportsPage() {
         tQty += ltr;
       });
 
-      // Monthly Revenue Reconciliation: sum unique buyer sales across all 3 cycles
+      // Monthly Revenue Reconciliation: sum unique active buyer sales across all 3 cycles
       const mSales = allSales.filter(s => s.month === opt.value);
       const uniqueSales = new Map<string, number>();
       mSales.forEach(s => {
-        const key = `${s.buyerId}_${s.cycleId}`;
-        uniqueSales.set(key, Number(s.totalAmount) || 0);
+        const buyerExists = buyers.find(b => b.id === s.buyerId);
+        if (buyerExists) {
+          const key = `${s.buyerId}_${s.cycleId}`;
+          uniqueSales.set(key, Number(s.totalAmount) || 0);
+        }
       });
       const tRev = Array.from(uniqueSales.values()).reduce((a, b) => a + b, 0);
 

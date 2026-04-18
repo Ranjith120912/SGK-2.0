@@ -141,7 +141,7 @@ export default function CycleSalesPage() {
   const dynamicGrandTotal = useMemo(() => {
     if (!buyers) return 0;
     
-    // Sum exactly one amount per buyer from the current cycle view
+    // Sum exactly one amount per active buyer from the current cycle view
     const revenueMap = new Map<string, number>();
     
     buyers.forEach(buyer => {

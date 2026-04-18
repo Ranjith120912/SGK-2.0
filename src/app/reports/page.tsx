@@ -142,6 +142,7 @@ export default function ReportsPage() {
       }
 
       const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
+      // PRIORITIZE CUSTOM RATE
       const rate = Number(farmerProfile.customRate) > 0 
         ? Number(farmerProfile.customRate) 
         : (farmerProfile.milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 35));
@@ -196,18 +197,17 @@ export default function ReportsPage() {
     const cost = cycleRoster.reduce((acc, c) => acc + c.totalAmount, 0);
     const qty = cycleRoster.reduce((acc, c) => acc + c.totalQty, 0);
     
-    // RECONCILIATION: Group by buyerId to ensure only ONE record per buyer is counted
-    const buyerSalesMap: Record<string, number> = {};
+    // RECONCILIATION: Use Map to ensure only ONE valid amount per active buyer is counted
+    const reconciledSalesMap: Record<string, number> = {};
     allSales?.filter(s => 
       s.month === selectedMonth && 
       s.cycleId === activeCycle && 
       activeBuyerIds.has(s.buyerId)
     ).forEach(s => {
-      // Prioritize the latest record if duplicates exist
-      buyerSalesMap[s.buyerId] = Number(s.totalAmount) || 0;
+      reconciledSalesMap[s.buyerId] = Number(s.totalAmount) || 0;
     });
     
-    const rev = Object.values(buyerSalesMap).reduce((acc, val) => acc + val, 0);
+    const rev = Object.values(reconciledSalesMap).reduce((acc, val) => acc + val, 0);
     
     return { qty, cost, rev, profit: rev - cost };
   }, [cycleRoster, allSales, selectedMonth, activeCycle, activeBuyerIds]);
@@ -232,7 +232,7 @@ export default function ReportsPage() {
         tQty += ltr;
       });
 
-      // Aggregate revenue month-wise, ensuring unique buyer entries
+      // Monthly Reconciliation: Ensure unique buyer-cycle entries
       const monthlyRevMap: Record<string, number> = {};
       mSales.forEach(s => {
         const key = `${s.buyerId}_${s.cycleId}`;
@@ -518,7 +518,7 @@ export default function ReportsPage() {
                     <AlertDialogHeader>
                       <AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase tracking-tight">
                         <AlertTriangle className="w-5 h-5" /> Irreversible Wipe
-                      </AlertTriangle>
+                      </AlertDialogTitle>
                       <AlertDialogDescription className="font-medium">
                         Are you sure you want to delete ALL historical entries and sales records? This will permanently wipe your audit logs. Directory items (Farmers/Buyers) will remain.
                       </AlertDialogDescription>
@@ -540,3 +540,4 @@ export default function ReportsPage() {
     </div>
   );
 }
+

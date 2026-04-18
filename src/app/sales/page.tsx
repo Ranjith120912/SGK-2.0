@@ -112,9 +112,11 @@ export default function CycleSalesPage() {
       ? parseFloat(manualAmountStr) 
       : (existingSale ? existingSale.totalAmount : 0);
 
-    if (isNaN(qty) || isNaN(finalAmount) || qty < 0 || finalAmount < 0) return;
+    // If both quantity and amount are cleared, allow saving 0
+    const qtyNum = isNaN(qty) ? 0 : qty;
+    const amtNum = isNaN(finalAmount) ? 0 : finalAmount;
 
-    const effectiveRate = qty > 0 ? parseFloat((finalAmount / qty).toFixed(2)) : 0;
+    const effectiveRate = qtyNum > 0 ? parseFloat((amtNum / qtyNum).toFixed(2)) : 0;
 
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
 
@@ -129,8 +131,8 @@ export default function CycleSalesPage() {
       cycleLabel: cycles[activeCycle]?.label,
       date: `${selectedMonth}-${cycles[activeCycle]?.start.toString().padStart(2, '0')}`,
       milkType,
-      quantity: qty,
-      totalAmount: finalAmount,
+      quantity: qtyNum,
+      totalAmount: amtNum,
       rate: effectiveRate,
       updatedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
@@ -145,15 +147,15 @@ export default function CycleSalesPage() {
     if (!sales || !buyers) return 0;
     const activeBuyerIds = new Set(buyers.map(b => b.id));
     
-    // RECONCILIATION: Group by buyerId to ensure only ONE record per buyer is counted
-    const reconciledSales: Record<string, number> = {};
+    // RECONCILIATION: Map ensures only ONE valid record per buyer is added
+    const reconciledMap: Record<string, number> = {};
     sales.forEach(s => {
       if (activeBuyerIds.has(s.buyerId)) {
-        reconciledSales[s.buyerId] = Number(s.totalAmount) || 0;
+        reconciledMap[s.buyerId] = Number(s.totalAmount) || 0;
       }
     });
 
-    return Object.values(reconciledSales).reduce((acc, val) => acc + val, 0);
+    return Object.values(reconciledMap).reduce((acc, val) => acc + val, 0);
   }, [sales, buyers]);
 
   if (!isClient) return null;
@@ -319,3 +321,4 @@ export default function CycleSalesPage() {
     </div>
   );
 }
+

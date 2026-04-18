@@ -172,8 +172,10 @@ export default function ReportsPage() {
     const cost = cycleRoster.reduce((acc, c) => acc + c.totalAmount, 0);
     const qty = cycleRoster.reduce((acc, c) => acc + c.totalQty, 0);
     
+    // Use a map to reconcile unique buyer amounts for THIS cycle
     const reconciledSalesMap: Record<string, number> = {};
     allSales?.filter(s => s.month === selectedMonth && s.cycleId === activeCycle && activeBuyerIds.has(s.buyerId)).forEach(s => {
+      // Overwrite ensures we only count the latest entry per buyer
       reconciledSalesMap[s.buyerId] = Number(s.totalAmount) || 0;
     });
     
@@ -198,6 +200,7 @@ export default function ReportsPage() {
         tQty += ltr;
       });
 
+      // Month-wide reconciliation across all 3 cycles
       const monthlyRevMap: Record<string, number> = {};
       mSales.forEach(s => {
         const key = `${s.buyerId}_${s.cycleId}`;
@@ -244,27 +247,16 @@ export default function ReportsPage() {
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Audit & Reports</h1>
               <p className="text-muted-foreground font-medium">Monthly and cycle-wise procurement analytics.</p>
             </div>
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-full sm:w-[220px] rounded-full font-bold h-11 border-primary/20 shadow-sm bg-card">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {monthOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </header>
-
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-4 gap-4">
-              <TabsList className="bg-muted p-1 rounded-full h-auto overflow-x-auto">
-                <TabsTrigger value="overview" className="rounded-full px-6 py-2 font-black uppercase text-[10px] tracking-widest">Overview</TabsTrigger>
-                <TabsTrigger value="cycle" className="rounded-full px-6 py-2 font-black uppercase text-[10px] tracking-widest">Cycle Report</TabsTrigger>
-                <TabsTrigger value="monthly" className="rounded-full px-6 py-2 font-black uppercase text-[10px] tracking-widest">Monthly Summary</TabsTrigger>
-                <TabsTrigger value="audit" className="rounded-full px-6 py-2 font-black uppercase text-[10px] tracking-widest">Master Log</TabsTrigger>
-              </TabsList>
-              
-              {(activeTab === "overview" || activeTab === "cycle") && (
-                <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-full border shadow-sm">
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="w-full sm:w-[220px] rounded-full font-bold h-11 border-primary/20 shadow-sm bg-card">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-full border shadow-sm">
                   {cycles.map((c, i) => (
                     <button 
                       key={i} 
@@ -275,7 +267,17 @@ export default function ReportsPage() {
                     </button>
                   ))}
                 </div>
-              )}
+            </div>
+          </header>
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-4 gap-4">
+              <TabsList className="bg-muted p-1 rounded-full h-auto overflow-x-auto">
+                <TabsTrigger value="overview" className="rounded-full px-6 py-2 font-black uppercase text-[10px] tracking-widest">Overview</TabsTrigger>
+                <TabsTrigger value="cycle" className="rounded-full px-6 py-2 font-black uppercase text-[10px] tracking-widest">Cycle Report</TabsTrigger>
+                <TabsTrigger value="monthly" className="rounded-full px-6 py-2 font-black uppercase text-[10px] tracking-widest">Monthly Summary</TabsTrigger>
+                <TabsTrigger value="audit" className="rounded-full px-6 py-2 font-black uppercase text-[10px] tracking-widest">Master Log</TabsTrigger>
+              </TabsList>
             </div>
 
             <TabsContent value="overview" className="space-y-6 animate-in fade-in duration-500">

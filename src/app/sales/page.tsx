@@ -96,18 +96,17 @@ export default function CycleSalesPage() {
 
   const handleAutoSave = (buyerId: string) => {
     const qtyStr = quantityValues[buyerId];
+    const amtStr = amountValues[buyerId];
     const milkType = milkTypes[buyerId] || 'COW';
+    
     if (!firestore || !selectedMonth) return;
 
     const existingSale = sales?.find(s => s.buyerId === buyerId);
-    const qty = (qtyStr !== undefined && qtyStr !== "") ? parseFloat(qtyStr) : (existingSale ? existingSale.quantity : 0);
-    const manualAmountStr = amountValues[buyerId];
-    const finalAmount = (manualAmountStr !== undefined && manualAmountStr !== "") 
-      ? parseFloat(manualAmountStr) 
-      : (existingSale ? existingSale.totalAmount : 0);
+    const qty = (qtyStr !== undefined && qtyStr !== "") ? parseFloat(qtyStr) : (existingSale ? Number(existingSale.quantity) : 0);
+    const amt = (amtStr !== undefined && amtStr !== "") ? parseFloat(amtStr) : (existingSale ? Number(existingSale.totalAmount) : 0);
 
     const qtyNum = isNaN(qty) ? 0 : qty;
-    const amtNum = isNaN(finalAmount) ? 0 : finalAmount;
+    const amtNum = isNaN(amt) ? 0 : amt;
     const effectiveRate = qtyNum > 0 ? parseFloat((amtNum / qtyNum).toFixed(2)) : 0;
 
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
@@ -134,23 +133,26 @@ export default function CycleSalesPage() {
     }, 500);
   };
 
-  const totalCycleRevenue = useMemo(() => {
+  const dynamicGrandTotal = useMemo(() => {
     if (!buyers) return 0;
     
-    let total = 0;
+    // Use a map to reconcile unique buyer amounts
+    const revenueMap: Record<string, number> = {};
+    
     buyers.forEach(buyer => {
-      const localAmount = amountValues[buyer.id];
-      if (localAmount !== undefined && localAmount !== "") {
-        total += parseFloat(localAmount) || 0;
+      const localAmt = amountValues[buyer.id];
+      if (localAmt !== undefined && localAmt !== "") {
+        revenueMap[buyer.id] = parseFloat(localAmt) || 0;
       } else {
-        const existingSale = sales?.find(s => s.buyerId === buyer.id);
-        if (existingSale) {
-          total += Number(existingSale.totalAmount) || 0;
+        const dbSale = sales?.find(s => s.buyerId === buyer.id);
+        if (dbSale) {
+          revenueMap[buyer.id] = Number(dbSale.totalAmount) || 0;
         }
       }
     });
-    return total;
-  }, [sales, buyers, amountValues]);
+
+    return Object.values(revenueMap).reduce((acc, val) => acc + val, 0);
+  }, [buyers, sales, amountValues]);
 
   if (!isClient) return null;
 
@@ -210,13 +212,19 @@ export default function CycleSalesPage() {
                 onChange={(e) => setSearchTerm(e.target.value)} 
               />
             </div>
-            <Card className="flex items-center gap-4 px-6 py-2 bg-accent/5 rounded-2xl border border-accent/10 shadow-sm">
-              <div className="p-2 bg-accent/10 rounded-xl">
-                <CalendarIcon className="w-5 h-5 text-accent" />
+            <Card className="flex items-center justify-between px-6 py-2 bg-accent/5 rounded-2xl border border-accent/10 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="p-2 bg-accent/10 rounded-xl">
+                  <CalendarIcon className="w-5 h-5 text-accent" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-accent/60 uppercase tracking-widest">Current Range</p>
+                  <p className="text-sm font-black uppercase">{cycles[activeCycle]?.range}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-[10px] font-black text-accent/60 uppercase tracking-widest">Current Range</p>
-                <p className="text-sm font-black uppercase">{cycles[activeCycle]?.range}</p>
+              <div className="text-right">
+                <p className="text-[10px] font-black text-primary/60 uppercase tracking-widest">Cycle Revenue</p>
+                <p className="text-xl font-black text-primary">₹ {dynamicGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
               </div>
             </Card>
           </div>
@@ -304,7 +312,7 @@ export default function CycleSalesPage() {
               </TableBody>
             </Table>
             <div className="p-5 bg-muted/20 text-center text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] border-t">
-              Cycle Grand Total Distribution Revenue: ₹ {totalCycleRevenue.toFixed(2)}
+              Cycle Grand Total Distribution Revenue: ₹ {dynamicGrandTotal.toFixed(2)}
             </div>
           </Card>
         </div>

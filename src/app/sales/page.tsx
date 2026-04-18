@@ -141,6 +141,11 @@ export default function CycleSalesPage() {
     }, 500);
   };
 
+  const totalCycleRevenue = useMemo(() => {
+    if (!sales) return 0;
+    return sales.reduce((acc, s) => acc + (Number(s.totalAmount) || 0), 0);
+  }, [sales]);
+
   if (!isClient) return null;
 
   return (
@@ -295,11 +300,7 @@ export default function CycleSalesPage() {
               </TableBody>
             </Table>
             <div className="p-5 bg-muted/20 text-center text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] border-t">
-              Cycle Grand Total Distribution Revenue: ₹ {filteredBuyers.reduce((acc, b) => {
-                const milkType = milkTypes[b.id] || 'COW';
-                const s = sales?.find(sale => sale.buyerId === b.id && sale.milkType === milkType);
-                return acc + (Number(s?.totalAmount) || 0);
-              }, 0).toFixed(2)}
+              Cycle Grand Total Distribution Revenue: ₹ {totalCycleRevenue.toFixed(2)}
             </div>
           </Card>
         </div>

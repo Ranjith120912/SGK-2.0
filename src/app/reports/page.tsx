@@ -7,7 +7,7 @@ import { Footer } from "@/components/footer";
 import { useCollection, useDoc, useMemoFirebase, useFirestore } from "@/firebase";
 import { collection, doc, deleteDoc } from "firebase/firestore";
 import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -194,7 +194,7 @@ export default function ReportsPage() {
     const cost = cycleRoster.reduce((acc, c) => acc + c.totalAmount, 0);
     const qty = cycleRoster.reduce((acc, c) => acc + c.totalQty, 0);
     
-    // STRICT INTEGRITY FILTER: Only count sales for buyers that exist in the directory
+    // DIRECT REVENUE SUM: Filter by cycle and active buyers
     const activeBuyerIds = new Set(buyers?.map(b => b.id) || []);
     const rev = allSales?.filter(s => 
       s.month === selectedMonth && 
@@ -222,7 +222,7 @@ export default function ReportsPage() {
         const f = farmers.find(item => item.id === e.farmerId || item.canNumber === e.canNumber);
         if (!f) return;
         const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
-        const rate = Number(f.customRate) > 0 ? Number(f.customRate) : (f.milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(f.milkType === 'COW' ? (Number(ratesConfig.cowRate) || 35) : 35)));
+        const rate = Number(f.customRate) > 0 ? Number(f.customRate) : (f.milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 35));
         tCost += (ltr * rate);
         tQty += ltr;
       });
@@ -420,9 +420,11 @@ export default function ReportsPage() {
                   <p className="text-xs font-black uppercase opacity-60 tracking-widest">Full Monthly Procurement Summary</p>
                   <p className="text-4xl font-black mt-1">₹ {monthlyRoster.reduce((acc, f) => acc + f.totalAmount, 0).toFixed(2)}</p>
                 </div>
-                <Button onClick={() => handleExportExcel(monthlyRoster, "Monthly_Report")} className="rounded-full bg-white text-accent px-10 h-12 font-black uppercase text-xs shadow-lg hover:bg-white/90">
-                  <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Export
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={() => handleExportExcel(monthlyRoster, "Monthly_Report")} className="rounded-full bg-white text-accent px-10 h-12 font-black uppercase text-xs shadow-lg hover:bg-white/90">
+                    <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Export
+                  </Button>
+                </div>
               </div>
               
               <Card className="rounded-3xl border-none shadow-xl overflow-hidden bg-card/50 backdrop-blur-sm">

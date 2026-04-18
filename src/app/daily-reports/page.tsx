@@ -70,7 +70,6 @@ export default function DailyReportsPage() {
       const fid = e.farmerId;
       const farmerProfile = farmers.find(f => f.id === fid || f.canNumber === e.canNumber);
       
-      // STRICT DIRECTORY FILTER
       if (!farmerProfile) return;
 
       const name = farmerProfile.name;
@@ -92,7 +91,7 @@ export default function DailyReportsPage() {
       const kg = Number(e.kgWeight) || 0;
       const ltr = kg * CONVERSION_RATE;
       
-      // PRECISION RATE RESOLUTION: Custom Rate Priority (for both COW and BUFFALO)
+      // PRECISION RATE RESOLUTION
       const rate = Number(farmerProfile.customRate) > 0 
         ? Number(farmerProfile.customRate) 
         : (milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 35));
@@ -114,8 +113,7 @@ export default function DailyReportsPage() {
     return Object.values(map).sort((a: any, b: any) => {
       const aNum = parseInt(a.can);
       const bNum = parseInt(b.can);
-      if (isNaN(aNum) || isNaN(bNum)) return a.can.localeCompare(b.can);
-      return aNum - bNum;
+      return (isNaN(aNum) || isNaN(bNum)) ? a.can.localeCompare(b.can) : aNum - bNum;
     });
   }, [allEntries, farmers, selectedDate, ratesConfig]);
 
@@ -143,7 +141,6 @@ export default function DailyReportsPage() {
       "PAYOUT (Rs)": p.totalAmt.toFixed(2)
     }));
     
-    // Add Totals Row
     data.push({
       "CAN": "TOTAL",
       "FARMER NAME": "",
@@ -185,7 +182,6 @@ export default function DailyReportsPage() {
       p.totalAmt.toFixed(2)
     ]);
 
-    // Add Totals Row
     bodyRows.push([
       'TOTAL',
       '',
@@ -219,7 +215,8 @@ export default function DailyReportsPage() {
         const imageFormat = formatMatch ? formatMatch[1].toUpperCase() : 'PNG';
         const finalFormat = imageFormat.includes('JP') ? 'JPEG' : 'PNG';
         
-        pdf.addImage(ratesConfig.stampUrl, finalFormat, pageWidth - 60, pageHeight - 45, 40, 20);
+        // Locked position: 25mm above bottom
+        pdf.addImage(ratesConfig.stampUrl, finalFormat, pageWidth - 60, pageHeight - 50, 40, 25);
       } catch (e) {
         console.error("Failed to add stamp to report PDF:", e);
       }
@@ -310,7 +307,7 @@ export default function DailyReportsPage() {
                 ) : dailyData.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-20 italic text-muted-foreground font-medium uppercase text-[10px] tracking-widest">
-                      No matching directory records found for this date.
+                      No matching records found for this date.
                     </TableCell>
                   </TableRow>
                 ) : (

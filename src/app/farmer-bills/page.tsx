@@ -74,7 +74,6 @@ export default function FarmerBillsPage() {
   const { data: ratesConfig } = useDoc(settingsRef);
 
   const CONVERSION_RATE = 0.96;
-
   const currentCycle = cycles[activeCycle];
 
   const masterRoster = useMemo(() => {
@@ -109,9 +108,7 @@ export default function FarmerBillsPage() {
       }
 
       const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
-      
-      // PRECISION RATE RESOLUTION: Prioritize custom rates for Cow (35 default) and Buffalo
-      let rate = Number(farmerProfile.customRate) > 0 
+      const rate = Number(farmerProfile.customRate) > 0 
         ? Number(farmerProfile.customRate) 
         : (milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 35));
 
@@ -122,17 +119,14 @@ export default function FarmerBillsPage() {
     return Object.values(map).sort((a: any, b: any) => {
       const aNum = parseInt(a.can);
       const bNum = parseInt(b.can);
-      if (isNaN(aNum) || isNaN(bNum)) return a.can.localeCompare(b.can);
-      return aNum - bNum;
+      return (isNaN(aNum) || isNaN(bNum)) ? a.can.localeCompare(b.can) : aNum - bNum;
     });
   }, [allEntries, farmers, selectedMonth, activeCycle, ratesConfig, currentCycle]);
 
   const generateProfessionalInvoice = (pdf: jsPDF, f: any) => {
     const company = (ratesConfig?.companyName || "SGK MILK DISTRIBUTIONS").toUpperCase();
     const [year, month] = selectedMonth.split('-').map(Number);
-    const periodStartStr = `${currentCycle.start}/${month}/${year.toString().slice(-2)}`;
-    const periodEndStr = `${currentCycle.end}/${month}/${year.toString().slice(-2)}`;
-    const period = `${periodStartStr} to ${periodEndStr}`;
+    const period = `${currentCycle.start}/${month}/${year.toString().slice(-2)} to ${currentCycle.end}/${month}/${year.toString().slice(-2)}`;
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     
@@ -146,97 +140,64 @@ export default function FarmerBillsPage() {
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "normal");
     
-    const drawUnderlinedField = (label: string, value: string, x: number, y: number, width: number) => {
+    const drawField = (label: string, value: string, x: number, y: number, width: number) => {
       pdf.text(label, x, y);
-      const labelWidth = pdf.getTextWidth(label);
+      const labelW = pdf.getTextWidth(label);
       pdf.setFont("helvetica", "bold");
-      pdf.text(value.toUpperCase(), x + labelWidth + 5, y);
-      pdf.line(x + labelWidth + 4, y + 1, x + width, y + 1);
+      pdf.text(value.toUpperCase(), x + labelW + 5, y);
+      pdf.line(x + labelW + 4, y + 1, x + width, y + 1);
       pdf.setFont("helvetica", "normal");
     };
 
-    drawUnderlinedField("NAME:", f.name, 20, 45, 100);
-    drawUnderlinedField("DATE:", format(new Date(), 'dd/MM/yyyy'), 110, 45, 190);
+    drawField("NAME:", f.name, 20, 45, 100);
+    drawField("DATE:", format(new Date(), 'dd/MM/yyyy'), 110, 45, 190);
     
-    const farmerProfile = farmers?.find(item => item.id === f.id);
-    drawUnderlinedField("A/C NO:", farmerProfile?.bankAccountNumber || "---", 20, 55, 100);
-    drawUnderlinedField("PERIOD:", period, 110, 55, 190);
-    
-    drawUnderlinedField("CAN NO:", f.can, 20, 65, 100);
-    const avgRate = f.totalQty > 0 ? (f.totalAmount / f.totalQty).toFixed(2) : "0.00";
-    drawUnderlinedField("RATE (Rs):", avgRate, 110, 65, 190);
+    const profile = farmers?.find(item => item.id === f.id);
+    drawField("A/C NO:", profile?.bankAccountNumber || "---", 20, 55, 100);
+    drawField("PERIOD:", period, 110, 55, 190);
+    drawField("CAN NO:", f.can, 20, 65, 100);
+    const avgR = f.totalQty > 0 ? (f.totalAmount / f.totalQty).toFixed(2) : "0.00";
+    drawField("RATE (Rs):", avgR, 110, 65, 190);
 
-    const dateObjects = [];
+    const rows = [];
     for (let d = currentCycle.start; d <= currentCycle.end; d++) {
-      dateObjects.push(new Date(year, month - 1, d));
-    }
-
-    const rows = dateObjects.map(dateObj => {
-      const dateStr = format(dateObj, 'yyyy-MM-dd');
-      const dayEntries = allEntries!.filter(e => (e.farmerId === f.id || e.canNumber === f.can) && e.date === dateStr);
-      
-      const mKg = dayEntries.find(e => e.session === 'Morning')?.kgWeight || 0;
-      const eKg = dayEntries.find(e => e.session === 'Evening')?.kgWeight || 0;
-      
-      const mQty = Number(mKg) * CONVERSION_RATE;
-      const eQty = Number(eKg) * CONVERSION_RATE;
-      const tQty = mQty + eQty;
-
-      let rate = farmerProfile && Number(farmerProfile.customRate) > 0 
-        ? Number(farmerProfile.customRate) 
+      const ds = `${year}-${month.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`;
+      const dayE = allEntries!.filter(e => (e.farmerId === f.id || e.canNumber === f.can) && e.date === ds);
+      const mQ = (Number(dayE.find(e => e.session === 'Morning')?.kgWeight) || 0) * CONVERSION_RATE;
+      const eQ = (Number(dayE.find(e => e.session === 'Evening')?.kgWeight) || 0) * CONVERSION_RATE;
+      const tQ = mQ + eQ;
+      const rate = profile && Number(profile.customRate) > 0 
+        ? Number(profile.customRate) 
         : (f.milkType === 'BUFFALO' ? (Number(ratesConfig?.buffaloRate) || 0) : (Number(ratesConfig?.cowRate) || 35));
-
-      const amt = tQty * rate;
-
-      return [
-        format(dateObj, 'dd/MM/yy'),
-        mQty.toFixed(2),
-        eQty.toFixed(2),
-        tQty.toFixed(2),
-        rate.toFixed(2),
-        amt.toFixed(2)
-      ];
-    });
+      
+      rows.push([format(new Date(year, month - 1, d), 'dd/MM/yy'), mQ.toFixed(2), eQ.toFixed(2), tQ.toFixed(2), rate.toFixed(2), (tQ * rate).toFixed(2)]);
+    }
 
     (pdf as any).autoTable({
       startY: 75,
-      head: [['DATE', 'MORNING (L)', 'EVENING (L)', 'TOTAL LITRES', 'RATE (Rs)', 'AMOUNT (Rs)']],
+      head: [['DATE', 'MORNING (L)', 'EVENING (L)', 'TOTAL (L)', 'RATE (Rs)', 'AMOUNT (Rs)']],
       body: rows,
       theme: 'grid',
-      headStyles: { fillColor: [255, 255, 255], textColor: 0, halign: 'center', fontStyle: 'bold', lineWidth: 0.1 },
-      bodyStyles: { halign: 'center', textColor: 0, lineWidth: 0.1 },
-      styles: { fontSize: 9, cellPadding: 2.5 },
+      headStyles: { fillColor: [255, 255, 255], textColor: 0, fontStyle: 'bold' },
+      bodyStyles: { halign: 'center' },
       margin: { left: 20, right: 20 }
     });
 
     const finalY = (pdf as any).lastAutoTable.finalY;
-    
     pdf.setFont("helvetica", "bold");
-    pdf.line(20, finalY, 190, finalY);
     pdf.text("TOTAL", 25, finalY + 7);
     pdf.text(f.totalQty.toFixed(2), 115, finalY + 7, { align: 'center' });
     pdf.text(f.totalAmount.toFixed(2), 178, finalY + 7, { align: 'center' });
-    pdf.line(20, finalY + 11, 190, finalY + 11);
 
-    // SIGNATORY FOOTER: Precision Locked exactly 25mm above the line
+    // SIGNATORY FOOTER: Locked 25mm above line
     const sigLineY = pageHeight - 25;
-    const stampHeight = 25;
-    const stampY = sigLineY - 50; // Bottom of stamp will be at sigLineY - 25
-
     if (ratesConfig?.stampUrl) {
       try {
         const formatMatch = ratesConfig.stampUrl.match(/^data:image\/([a-zA-Z+]+);base64,/);
-        const imageFormat = formatMatch ? formatMatch[1].toUpperCase() : 'PNG';
-        const finalFormat = imageFormat.includes('JP') ? 'JPEG' : 'PNG';
-        
-        pdf.addImage(ratesConfig.stampUrl, finalFormat, pageWidth - 70, stampY, 50, stampHeight);
-      } catch (e) {
-        console.error("Failed to add stamp to PDF:", e);
-      }
+        const finalFormat = formatMatch && formatMatch[1].includes('JP') ? 'JPEG' : 'PNG';
+        pdf.addImage(ratesConfig.stampUrl, finalFormat, pageWidth - 70, sigLineY - 30, 50, 25);
+      } catch (e) {}
     }
-
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(10);
     pdf.text("AUTHORIZED SIGNATURE", pageWidth - 20, pageHeight - 20, { align: 'right' });
     pdf.line(pageWidth - 75, sigLineY, pageWidth - 20, sigLineY);
   };
@@ -250,12 +211,8 @@ export default function FarmerBillsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <header className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
             <div>
-              <div className="flex items-center gap-2 text-primary mb-1">
-                <FileText className="w-5 h-5" />
-                <span className="text-xs font-black uppercase tracking-widest">Validated Billing</span>
-              </div>
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Farmer Bills</h1>
-              <p className="text-muted-foreground font-medium">Invoices synchronized with Management Directory.</p>
+              <p className="text-muted-foreground font-medium">Professional invoices for validated farmers.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4">
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
@@ -287,13 +244,12 @@ export default function FarmerBillsPage() {
             <Button 
               onClick={() => {
                 const pdf = new jsPDF();
-                const valid = masterRoster.filter(f => f.totalQty > 0);
-                valid.forEach((f, i) => { if (i > 0) pdf.addPage(); generateProfessionalInvoice(pdf, f); });
-                pdf.save(`All_Bills_${selectedMonth}_${currentCycle.label}.pdf`);
+                masterRoster.filter(f => f.totalQty > 0).forEach((f, i) => { if (i > 0) pdf.addPage(); generateProfessionalInvoice(pdf, f); });
+                pdf.save(`Bills_${selectedMonth}_${currentCycle.label}.pdf`);
               }}
               className="rounded-full bg-rose-600 hover:bg-rose-700 h-12 px-10 shadow-lg font-black uppercase text-xs"
             >
-              <FileDown className="mr-2 h-4 w-4" /> Download All Bills (PDF)
+              <FileDown className="mr-2 h-4 w-4" /> Download All Bills
             </Button>
           </div>
 
@@ -313,7 +269,7 @@ export default function FarmerBillsPage() {
                 {entriesLoading || farmersLoading ? (
                   <TableRow><TableCell colSpan={6} className="text-center py-20"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" /></TableCell></TableRow>
                 ) : masterRoster.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-20 italic text-muted-foreground">No matching directory data found for this cycle.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center py-20 italic text-muted-foreground">No matching data found for this cycle.</TableCell></TableRow>
                 ) : (
                   masterRoster.map(f => (
                     <TableRow key={f.id} className="hover:bg-primary/5 transition-colors group">
@@ -328,8 +284,7 @@ export default function FarmerBillsPage() {
                       <TableCell className="text-right font-black text-primary text-base">₹ {f.totalAmount.toFixed(2)}</TableCell>
                       <TableCell className="text-right pr-10">
                         <Button 
-                          variant="ghost" 
-                          size="sm" 
+                          variant="ghost" size="sm" 
                           onClick={() => {
                             const pdf = new jsPDF();
                             generateProfessionalInvoice(pdf, f);
@@ -337,7 +292,7 @@ export default function FarmerBillsPage() {
                           }}
                           className="text-primary font-black uppercase text-[10px] group-hover:bg-primary/10 rounded-full h-8 px-4"
                         >
-                          Print Bill <ChevronRight className="w-3 h-3 ml-1" />
+                          Print <ChevronRight className="w-3 h-3 ml-1" />
                         </Button>
                       </TableCell>
                     </TableRow>

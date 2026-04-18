@@ -116,7 +116,7 @@ export default function CycleSalesPage() {
 
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
 
-    // COMPOSITE ID: buyerId_month_cycleId ensures stability and overwrites ghost data
+    // STABLE COMPOSITE ID: Ensures one record per buyer per cycle
     const saleId = `${buyerId}_${selectedMonth}_C${activeCycle}`;
     const docRef = doc(firestore, 'sales', saleId);
 
@@ -147,10 +147,8 @@ export default function CycleSalesPage() {
     buyers.forEach(buyer => {
       const localAmt = amountValues[buyer.id];
       if (localAmt !== undefined) {
-        // User is currently editing or has edited this row
         revenueMap.set(buyer.id, localAmt === "" ? 0 : parseFloat(localAmt) || 0);
       } else {
-        // Use persisted DB value
         const dbSale = sales?.find(s => s.buyerId === buyer.id);
         revenueMap.set(buyer.id, dbSale ? Number(dbSale.totalAmount) || 0 : 0);
       }
@@ -173,7 +171,7 @@ export default function CycleSalesPage() {
                 <span className="text-xs font-black uppercase tracking-widest">Business Distribution</span>
               </div>
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Cycle Sales</h1>
-              <p className="text-muted-foreground font-medium">Record bulk sales amounts for 10-day distribution periods.</p>
+              <p className="text-muted-foreground font-medium">Record bulk sales for 10-day distribution periods.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>

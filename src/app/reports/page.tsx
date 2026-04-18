@@ -111,7 +111,7 @@ export default function ReportsPage() {
   const CONVERSION_RATE = 0.96;
   const currentCycle = cycles[activeCycle];
 
-  // CYCLE PROCUREMENT ROSTER (Robust Calculation)
+  // CYCLE PROCUREMENT ROSTER
   const cycleRoster = useMemo(() => {
     if (!allEntries || !selectedMonth || !currentCycle || !farmers || !ratesConfig) return [];
     
@@ -151,10 +151,14 @@ export default function ReportsPage() {
       map[fid].totalAmount += amt;
     });
 
-    return Object.values(map).sort((a: any, b: any) => parseInt(a.can) - parseInt(b.can));
-  }, [allEntries, farmers, selectedMonth, activeCycle, ratesConfig, currentCycle]);
+    return Object.values(map).sort((a: any, b: any) => {
+      const aN = parseInt(a.can);
+      const bN = parseInt(b.can);
+      return isNaN(aN) || isNaN(bN) ? a.can.localeCompare(b.can) : aN - bN;
+    });
+  }, [allEntries, farmers, selectedMonth, currentCycle, ratesConfig]);
 
-  // MONTHLY PROCUREMENT ROSTER (Robust Calculation)
+  // MONTHLY PROCUREMENT ROSTER
   const monthlyRoster = useMemo(() => {
     if (!allEntries || !selectedMonth || !farmers || !ratesConfig) return [];
     const map: Record<string, any> = {};
@@ -189,40 +193,40 @@ export default function ReportsPage() {
       map[fid].totalAmount += amt;
     });
 
-    return Object.values(map).sort((a: any, b: any) => parseInt(a.can) - parseInt(b.can));
+    return Object.values(map).sort((a: any, b: any) => {
+      const aN = parseInt(a.can);
+      const bN = parseInt(b.can);
+      return isNaN(aN) || isNaN(bN) ? a.can.localeCompare(b.can) : aN - bN;
+    });
   }, [allEntries, farmers, selectedMonth, ratesConfig]);
 
-  // RECONCILED CYCLE FINANCIALS (Strict Reconciliation)
+  // RECONCILED FINANCIALS
   const cycleStats = useMemo(() => {
     const cost = cycleRoster.reduce((acc, c) => acc + c.totalAmount, 0);
     const qty = cycleRoster.reduce((acc, c) => acc + c.totalQty, 0);
     
     let rev = 0;
     if (allSales && buyers) {
-      // Use a Map to ensure only one sale per active buyer is counted per cycle
       const uniqueSales = new Map<string, number>();
-      
       const cycleSalesRecords = allSales.filter(s => 
         s.month === selectedMonth && 
-        s.cycleId !== undefined && 
         Number(s.cycleId) === activeCycle
       );
 
       cycleSalesRecords.forEach(s => {
+        // Ensure the buyer still exists in the active directory
         const buyerExists = buyers.find(b => b.id === s.buyerId);
         if (buyerExists) {
-          // Stable override ensures the latest entry for this buyer/cycle is used
           uniqueSales.set(s.buyerId, Number(s.totalAmount) || 0);
         }
       });
-      
       rev = Array.from(uniqueSales.values()).reduce((a, b) => a + b, 0);
     }
 
     return { qty, cost, rev, profit: rev - cost };
   }, [cycleRoster, allSales, selectedMonth, activeCycle, buyers]);
 
-  // MASTER AUDIT LOG (Robust Monthly Sums)
+  // MASTER AUDIT LOG
   const auditData = useMemo(() => {
     if (!allEntries || !allSales || !farmers || !ratesConfig || !buyers) return [];
     
@@ -246,7 +250,6 @@ export default function ReportsPage() {
       mSales.forEach(s => {
         const buyerExists = buyers.find(b => b.id === s.buyerId);
         if (buyerExists) {
-          // Composite key Buyer + Cycle ensures reconciliation across all 3 monthly cycles
           const key = `${s.buyerId}_${s.cycleId}`;
           uniqueMonthlySales.set(key, Number(s.totalAmount) || 0);
         }
@@ -305,7 +308,7 @@ export default function ReportsPage() {
                 <span className="text-xs font-black uppercase tracking-widest">Financial Audit</span>
               </div>
               <h1 className="text-3xl font-black text-primary tracking-tight uppercase">Audit & Reports</h1>
-              <p className="text-muted-foreground font-medium">Monthly and cycle-wise procurement analytics.</p>
+              <p className="text-muted-foreground font-medium">Robust Procurement & Distribution Analytics.</p>
             </div>
             <div className="flex flex-col sm:flex-row items-center gap-4">
                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
@@ -353,14 +356,14 @@ export default function ReportsPage() {
                   <div className="absolute -right-4 -top-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
                     <TrendingUp className="w-32 h-32" />
                   </div>
-                  <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Revenue (Sales)</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Cycle Revenue</p>
                   <p className="text-4xl font-black mt-2">₹ {cycleStats.rev.toFixed(2)}</p>
                 </Card>
                 <Card className="rounded-[2rem] p-8 border-none bg-rose-500/10 text-rose-600 shadow-sm relative overflow-hidden group">
                   <div className="absolute -right-4 -top-4 opacity-5 group-hover:scale-110 transition-transform duration-500">
                     <CreditCard className="w-32 h-32 text-rose-600" />
                   </div>
-                  <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Total Payouts</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Cycle Payouts</p>
                   <p className="text-3xl font-black mt-2">₹ {cycleStats.cost.toFixed(2)}</p>
                 </Card>
                 <Card className="rounded-[2rem] p-8 border-none bg-emerald-500/10 text-emerald-600 shadow-sm relative overflow-hidden group">
@@ -435,7 +438,7 @@ export default function ReportsPage() {
             <TabsContent value="monthly" className="space-y-6 animate-in fade-in duration-500">
               <div className="flex flex-col sm:flex-row justify-between items-center bg-accent p-8 rounded-[2rem] text-white gap-6 shadow-xl">
                 <div>
-                  <p className="text-xs font-black uppercase opacity-60 tracking-widest">Full Monthly Procurement Summary</p>
+                  <p className="text-xs font-black uppercase opacity-60 tracking-widest">Monthly Procurement (Payouts Total)</p>
                   <p className="text-4xl font-black mt-1">₹ {monthlyRoster.reduce((acc, f) => acc + f.totalAmount, 0).toFixed(2)}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -486,7 +489,7 @@ export default function ReportsPage() {
                       <TableHead className="pl-10 font-black text-[10px] uppercase py-8 tracking-widest">Financial Period</TableHead>
                       <TableHead className="text-center font-black text-[10px] uppercase tracking-widest">Total Vol (L)</TableHead>
                       <TableHead className="text-center font-black text-[10px] uppercase tracking-widest">Total Payouts</TableHead>
-                      <TableHead className="text-center font-black text-[10px] uppercase tracking-widest">Direct Revenue</TableHead>
+                      <TableHead className="text-center font-black text-[10px] uppercase tracking-widest">Sales Revenue</TableHead>
                       <TableHead className="text-right pr-10 font-black text-[10px] uppercase tracking-widest">Net Profit</TableHead>
                     </TableRow>
                   </TableHeader>

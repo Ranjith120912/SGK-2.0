@@ -91,7 +91,8 @@ export default function CycleSalesPage() {
   const handleMilkTypeChange = (buyerId: string, type: 'COW' | 'BUFFALO') => {
     setMilkTypes(prev => ({ ...prev, [buyerId]: type }));
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'idle' }));
-    setTimeout(() => handleAutoSave(buyerId), 0);
+    // Auto-save on type change
+    setTimeout(() => handleAutoSave(buyerId), 100);
   };
 
   const handleAutoSave = (buyerId: string) => {
@@ -103,6 +104,7 @@ export default function CycleSalesPage() {
 
     const existingSale = sales?.find(s => s.buyerId === buyerId);
     
+    // Resolve numbers correctly from local state or DB
     const qtyNum = qtyStr !== undefined 
       ? (qtyStr === "" ? 0 : parseFloat(qtyStr)) 
       : (existingSale ? Number(existingSale.quantity) : 0);
@@ -115,7 +117,7 @@ export default function CycleSalesPage() {
 
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
 
-    // Composite ID to prevent duplicates per cycle
+    // Fixed Composite ID: ensure exactly one record per buyer per cycle
     const saleId = `${buyerId}_${selectedMonth}_C${activeCycle}`;
     const docRef = doc(firestore, 'sales', saleId);
 
@@ -138,10 +140,11 @@ export default function CycleSalesPage() {
     }, 500);
   };
 
+  // DYNAMIC GRAND TOTAL: Recalculates instantly as user types
   const dynamicGrandTotal = useMemo(() => {
     if (!buyers) return 0;
     
-    // Sum exactly one amount per active buyer from the current cycle view
+    // Reconcile one amount per buyer in the directory
     const revenueMap = new Map<string, number>();
     
     buyers.forEach(buyer => {
@@ -189,6 +192,7 @@ export default function CycleSalesPage() {
                     key={i} 
                     onClick={() => {
                       setActiveCycle(i);
+                      // Clear local input cache to avoid stale values between cycles
                       setQuantityValues({});
                       setAmountValues({});
                       setSavingStatus({});

@@ -194,7 +194,7 @@ export default function ReportsPage() {
     const cost = cycleRoster.reduce((acc, c) => acc + c.totalAmount, 0);
     const qty = cycleRoster.reduce((acc, c) => acc + c.totalQty, 0);
     
-    // RECONCILE REVENUE: Use Map to identify unique buyer records per cycle for active buyers only
+    // RECONCILE REVENUE: Use Map to identify unique buyer records per cycle to eliminate ghost revenue
     let rev = 0;
     if (allSales && buyers) {
       const uniqueSales = new Map<string, number>();
@@ -203,7 +203,7 @@ export default function ReportsPage() {
             s.cycleId !== undefined && 
             Number(s.cycleId) === activeCycle) {
           
-          // Verify buyer exists in current roster to exclude ghost records from deleted buyers
+          // Only count sales for buyers currently in the directory
           const buyerExists = buyers.find(b => b.id === s.buyerId);
           if (buyerExists) {
             uniqueSales.set(s.buyerId, Number(s.totalAmount) || 0);
@@ -234,12 +234,13 @@ export default function ReportsPage() {
         tQty += ltr;
       });
 
-      // Monthly Revenue Reconciliation: sum unique active buyer sales across all 3 cycles
+      // Monthly Revenue Reconciliation: sum unique active buyer sales across all cycles for that month
       const mSales = allSales.filter(s => s.month === opt.value);
       const uniqueSales = new Map<string, number>();
       mSales.forEach(s => {
         const buyerExists = buyers.find(b => b.id === s.buyerId);
         if (buyerExists) {
+          // Key by buyer and cycle to handle the 3 distinct cycle entries per month
           const key = `${s.buyerId}_${s.cycleId}`;
           uniqueSales.set(key, Number(s.totalAmount) || 0);
         }

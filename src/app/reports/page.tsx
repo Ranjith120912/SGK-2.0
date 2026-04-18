@@ -127,11 +127,23 @@ export default function ReportsPage() {
       if (!farmerProfile) return;
 
       if (!map[fid]) {
-        map[fid] = { id: fid, can: farmerProfile.canNumber, name: farmerProfile.name, milkType: farmerProfile.milkType || "COW", morningQty: 0, eveningQty: 0, totalQty: 0, totalAmount: 0 };
+        map[fid] = { 
+          id: fid, 
+          can: farmerProfile.canNumber, 
+          name: farmerProfile.name, 
+          milkType: farmerProfile.milkType || "COW", 
+          morningQty: 0, 
+          eveningQty: 0, 
+          totalQty: 0, 
+          totalAmount: 0 
+        };
       }
 
       const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
-      const rate = Number(farmerProfile.customRate) > 0 ? Number(farmerProfile.customRate) : (farmerProfile.milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 35));
+      const rate = Number(farmerProfile.customRate) > 0 
+        ? Number(farmerProfile.customRate) 
+        : (farmerProfile.milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 35));
+      
       const amt = ltr * rate;
       if (e.session === 'Morning') map[fid].morningQty += ltr; else map[fid].eveningQty += ltr;
       map[fid].totalQty += ltr;
@@ -152,11 +164,23 @@ export default function ReportsPage() {
       if (!farmerProfile) return;
 
       if (!map[fid]) {
-        map[fid] = { id: fid, can: farmerProfile.canNumber, name: farmerProfile.name, milkType: farmerProfile.milkType || "COW", morningQty: 0, eveningQty: 0, totalQty: 0, totalAmount: 0 };
+        map[fid] = { 
+          id: fid, 
+          can: farmerProfile.canNumber, 
+          name: farmerProfile.name, 
+          milkType: farmerProfile.milkType || "COW", 
+          morningQty: 0, 
+          eveningQty: 0, 
+          totalQty: 0, 
+          totalAmount: 0 
+        };
       }
 
       const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
-      const rate = Number(farmerProfile.customRate) > 0 ? Number(farmerProfile.customRate) : (farmerProfile.milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 35));
+      const rate = Number(farmerProfile.customRate) > 0 
+        ? Number(farmerProfile.customRate) 
+        : (farmerProfile.milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 35));
+      
       const amt = ltr * rate;
       if (e.session === 'Morning') map[fid].morningQty += ltr; else map[fid].eveningQty += ltr;
       map[fid].totalQty += ltr;
@@ -170,15 +194,18 @@ export default function ReportsPage() {
     const cost = cycleRoster.reduce((acc, c) => acc + c.totalAmount, 0);
     const qty = cycleRoster.reduce((acc, c) => acc + c.totalQty, 0);
     
-    // RECONCILIATION: Map by buyerId to ensure only one valid sale record per unique buyer
+    // RECONCILIATION ENGINE: Ensures total revenue matches manual entries for the cycle
     let rev = 0;
     if (allSales && buyers) {
       const activeIds = new Set(buyers.map(b => b.id));
       const uniqueSales = new Map<string, number>();
       
       allSales.forEach(s => {
-        if (s.month === selectedMonth && Number(s.cycleId) === activeCycle && activeIds.has(s.buyerId)) {
-          // Identify the single valid entry for this buyer in the cycle
+        if (s.month === selectedMonth && 
+            s.cycleId !== undefined && 
+            Number(s.cycleId) === activeCycle && 
+            activeIds.has(s.buyerId)) {
+          // Identify the single valid entry for this buyer in the cycle (prevents "Ghost" records)
           uniqueSales.set(s.buyerId, Number(s.totalAmount) || 0);
         }
       });
@@ -201,12 +228,14 @@ export default function ReportsPage() {
         const f = farmers.find(item => item.id === e.farmerId || item.canNumber === e.canNumber);
         if (!f) return;
         const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
-        const rate = Number(f.customRate) > 0 ? Number(f.customRate) : (f.milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 35));
+        const rate = Number(f.customRate) > 0 
+          ? Number(f.customRate) 
+          : (f.milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(f.milkType === 'COW' ? (ratesConfig.cowRate || 35) : 35)));
         tCost += (ltr * rate);
         tQty += ltr;
       });
 
-      // RECONCILIATION: Monthly revenue sum across cycles for unique buyers
+      // Monthly revenue sum across cycles for unique buyers
       const mSales = allSales.filter(s => s.month === opt.value && activeIds.has(s.buyerId));
       const uniqueSales = new Map<string, number>();
       mSales.forEach(s => {
@@ -220,7 +249,15 @@ export default function ReportsPage() {
   }, [allEntries, allSales, farmers, ratesConfig, monthOptions, buyers]);
 
   const handleExportExcel = (roster: any[], title: string) => {
-    const data = roster.map(f => ({ CAN: f.can, Name: f.name, Type: f.milkType, Morning: f.morningQty.toFixed(2), Evening: f.eveningQty.toFixed(2), Total: f.totalQty.toFixed(2), Payout: f.totalAmount.toFixed(2) }));
+    const data = roster.map(f => ({ 
+      CAN: f.can, 
+      Name: f.name, 
+      Type: f.milkType, 
+      Morning: f.morningQty.toFixed(2), 
+      Evening: f.eveningQty.toFixed(2), 
+      Total: f.totalQty.toFixed(2), 
+      Payout: f.totalAmount.toFixed(2) 
+    }));
     const ws = utils.json_to_sheet(data);
     const wb = utils.book_new();
     utils.book_append_sheet(wb, ws, title);
@@ -487,3 +524,4 @@ export default function ReportsPage() {
     </div>
   );
 }
+

@@ -103,7 +103,7 @@ export default function CycleSalesPage() {
 
     const existingSale = sales?.find(s => s.buyerId === buyerId);
     
-    // RECONCILIATION: Priority logic to ensure manual input is used correctly
+    // If the input is empty string, we want to save it as 0
     const qtyNum = qtyStr !== undefined 
       ? (qtyStr === "" ? 0 : parseFloat(qtyStr)) 
       : (existingSale ? Number(existingSale.quantity) : 0);
@@ -116,7 +116,7 @@ export default function CycleSalesPage() {
 
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
 
-    // STABLE COMPOSITE ID: Ensures only one record per buyer per cycle exists
+    // STABLE COMPOSITE ID: buyer_month_cycle
     const saleId = `${buyerId}_${selectedMonth}_C${activeCycle}`;
     const docRef = doc(firestore, 'sales', saleId);
 
@@ -142,14 +142,16 @@ export default function CycleSalesPage() {
   const dynamicGrandTotal = useMemo(() => {
     if (!buyers) return 0;
     
-    // DYNAMIC ADDITION: Aggregates total based on unique buyers only
+    // Aggregate total based on unique active buyers shown on current screen
     const revenueMap = new Map<string, number>();
     
     buyers.forEach(buyer => {
+      // Check current session state first (what the user is typing)
       const localAmt = amountValues[buyer.id];
       if (localAmt !== undefined) {
         revenueMap.set(buyer.id, localAmt === "" ? 0 : parseFloat(localAmt) || 0);
       } else {
+        // Fallback to what's in the DB for THIS SPECIFIC CYCLE
         const dbSale = sales?.find(s => s.buyerId === buyer.id);
         revenueMap.set(buyer.id, dbSale ? Number(dbSale.totalAmount) || 0 : 0);
       }

@@ -177,8 +177,8 @@ export default function ReportsPage() {
     if (allSales && activeBuyerIds.size > 0) {
       const uniqueSales = new Map<string, number>();
       allSales.forEach(s => {
-        if (s.month === selectedMonth && s.cycleId === activeCycle && activeBuyerIds.has(s.buyerId)) {
-          // Identify unique buyer amount (ignores duplicates/ghosts)
+        if (s.month === selectedMonth && Number(s.cycleId) === activeCycle && activeBuyerIds.has(s.buyerId)) {
+          // Identify unique buyer amount (ignores duplicates/ghosts by overwriting with latest)
           uniqueSales.set(s.buyerId, Number(s.totalAmount) || 0);
         }
       });
@@ -204,7 +204,7 @@ export default function ReportsPage() {
         tQty += ltr;
       });
 
-      // RECONCILIATION: Monthly revenue sum across cycles (grouped by buyerId+cycleId)
+      // RECONCILIATION: Monthly revenue sum across cycles (grouped by buyerId+cycleId for uniqueness)
       const mSales = allSales.filter(s => s.month === opt.value && activeBuyerIds.has(s.buyerId));
       const uniqueSales = new Map<string, number>();
       mSales.forEach(s => {

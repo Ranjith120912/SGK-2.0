@@ -129,24 +129,11 @@ export default function ReportsPage() {
       if (!farmerProfile) return;
 
       if (!map[fid]) {
-        map[fid] = { 
-          id: fid, 
-          can: farmerProfile.canNumber, 
-          name: farmerProfile.name, 
-          milkType: farmerProfile.milkType || "COW", 
-          morningQty: 0, 
-          eveningQty: 0, 
-          totalQty: 0, 
-          totalAmount: 0 
-        };
+        map[fid] = { id: fid, can: farmerProfile.canNumber, name: farmerProfile.name, milkType: farmerProfile.milkType || "COW", morningQty: 0, eveningQty: 0, totalQty: 0, totalAmount: 0 };
       }
 
       const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
-      // PRIORITIZE CUSTOM RATE
-      const rate = Number(farmerProfile.customRate) > 0 
-        ? Number(farmerProfile.customRate) 
-        : (farmerProfile.milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 35));
-
+      const rate = Number(farmerProfile.customRate) > 0 ? Number(farmerProfile.customRate) : (farmerProfile.milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 35));
       const amt = ltr * rate;
       if (e.session === 'Morning') map[fid].morningQty += ltr; else map[fid].eveningQty += ltr;
       map[fid].totalQty += ltr;
@@ -167,23 +154,11 @@ export default function ReportsPage() {
       if (!farmerProfile) return;
 
       if (!map[fid]) {
-        map[fid] = { 
-          id: fid, 
-          can: farmerProfile.canNumber, 
-          name: farmerProfile.name, 
-          milkType: farmerProfile.milkType || "COW", 
-          morningQty: 0, 
-          eveningQty: 0, 
-          totalQty: 0, 
-          totalAmount: 0 
-        };
+        map[fid] = { id: fid, can: farmerProfile.canNumber, name: farmerProfile.name, milkType: farmerProfile.milkType || "COW", morningQty: 0, eveningQty: 0, totalQty: 0, totalAmount: 0 };
       }
 
       const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
-      const rate = Number(farmerProfile.customRate) > 0 
-        ? Number(farmerProfile.customRate) 
-        : (farmerProfile.milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 35));
-
+      const rate = Number(farmerProfile.customRate) > 0 ? Number(farmerProfile.customRate) : (farmerProfile.milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 35));
       const amt = ltr * rate;
       if (e.session === 'Morning') map[fid].morningQty += ltr; else map[fid].eveningQty += ltr;
       map[fid].totalQty += ltr;
@@ -197,18 +172,12 @@ export default function ReportsPage() {
     const cost = cycleRoster.reduce((acc, c) => acc + c.totalAmount, 0);
     const qty = cycleRoster.reduce((acc, c) => acc + c.totalQty, 0);
     
-    // RECONCILIATION: Use Map to ensure only ONE valid amount per active buyer is counted
     const reconciledSalesMap: Record<string, number> = {};
-    allSales?.filter(s => 
-      s.month === selectedMonth && 
-      s.cycleId === activeCycle && 
-      activeBuyerIds.has(s.buyerId)
-    ).forEach(s => {
+    allSales?.filter(s => s.month === selectedMonth && s.cycleId === activeCycle && activeBuyerIds.has(s.buyerId)).forEach(s => {
       reconciledSalesMap[s.buyerId] = Number(s.totalAmount) || 0;
     });
     
     const rev = Object.values(reconciledSalesMap).reduce((acc, val) => acc + val, 0);
-    
     return { qty, cost, rev, profit: rev - cost };
   }, [cycleRoster, allSales, selectedMonth, activeCycle, activeBuyerIds]);
 
@@ -217,10 +186,7 @@ export default function ReportsPage() {
     
     return monthOptions.map((opt) => {
       const mEntries = allEntries.filter(e => e.date.startsWith(opt.value));
-      const mSales = allSales.filter(s => 
-        s.month === opt.value && 
-        activeBuyerIds.has(s.buyerId)
-      );
+      const mSales = allSales.filter(s => s.month === opt.value && activeBuyerIds.has(s.buyerId));
       
       let tCost = 0, tQty = 0;
       mEntries.forEach(e => {
@@ -232,7 +198,6 @@ export default function ReportsPage() {
         tQty += ltr;
       });
 
-      // Monthly Reconciliation: Ensure unique buyer-cycle entries
       const monthlyRevMap: Record<string, number> = {};
       mSales.forEach(s => {
         const key = `${s.buyerId}_${s.cycleId}`;
@@ -240,27 +205,12 @@ export default function ReportsPage() {
       });
       const tRev = Object.values(monthlyRevMap).reduce((acc, val) => acc + val, 0);
 
-      return { 
-        label: opt.label, 
-        value: opt.value, 
-        qty: tQty, 
-        cost: tCost, 
-        revenue: tRev, 
-        profit: tRev - tCost 
-      };
+      return { label: opt.label, value: opt.value, qty: tQty, cost: tCost, revenue: tRev, profit: tRev - tCost };
     });
   }, [allEntries, allSales, farmers, ratesConfig, monthOptions, buyers, activeBuyerIds]);
 
   const handleExportExcel = (roster: any[], title: string) => {
-    const data = roster.map(f => ({ 
-      CAN: f.can, 
-      Name: f.name, 
-      Type: f.milkType, 
-      Morning: f.morningQty.toFixed(2), 
-      Evening: f.eveningQty.toFixed(2), 
-      Total: f.totalQty.toFixed(2), 
-      Payout: f.totalAmount.toFixed(2) 
-    }));
+    const data = roster.map(f => ({ CAN: f.can, Name: f.name, Type: f.milkType, Morning: f.morningQty.toFixed(2), Evening: f.eveningQty.toFixed(2), Total: f.totalQty.toFixed(2), Payout: f.totalAmount.toFixed(2) }));
     const ws = utils.json_to_sheet(data);
     const wb = utils.book_new();
     utils.book_append_sheet(wb, ws, title);
@@ -270,12 +220,8 @@ export default function ReportsPage() {
   const handleMasterReset = async () => {
     setIsResetting(true);
     try {
-      if (allEntries) {
-        for (const e of allEntries) await deleteDoc(doc(firestore!, 'entries', e.id));
-      }
-      if (allSales) {
-        for (const s of allSales) await deleteDoc(doc(firestore!, 'sales', s.id));
-      }
+      if (allEntries) for (const e of allEntries) await deleteDoc(doc(firestore!, 'entries', e.id));
+      if (allSales) for (const s of allSales) await deleteDoc(doc(firestore!, 'sales', s.id));
       toast({ title: "Reset Complete", description: "All entry and sales data wiped." });
     } catch (e) {
       toast({ title: "Reset Failed", variant: "destructive" });
@@ -323,10 +269,7 @@ export default function ReportsPage() {
                     <button 
                       key={i} 
                       onClick={() => setActiveCycle(i)} 
-                      className={cn(
-                        "rounded-full text-[10px] font-black px-4 h-9 transition-all", 
-                        activeCycle === i ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:bg-muted"
-                      )}
+                      className={cn("rounded-full text-[10px] font-black px-4 h-9 transition-all", activeCycle === i ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:bg-muted")}
                     >
                       {c.label}
                     </button>
@@ -344,7 +287,6 @@ export default function ReportsPage() {
                   <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Volume Procurement</p>
                   <p className="text-4xl font-black mt-2">{cycleStats.qty.toFixed(2)} <span className="text-lg">L</span></p>
                 </Card>
-                
                 <Card className="rounded-[2rem] bg-accent text-white p-8 shadow-xl relative overflow-hidden group">
                   <div className="absolute -right-4 -top-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
                     <TrendingUp className="w-32 h-32" />
@@ -352,7 +294,6 @@ export default function ReportsPage() {
                   <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Revenue (Sales)</p>
                   <p className="text-4xl font-black mt-2">₹ {cycleStats.rev.toFixed(2)}</p>
                 </Card>
-
                 <Card className="rounded-[2rem] p-8 border-none bg-rose-500/10 text-rose-600 shadow-sm relative overflow-hidden group">
                   <div className="absolute -right-4 -top-4 opacity-5 group-hover:scale-110 transition-transform duration-500">
                     <CreditCard className="w-32 h-32 text-rose-600" />
@@ -360,7 +301,6 @@ export default function ReportsPage() {
                   <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Total Payouts</p>
                   <p className="text-3xl font-black mt-2">₹ {cycleStats.cost.toFixed(2)}</p>
                 </Card>
-
                 <Card className="rounded-[2rem] p-8 border-none bg-emerald-500/10 text-emerald-600 shadow-sm relative overflow-hidden group">
                   <div className="absolute -right-4 -top-4 opacity-5 group-hover:scale-110 transition-transform duration-500">
                     <IndianRupee className="w-32 h-32 text-emerald-600" />
@@ -442,7 +382,6 @@ export default function ReportsPage() {
                   </Button>
                 </div>
               </div>
-              
               <Card className="rounded-3xl border-none shadow-xl overflow-hidden bg-card/50 backdrop-blur-sm">
                 <Table>
                   <TableHeader className="bg-muted/50 border-b">
@@ -506,7 +445,6 @@ export default function ReportsPage() {
                   </TableBody>
                 </Table>
               </Card>
-
               <div className="flex justify-end pt-4">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
@@ -540,4 +478,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-

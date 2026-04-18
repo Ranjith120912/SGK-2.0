@@ -70,14 +70,8 @@ export default function CycleSalesPage() {
     );
   }, [firestore, selectedMonth, activeCycle]);
 
-  const settingsRef = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return doc(firestore, 'settings', 'milk_rates');
-  }, [firestore]);
-
   const { data: buyers } = useCollection(buyersQuery);
   const { data: sales } = useCollection(salesQuery);
-  const { data: ratesConfig } = useDoc(settingsRef);
 
   const filteredBuyers = buyers?.filter(b => 
     b.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -112,15 +106,12 @@ export default function CycleSalesPage() {
       ? parseFloat(manualAmountStr) 
       : (existingSale ? existingSale.totalAmount : 0);
 
-    // If both quantity and amount are cleared, allow saving 0
     const qtyNum = isNaN(qty) ? 0 : qty;
     const amtNum = isNaN(finalAmount) ? 0 : finalAmount;
-
     const effectiveRate = qtyNum > 0 ? parseFloat((amtNum / qtyNum).toFixed(2)) : 0;
 
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
 
-    // Composite ID to ensure unique record per buyer per cycle
     const saleId = `${buyerId}_${selectedMonth}_C${activeCycle}`;
     const docRef = doc(firestore, 'sales', saleId);
 
@@ -144,19 +135,22 @@ export default function CycleSalesPage() {
   };
 
   const totalCycleRevenue = useMemo(() => {
-    if (!sales || !buyers) return 0;
-    const activeBuyerIds = new Set(buyers.map(b => b.id));
+    if (!buyers) return 0;
     
-    // RECONCILIATION: Map ensures only ONE valid record per buyer is added
-    const reconciledMap: Record<string, number> = {};
-    sales.forEach(s => {
-      if (activeBuyerIds.has(s.buyerId)) {
-        reconciledMap[s.buyerId] = Number(s.totalAmount) || 0;
+    let total = 0;
+    buyers.forEach(buyer => {
+      const localAmount = amountValues[buyer.id];
+      if (localAmount !== undefined && localAmount !== "") {
+        total += parseFloat(localAmount) || 0;
+      } else {
+        const existingSale = sales?.find(s => s.buyerId === buyer.id);
+        if (existingSale) {
+          total += Number(existingSale.totalAmount) || 0;
+        }
       }
     });
-
-    return Object.values(reconciledMap).reduce((acc, val) => acc + val, 0);
-  }, [sales, buyers]);
+    return total;
+  }, [sales, buyers, amountValues]);
 
   if (!isClient) return null;
 
@@ -250,10 +244,8 @@ export default function CycleSalesPage() {
                   filteredBuyers.map((buyer) => {
                     const existingSale = sales?.find(s => s.buyerId === buyer.id);
                     const currentMilkType = milkTypes[buyer.id] || (existingSale ? existingSale.milkType : 'COW');
-                    
                     const currentQtyStr = quantityValues[buyer.id] !== undefined ? quantityValues[buyer.id] : (existingSale ? existingSale.quantity.toString() : "");
                     const currentAmountStr = amountValues[buyer.id] !== undefined ? amountValues[buyer.id] : (existingSale ? existingSale.totalAmount.toString() : "");
-                    
                     const status = savingStatus[buyer.id] || (existingSale ? 'saved' : 'idle');
 
                     return (
@@ -321,4 +313,3 @@ export default function CycleSalesPage() {
     </div>
   );
 }
-

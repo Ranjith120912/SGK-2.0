@@ -18,7 +18,10 @@ import {
   Users,
   FileSpreadsheet,
   FileBarChart,
-  CalendarDays
+  CalendarDays,
+  TrendingUp,
+  TrendingDown,
+  Wallet
 } from "lucide-react";
 import { format, endOfMonth, subMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -135,7 +138,6 @@ export default function ReportsPage() {
 
       const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
       
-      // PRECISION RATE RESOLUTION: Prioritize custom rates (default Cow 35)
       let rate = Number(farmerProfile.customRate) > 0 
         ? Number(farmerProfile.customRate) 
         : (milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 35));
@@ -153,52 +155,6 @@ export default function ReportsPage() {
       return (isNaN(aNum) || isNaN(bNum)) ? a.can.localeCompare(b.can) : aNum - bNum;
     });
   }, [allEntries, farmers, selectedMonth, activeCycle, ratesConfig, currentCycle]);
-
-  const monthlyRoster = useMemo(() => {
-    if (!allEntries || !selectedMonth || !farmers || !ratesConfig) return [];
-    
-    const map: Record<string, any> = {};
-    const monthEntries = allEntries.filter(e => e.date.startsWith(selectedMonth));
-
-    monthEntries.forEach(e => {
-      const fid = e.farmerId;
-      const farmerProfile = farmers.find(f => f.id === fid || f.canNumber === e.canNumber);
-      
-      if (!farmerProfile) return;
-
-      const name = farmerProfile.name;
-      const can = farmerProfile.canNumber;
-      const milkType = farmerProfile.milkType || "COW";
-
-      if (!map[fid]) {
-        map[fid] = {
-          id: fid,
-          can,
-          name,
-          milkType,
-          morningQty: 0, eveningQty: 0, totalQty: 0, totalAmount: 0
-        };
-      }
-
-      const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
-      
-      let rate = Number(farmerProfile.customRate) > 0 
-        ? Number(farmerProfile.customRate) 
-        : (milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 35));
-
-      const amt = ltr * rate;
-      if (e.session === 'Morning') map[fid].morningQty += ltr;
-      else map[fid].eveningQty += ltr;
-      map[fid].totalQty += ltr;
-      map[fid].totalAmount += amt;
-    });
-
-    return Object.values(map).sort((a: any, b: any) => {
-      const aNum = parseInt(a.can);
-      const bNum = parseInt(b.can);
-      return (isNaN(aNum) || isNaN(bNum)) ? a.can.localeCompare(b.can) : aNum - bNum;
-    });
-  }, [allEntries, farmers, selectedMonth, ratesConfig]);
 
   const cycleStats = useMemo(() => {
     const totalProcAmt = cycleRoster.reduce((acc, c) => acc + c.totalAmount, 0);
@@ -390,9 +346,55 @@ export default function ReportsPage() {
             </TabsContent>
 
             <TabsContent value="cycle" className="space-y-6">
+              {/* Financial Summary Header for Cycle Report */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <Card className="rounded-3xl border-none bg-accent/10 p-6 flex items-center gap-4 shadow-sm">
+                  <div className="p-3 bg-accent/20 rounded-2xl">
+                    <TrendingUp className="w-6 h-6 text-accent" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase text-accent/70 tracking-[0.2em]">Revenue (Sales)</p>
+                    <p className="text-2xl font-black text-accent">₹ {cycleStats.saleRev.toFixed(2)}</p>
+                  </div>
+                </Card>
+                <Card className="rounded-3xl border-none bg-rose-500/10 p-6 flex items-center gap-4 shadow-sm">
+                  <div className="p-3 bg-rose-500/20 rounded-2xl">
+                    <TrendingDown className="w-6 h-6 text-rose-600" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase text-rose-600/70 tracking-[0.2em]">Procurement Cost</p>
+                    <p className="text-2xl font-black text-rose-600">₹ {cycleStats.procCost.toFixed(2)}</p>
+                  </div>
+                </Card>
+                <Card className={cn(
+                  "rounded-3xl border-none p-6 flex items-center gap-4 shadow-sm",
+                  cycleStats.profit >= 0 ? "bg-green-500/10" : "bg-rose-500/10"
+                )}>
+                  <div className={cn(
+                    "p-3 rounded-2xl",
+                    cycleStats.profit >= 0 ? "bg-green-500/20" : "bg-rose-500/20"
+                  )}>
+                    <Wallet className={cn(
+                      "w-6 h-6",
+                      cycleStats.profit >= 0 ? "text-green-600" : "text-rose-600"
+                    )} />
+                  </div>
+                  <div>
+                    <p className={cn(
+                      "text-[10px] font-black uppercase tracking-[0.2em]",
+                      cycleStats.profit >= 0 ? "text-green-600/70" : "text-rose-600/70"
+                    )}>Net Cycle Profit</p>
+                    <p className={cn(
+                      "text-2xl font-black",
+                      cycleStats.profit >= 0 ? "text-green-600" : "text-rose-600"
+                    )}>₹ {cycleStats.profit.toFixed(2)}</p>
+                  </div>
+                </Card>
+              </div>
+
               <div className="flex flex-col sm:flex-row justify-between items-center bg-primary p-8 rounded-[2rem] text-white shadow-xl border-none gap-6">
                 <div>
-                  <p className="text-xs font-black uppercase opacity-60 tracking-widest">Cycle Grand Total - {currentCycle?.range}</p>
+                  <p className="text-xs font-black uppercase opacity-60 tracking-widest">Cycle Procurement Total - {currentCycle?.range}</p>
                   <p className="text-4xl font-black mt-1">₹ {cycleStats.procCost.toFixed(2)}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">

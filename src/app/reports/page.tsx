@@ -194,7 +194,7 @@ export default function ReportsPage() {
     const cost = cycleRoster.reduce((acc, c) => acc + c.totalAmount, 0);
     const qty = cycleRoster.reduce((acc, c) => acc + c.totalQty, 0);
     
-    // DIRECT REVENUE SUM: Filter by cycle and active buyers
+    // REVENUE: Filter by cycle and active buyers ONLY to ensure accuracy
     const activeBuyerIds = new Set(buyers?.map(b => b.id) || []);
     const rev = allSales?.filter(s => 
       s.month === selectedMonth && 

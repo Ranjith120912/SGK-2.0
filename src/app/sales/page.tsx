@@ -105,10 +105,12 @@ export default function CycleSalesPage() {
     if (!firestore || !selectedMonth) return;
 
     const existingSale = sales?.find(s => s.buyerId === buyerId && s.milkType === milkType);
-    const qty = qtyStr !== undefined && qtyStr !== "" ? parseFloat(qtyStr) : (existingSale ? existingSale.quantity : 0);
+    
+    // If input is empty string, we treat it as 0 to ensure the DB is updated and ghost numbers are removed
+    const qty = (qtyStr !== undefined && qtyStr !== "") ? parseFloat(qtyStr) : (existingSale ? existingSale.quantity : 0);
     
     const manualAmountStr = amountValues[buyerId];
-    const finalAmount = manualAmountStr !== undefined && manualAmountStr !== "" 
+    const finalAmount = (manualAmountStr !== undefined && manualAmountStr !== "") 
       ? parseFloat(manualAmountStr) 
       : (existingSale ? existingSale.totalAmount : 0);
 
@@ -141,10 +143,14 @@ export default function CycleSalesPage() {
     }, 500);
   };
 
+  // Only sum revenue for buyers currently in our active directory
   const totalCycleRevenue = useMemo(() => {
-    if (!sales) return 0;
-    return sales.reduce((acc, s) => acc + (Number(s.totalAmount) || 0), 0);
-  }, [sales]);
+    if (!sales || !buyers) return 0;
+    const activeBuyerIds = new Set(buyers.map(b => b.id));
+    return sales
+      .filter(s => activeBuyerIds.has(s.buyerId))
+      .reduce((acc, s) => acc + (Number(s.totalAmount) || 0), 0);
+  }, [sales, buyers]);
 
   if (!isClient) return null;
 

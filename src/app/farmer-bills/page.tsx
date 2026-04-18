@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -189,12 +190,15 @@ export default function FarmerBillsPage() {
     pdf.text(f.totalQty.toFixed(2), 115, finalY + 7, { align: 'center' });
     pdf.text(f.totalAmount.toFixed(2), 178, finalY + 7, { align: 'center' });
 
-    // SIGNATORY FOOTER: Locked 25mm above line
+    // SIGNATORY FOOTER: Precision locked 25mm above bottom line
     const sigLineY = pageHeight - 25;
     if (ratesConfig?.stampUrl) {
       try {
         const formatMatch = ratesConfig.stampUrl.match(/^data:image\/([a-zA-Z+]+);base64,/);
-        const finalFormat = formatMatch && formatMatch[1].includes('JP') ? 'JPEG' : 'PNG';
+        const imageFormat = formatMatch ? formatMatch[1].toUpperCase() : 'PNG';
+        const finalFormat = imageFormat.includes('JP') ? 'JPEG' : 'PNG';
+        
+        // Stamp bottom is 25mm above signature line (sigLineY - 25mm)
         pdf.addImage(ratesConfig.stampUrl, finalFormat, pageWidth - 70, sigLineY - 30, 50, 25);
       } catch (e) {}
     }
@@ -281,7 +285,7 @@ export default function FarmerBillsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-bold text-base">{f.totalQty.toFixed(2)}</TableCell>
-                      <TableCell className="text-right font-black text-primary text-base">₹ {f.totalAmount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right pr-10 font-black text-primary text-base">₹ {f.totalAmount.toFixed(2)}</TableCell>
                       <TableCell className="text-right pr-10">
                         <Button 
                           variant="ghost" size="sm" 

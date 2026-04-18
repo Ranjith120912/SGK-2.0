@@ -190,7 +190,7 @@ export default function FarmerBillsPage() {
     pdf.text(f.totalQty.toFixed(2), 115, finalY + 7, { align: 'center' });
     pdf.text(f.totalAmount.toFixed(2), 178, finalY + 7, { align: 'center' });
 
-    // SIGNATORY FOOTER: Precision locked 25mm above bottom line
+    // PRECISION SIGNATORY FOOTER: Stamp BOTTOM edge locked 25mm above signature line
     const sigLineY = pageHeight - 25;
     if (ratesConfig?.stampUrl) {
       try {
@@ -198,11 +198,16 @@ export default function FarmerBillsPage() {
         const imageFormat = formatMatch ? formatMatch[1].toUpperCase() : 'PNG';
         const finalFormat = imageFormat.includes('JP') ? 'JPEG' : 'PNG';
         
-        // Stamp bottom is 25mm above signature line (sigLineY - 25mm)
-        pdf.addImage(ratesConfig.stampUrl, finalFormat, pageWidth - 70, sigLineY - 30, 50, 25);
-      } catch (e) {}
+        // sigLineY is at pageHeight - 25. 
+        // Bottom of stamp should be at sigLineY - 25 = pageHeight - 50.
+        // If stamp height is 25, then top (Y) should be (pageHeight - 50) - 25 = pageHeight - 75.
+        // Or simply relative to sigLineY: Y = sigLineY - 25 (gap) - 25 (height) = sigLineY - 50.
+        pdf.addImage(ratesConfig.stampUrl, finalFormat, pageWidth - 70, sigLineY - 50, 50, 25);
+      } catch (e) {
+        console.error("PDF Stamp Error:", e);
+      }
     }
-    pdf.text("AUTHORIZED SIGNATURE", pageWidth - 20, pageHeight - 20, { align: 'right' });
+    pdf.text("AUTHORIZED SIGNATURE", pageWidth - 20, pageHeight - 15, { align: 'right' });
     pdf.line(pageWidth - 75, sigLineY, pageWidth - 20, sigLineY);
   };
 

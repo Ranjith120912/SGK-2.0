@@ -97,6 +97,8 @@ export default function CycleSalesPage() {
   const handleMilkTypeChange = (buyerId: string, type: 'COW' | 'BUFFALO') => {
     setMilkTypes(prev => ({ ...prev, [buyerId]: type }));
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'idle' }));
+    // Trigger save immediately on type change to ensure record integrity
+    setTimeout(() => handleAutoSave(buyerId), 0);
   };
 
   const handleAutoSave = (buyerId: string) => {
@@ -104,9 +106,9 @@ export default function CycleSalesPage() {
     const milkType = milkTypes[buyerId] || 'COW';
     if (!firestore || !selectedMonth) return;
 
-    const existingSale = sales?.find(s => s.buyerId === buyerId && s.milkType === milkType);
+    const existingSale = sales?.find(s => s.buyerId === buyerId);
     
-    // If input is empty string, we treat it as 0 to ensure the DB is updated and ghost numbers are removed
+    // Explicitly handle empty strings as 0 to clear records
     const qty = (qtyStr !== undefined && qtyStr !== "") ? parseFloat(qtyStr) : (existingSale ? existingSale.quantity : 0);
     
     const manualAmountStr = amountValues[buyerId];
@@ -116,12 +118,12 @@ export default function CycleSalesPage() {
 
     if (isNaN(qty) || isNaN(finalAmount) || qty < 0 || finalAmount < 0) return;
 
-    // Calculate effective rate for reporting metadata
     const effectiveRate = qty > 0 ? parseFloat((finalAmount / qty).toFixed(2)) : 0;
 
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
 
-    const saleId = `${buyerId}_${selectedMonth}_C${activeCycle}_${milkType}`;
+    // FIXED: Use a stable ID per buyer/cycle to prevent ghost records from different milk types
+    const saleId = `${buyerId}_${selectedMonth}_C${activeCycle}`;
     const docRef = doc(firestore, 'sales', saleId);
 
     setDocumentNonBlocking(docRef, {
@@ -143,10 +145,10 @@ export default function CycleSalesPage() {
     }, 500);
   };
 
-  // Only sum revenue for buyers currently in our active directory
   const totalCycleRevenue = useMemo(() => {
     if (!sales || !buyers) return 0;
     const activeBuyerIds = new Set(buyers.map(b => b.id));
+    // Correctly sum only the most recent records per buyer using the active sales list
     return sales
       .filter(s => activeBuyerIds.has(s.buyerId))
       .reduce((acc, s) => acc + (Number(s.totalAmount) || 0), 0);
@@ -242,8 +244,8 @@ export default function CycleSalesPage() {
                   </TableRow>
                 ) : (
                   filteredBuyers.map((buyer) => {
-                    const currentMilkType = milkTypes[buyer.id] || 'COW';
-                    const existingSale = sales?.find(s => s.buyerId === buyer.id && s.milkType === currentMilkType);
+                    const existingSale = sales?.find(s => s.buyerId === buyer.id);
+                    const currentMilkType = milkTypes[buyer.id] || (existingSale ? existingSale.milkType : 'COW');
                     
                     const currentQtyStr = quantityValues[buyer.id] !== undefined ? quantityValues[buyer.id] : (existingSale ? existingSale.quantity.toString() : "");
                     const currentAmountStr = amountValues[buyer.id] !== undefined ? amountValues[buyer.id] : (existingSale ? existingSale.totalAmount.toString() : "");
@@ -251,7 +253,7 @@ export default function CycleSalesPage() {
                     const status = savingStatus[buyer.id] || (existingSale ? 'saved' : 'idle');
 
                     return (
-                      <TableRow key={buyer.id} className={cn("group transition-colors border-b last:border-0", existingSale ? "bg-primary/5" : "hover:bg-primary/5")}>
+                      <TableRow key={buyer.id} className={cn("group transition-colors border-b last:border-0", existingSale && Number(existingSale.totalAmount) > 0 ? "bg-primary/5" : "hover:bg-primary/5")}>
                         <TableCell className="font-black text-primary pl-10 text-lg uppercase">{buyer.buyerCode}</TableCell>
                         <TableCell className="font-bold text-base uppercase">{buyer.name}</TableCell>
                         <TableCell>

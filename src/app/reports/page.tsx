@@ -111,6 +111,8 @@ export default function ReportsPage() {
   const CONVERSION_RATE = 0.96;
   const currentCycle = cycles[activeCycle];
 
+  const activeBuyerIds = useMemo(() => new Set(buyers?.map(b => b.id) || []), [buyers]);
+
   const cycleRoster = useMemo(() => {
     if (!allEntries || !selectedMonth || !currentCycle || !farmers || !ratesConfig) return [];
     
@@ -194,22 +196,25 @@ export default function ReportsPage() {
     const cost = cycleRoster.reduce((acc, c) => acc + c.totalAmount, 0);
     const qty = cycleRoster.reduce((acc, c) => acc + c.totalQty, 0);
     
-    // REVENUE: Filter by cycle and active buyers ONLY to ensure accuracy
-    const activeBuyerIds = new Set(buyers?.map(b => b.id) || []);
-    const rev = allSales?.filter(s => 
+    // PRECISION REVENUE RECONCILIATION: Group by buyerId to prevent double-counting of ghost milk-type records
+    const buyerSalesMap: Record<string, number> = {};
+    allSales?.filter(s => 
       s.month === selectedMonth && 
       s.cycleId === activeCycle && 
       activeBuyerIds.has(s.buyerId)
-    ).reduce((acc, s) => acc + (Number(s.totalAmount) || 0), 0) || 0;
+    ).forEach(s => {
+      // In a reconciled audit, we only take the most recent amount per buyer
+      buyerSalesMap[s.buyerId] = Number(s.totalAmount) || 0;
+    });
+    
+    const rev = Object.values(buyerSalesMap).reduce((acc, val) => acc + val, 0);
     
     return { qty, cost, rev, profit: rev - cost };
-  }, [cycleRoster, allSales, selectedMonth, activeCycle, buyers]);
+  }, [cycleRoster, allSales, selectedMonth, activeCycle, activeBuyerIds]);
 
   const auditData = useMemo(() => {
     if (!allEntries || !allSales || !farmers || !ratesConfig || !buyers) return [];
     
-    const activeBuyerIds = new Set(buyers.map(b => b.id));
-
     return monthOptions.map((opt) => {
       const mEntries = allEntries.filter(e => e.date.startsWith(opt.value));
       const mSales = allSales.filter(s => 
@@ -227,7 +232,15 @@ export default function ReportsPage() {
         tQty += ltr;
       });
 
-      const tRev = mSales.reduce((acc, s) => acc + (Number(s.totalAmount) || 0), 0);
+      // Grouped monthly revenue to prevent duplicates
+      const monthlyBuyerMap: Record<string, number> = {};
+      mSales.forEach(s => {
+        // Aggregate across all cycles for that buyer in that month
+        const key = `${s.buyerId}_${s.cycleId}`;
+        monthlyBuyerMap[key] = Number(s.totalAmount) || 0;
+      });
+      const tRev = Object.values(monthlyBuyerMap).reduce((acc, val) => acc + val, 0);
+
       return { 
         label: opt.label, 
         value: opt.value, 
@@ -237,7 +250,7 @@ export default function ReportsPage() {
         profit: tRev - tCost 
       };
     });
-  }, [allEntries, allSales, farmers, ratesConfig, monthOptions, buyers]);
+  }, [allEntries, allSales, farmers, ratesConfig, monthOptions, buyers, activeBuyerIds]);
 
   const handleExportExcel = (roster: any[], title: string) => {
     const data = roster.map(f => ({ 

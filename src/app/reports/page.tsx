@@ -172,13 +172,18 @@ export default function ReportsPage() {
     const cost = cycleRoster.reduce((acc, c) => acc + c.totalAmount, 0);
     const qty = cycleRoster.reduce((acc, c) => acc + c.totalQty, 0);
     
-    // Buyer-Unique Reconciliation: ensures we only count one valid sales entry per buyer
-    const reconciledSalesMap: Record<string, number> = {};
-    allSales?.filter(s => s.month === selectedMonth && s.cycleId === activeCycle && activeBuyerIds.has(s.buyerId)).forEach(s => {
-      reconciledSalesMap[s.buyerId] = Number(s.totalAmount) || 0;
-    });
-    
-    const rev = Object.values(reconciledSalesMap).reduce((acc, val) => acc + val, 0);
+    // RECONCILIATION: Sum unique buyer sales amounts for active buyers
+    let rev = 0;
+    if (allSales && activeBuyerIds.size > 0) {
+      const uniqueSales = new Map<string, number>();
+      allSales.forEach(s => {
+        if (s.month === selectedMonth && s.cycleId === activeCycle && activeBuyerIds.has(s.buyerId)) {
+          uniqueSales.set(s.buyerId, Number(s.totalAmount) || 0);
+        }
+      });
+      rev = Array.from(uniqueSales.values()).reduce((a, b) => a + b, 0);
+    }
+
     return { qty, cost, rev, profit: rev - cost };
   }, [cycleRoster, allSales, selectedMonth, activeCycle, activeBuyerIds]);
 
@@ -187,7 +192,6 @@ export default function ReportsPage() {
     
     return monthOptions.map((opt) => {
       const mEntries = allEntries.filter(e => e.date.startsWith(opt.value));
-      const mSales = allSales.filter(s => s.month === opt.value && activeBuyerIds.has(s.buyerId));
       
       let tCost = 0, tQty = 0;
       mEntries.forEach(e => {
@@ -199,13 +203,14 @@ export default function ReportsPage() {
         tQty += ltr;
       });
 
-      // Month-wide reconciliation across all cycles
-      const monthlyRevMap: Record<string, number> = {};
+      // RECONCILIATION: Monthly revenue sum across cycles
+      const mSales = allSales.filter(s => s.month === opt.value && activeBuyerIds.has(s.buyerId));
+      const uniqueSales = new Map<string, number>();
       mSales.forEach(s => {
         const key = `${s.buyerId}_${s.cycleId}`;
-        monthlyRevMap[key] = Number(s.totalAmount) || 0;
+        uniqueSales.set(key, Number(s.totalAmount) || 0);
       });
-      const tRev = Object.values(monthlyRevMap).reduce((acc, val) => acc + val, 0);
+      const tRev = Array.from(uniqueSales.values()).reduce((a, b) => a + b, 0);
 
       return { label: opt.label, value: opt.value, qty: tQty, cost: tCost, revenue: tRev, profit: tRev - tCost };
     });

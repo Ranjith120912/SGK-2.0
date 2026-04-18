@@ -102,16 +102,22 @@ export default function CycleSalesPage() {
     if (!firestore || !selectedMonth) return;
 
     const existingSale = sales?.find(s => s.buyerId === buyerId);
-    const qty = (qtyStr !== undefined && qtyStr !== "") ? parseFloat(qtyStr) : (existingSale ? Number(existingSale.quantity) : 0);
-    const amt = (amtStr !== undefined && amtStr !== "") ? parseFloat(amtStr) : (existingSale ? Number(existingSale.totalAmount) : 0);
+    
+    // IF user hasn't touched the field (undefined), use DB.
+    // IF user cleared the field (""), use 0.
+    // IF user typed a value, use it.
+    const qtyNum = qtyStr !== undefined 
+      ? (qtyStr === "" ? 0 : parseFloat(qtyStr)) 
+      : (existingSale ? Number(existingSale.quantity) : 0);
+      
+    const amtNum = amtStr !== undefined 
+      ? (amtStr === "" ? 0 : parseFloat(amtStr)) 
+      : (existingSale ? Number(existingSale.totalAmount) : 0);
 
-    const qtyNum = isNaN(qty) ? 0 : qty;
-    const amtNum = isNaN(amt) ? 0 : amt;
     const effectiveRate = qtyNum > 0 ? parseFloat((amtNum / qtyNum).toFixed(2)) : 0;
 
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
 
-    // Composite key to prevent ghost duplicates
     const saleId = `${buyerId}_${selectedMonth}_C${activeCycle}`;
     const docRef = doc(firestore, 'sales', saleId);
 
@@ -137,22 +143,22 @@ export default function CycleSalesPage() {
   const dynamicGrandTotal = useMemo(() => {
     if (!buyers) return 0;
     
-    // Dynamic calculation: prioritized mapped reconciliation
-    const revenueMap: Record<string, number> = {};
+    // RECONCILIATION: Addition of amounts entered for each buyer
+    const revenueMap = new Map<string, number>();
     
     buyers.forEach(buyer => {
       const localAmt = amountValues[buyer.id];
-      if (localAmt !== undefined && localAmt !== "") {
-        revenueMap[buyer.id] = parseFloat(localAmt) || 0;
+      if (localAmt !== undefined) {
+        // Use local entry (can be 0 if cleared)
+        revenueMap.set(buyer.id, localAmt === "" ? 0 : parseFloat(localAmt) || 0);
       } else {
+        // Fallback to DB
         const dbSale = sales?.find(s => s.buyerId === buyer.id);
-        if (dbSale) {
-          revenueMap[buyer.id] = Number(dbSale.totalAmount) || 0;
-        }
+        revenueMap.set(buyer.id, dbSale ? Number(dbSale.totalAmount) || 0 : 0);
       }
     });
 
-    return Object.values(revenueMap).reduce((acc, val) => acc + val, 0);
+    return Array.from(revenueMap.values()).reduce((acc, val) => acc + val, 0);
   }, [buyers, sales, amountValues]);
 
   if (!isClient) return null;

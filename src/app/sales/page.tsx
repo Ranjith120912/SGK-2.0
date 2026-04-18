@@ -118,6 +118,7 @@ export default function CycleSalesPage() {
 
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
 
+    // Composite ID to ensure unique record per buyer per cycle
     const saleId = `${buyerId}_${selectedMonth}_C${activeCycle}`;
     const docRef = doc(firestore, 'sales', saleId);
 
@@ -144,8 +145,7 @@ export default function CycleSalesPage() {
     if (!sales || !buyers) return 0;
     const activeBuyerIds = new Set(buyers.map(b => b.id));
     
-    // RECONCILIATION: Use a Map to ensure only ONE record per buyer is counted
-    // This removes "Ghost" duplicates from previous historical records
+    // RECONCILIATION: Group by buyerId to ensure only ONE record per buyer is counted
     const reconciledSales: Record<string, number> = {};
     sales.forEach(s => {
       if (activeBuyerIds.has(s.buyerId)) {

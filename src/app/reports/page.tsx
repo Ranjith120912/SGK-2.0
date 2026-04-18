@@ -203,6 +203,7 @@ export default function ReportsPage() {
       s.cycleId === activeCycle && 
       activeBuyerIds.has(s.buyerId)
     ).forEach(s => {
+      // Prioritize the latest record if duplicates exist
       buyerSalesMap[s.buyerId] = Number(s.totalAmount) || 0;
     });
     
@@ -231,12 +232,13 @@ export default function ReportsPage() {
         tQty += ltr;
       });
 
-      const monthlyBuyerCycleMap: Record<string, number> = {};
+      // Aggregate revenue month-wise, ensuring unique buyer entries
+      const monthlyRevMap: Record<string, number> = {};
       mSales.forEach(s => {
         const key = `${s.buyerId}_${s.cycleId}`;
-        monthlyBuyerCycleMap[key] = Number(s.totalAmount) || 0;
+        monthlyRevMap[key] = Number(s.totalAmount) || 0;
       });
-      const tRev = Object.values(monthlyBuyerCycleMap).reduce((acc, val) => acc + val, 0);
+      const tRev = Object.values(monthlyRevMap).reduce((acc, val) => acc + val, 0);
 
       return { 
         label: opt.label, 
@@ -268,8 +270,12 @@ export default function ReportsPage() {
   const handleMasterReset = async () => {
     setIsResetting(true);
     try {
-      if (allEntries) for (const e of allEntries) await deleteDoc(doc(firestore!, 'entries', e.id));
-      if (allSales) for (const s of allSales) await deleteDoc(doc(firestore!, 'sales', s.id));
+      if (allEntries) {
+        for (const e of allEntries) await deleteDoc(doc(firestore!, 'entries', e.id));
+      }
+      if (allSales) {
+        for (const s of allSales) await deleteDoc(doc(firestore!, 'sales', s.id));
+      }
       toast({ title: "Reset Complete", description: "All entry and sales data wiped." });
     } catch (e) {
       toast({ title: "Reset Failed", variant: "destructive" });
@@ -311,7 +317,7 @@ export default function ReportsPage() {
                 <TabsTrigger value="audit" className="rounded-full px-6 py-2 font-black uppercase text-[10px] tracking-widest">Master Log</TabsTrigger>
               </TabsList>
               
-              {activeTab === "cycle" && (
+              {(activeTab === "overview" || activeTab === "cycle") && (
                 <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-full border shadow-sm">
                   {cycles.map((c, i) => (
                     <button 
@@ -512,7 +518,7 @@ export default function ReportsPage() {
                     <AlertDialogHeader>
                       <AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase tracking-tight">
                         <AlertTriangle className="w-5 h-5" /> Irreversible Wipe
-                      </AlertDialogTitle>
+                      </AlertTriangle>
                       <AlertDialogDescription className="font-medium">
                         Are you sure you want to delete ALL historical entries and sales records? This will permanently wipe your audit logs. Directory items (Farmers/Buyers) will remain.
                       </AlertDialogDescription>

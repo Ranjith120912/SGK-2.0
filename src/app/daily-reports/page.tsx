@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -215,7 +216,6 @@ export default function DailyReportsPage() {
         const imageFormat = formatMatch ? formatMatch[1].toUpperCase() : 'PNG';
         const finalFormat = imageFormat.includes('JP') ? 'JPEG' : 'PNG';
         
-        // Locked position: 25mm above bottom
         pdf.addImage(ratesConfig.stampUrl, finalFormat, pageWidth - 60, pageHeight - 50, 40, 25);
       } catch (e) {
         console.error("Failed to add stamp to report PDF:", e);

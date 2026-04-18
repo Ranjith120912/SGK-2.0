@@ -194,7 +194,6 @@ export default function ReportsPage() {
     const cost = cycleRoster.reduce((acc, c) => acc + c.totalAmount, 0);
     const qty = cycleRoster.reduce((acc, c) => acc + c.totalQty, 0);
     
-    // RECONCILIATION ENGINE: Ensures total revenue matches manual entries for the cycle
     let rev = 0;
     if (allSales && buyers) {
       const activeIds = new Set(buyers.map(b => b.id));
@@ -205,7 +204,6 @@ export default function ReportsPage() {
             s.cycleId !== undefined && 
             Number(s.cycleId) === activeCycle && 
             activeIds.has(s.buyerId)) {
-          // Identify the single valid entry for this buyer in the cycle (prevents "Ghost" records)
           uniqueSales.set(s.buyerId, Number(s.totalAmount) || 0);
         }
       });
@@ -230,12 +228,11 @@ export default function ReportsPage() {
         const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
         const rate = Number(f.customRate) > 0 
           ? Number(f.customRate) 
-          : (f.milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(f.milkType === 'COW' ? (ratesConfig.cowRate || 35) : 35)));
+          : (f.milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate || 35)));
         tCost += (ltr * rate);
         tQty += ltr;
       });
 
-      // Monthly revenue sum across cycles for unique buyers
       const mSales = allSales.filter(s => s.month === opt.value && activeIds.has(s.buyerId));
       const uniqueSales = new Map<string, number>();
       mSales.forEach(s => {
@@ -524,4 +521,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-

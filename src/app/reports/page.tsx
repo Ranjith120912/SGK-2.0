@@ -172,10 +172,9 @@ export default function ReportsPage() {
     const cost = cycleRoster.reduce((acc, c) => acc + c.totalAmount, 0);
     const qty = cycleRoster.reduce((acc, c) => acc + c.totalQty, 0);
     
-    // Use a map to reconcile unique buyer amounts for THIS cycle
+    // Buyer-Unique Reconciliation: ensures we only count one valid sales entry per buyer
     const reconciledSalesMap: Record<string, number> = {};
     allSales?.filter(s => s.month === selectedMonth && s.cycleId === activeCycle && activeBuyerIds.has(s.buyerId)).forEach(s => {
-      // Overwrite ensures we only count the latest entry per buyer
       reconciledSalesMap[s.buyerId] = Number(s.totalAmount) || 0;
     });
     
@@ -200,7 +199,7 @@ export default function ReportsPage() {
         tQty += ltr;
       });
 
-      // Month-wide reconciliation across all 3 cycles
+      // Month-wide reconciliation across all cycles
       const monthlyRevMap: Record<string, number> = {};
       mSales.forEach(s => {
         const key = `${s.buyerId}_${s.cycleId}`;

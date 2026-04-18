@@ -111,6 +111,7 @@ export default function CycleSalesPage() {
 
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
 
+    // Composite key to prevent ghost duplicates
     const saleId = `${buyerId}_${selectedMonth}_C${activeCycle}`;
     const docRef = doc(firestore, 'sales', saleId);
 
@@ -136,7 +137,7 @@ export default function CycleSalesPage() {
   const dynamicGrandTotal = useMemo(() => {
     if (!buyers) return 0;
     
-    // Use a map to reconcile unique buyer amounts
+    // Dynamic calculation: prioritized mapped reconciliation
     const revenueMap: Record<string, number> = {};
     
     buyers.forEach(buyer => {

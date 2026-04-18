@@ -202,25 +202,32 @@ export default function ReportsPage() {
 
   // RECONCILED FINANCIALS
   const cycleStats = useMemo(() => {
-    const cost = cycleRoster.reduce((acc, c) => acc + c.totalAmount, 0);
-    const qty = cycleRoster.reduce((acc, c) => acc + c.totalQty, 0);
+    const cost = cycleRoster.reduce((acc, c) => acc + (Number(c.totalAmount) || 0), 0);
+    const qty = cycleRoster.reduce((acc, c) => acc + (Number(c.totalQty) || 0), 0);
     
     let rev = 0;
     if (allSales && buyers) {
-      const uniqueSales = new Map<string, number>();
+      // ROBUST RECONCILIATION: Map keyed by buyerId to ensure exactly 1 record per buyer.
+      // We prioritize documents that match our stable ID format to eliminate ghost data.
+      const uniqueSales = new Map<string, {amount: number, isStable: boolean}>();
       const cycleSalesRecords = allSales.filter(s => 
         s.month === selectedMonth && 
         Number(s.cycleId) === activeCycle
       );
 
       cycleSalesRecords.forEach(s => {
-        // Ensure the buyer still exists in the active directory
-        const buyerExists = buyers.find(b => b.id === s.buyerId);
-        if (buyerExists) {
-          uniqueSales.set(s.buyerId, Number(s.totalAmount) || 0);
+        const isStable = s.id === `${s.buyerId}_${s.month}_C${s.cycleId}`;
+        const existing = uniqueSales.get(s.buyerId);
+        
+        // Update if no record exists OR if current record is "stable" format (overwriting orphans)
+        if (!existing || isStable || !existing.isStable) {
+          uniqueSales.set(s.buyerId, { 
+            amount: Number(s.totalAmount) || 0, 
+            isStable 
+          });
         }
       });
-      rev = Array.from(uniqueSales.values()).reduce((a, b) => a + b, 0);
+      rev = Array.from(uniqueSales.values()).reduce((a, b) => a + b.amount, 0);
     }
 
     return { qty, cost, rev, profit: rev - cost };
@@ -246,15 +253,21 @@ export default function ReportsPage() {
       });
 
       const mSales = allSales.filter(s => s.month === opt.value);
-      const uniqueMonthlySales = new Map<string, number>();
+      // ROBUST MONTHLY RECONCILIATION
+      const uniqueMonthlySales = new Map<string, {amount: number, isStable: boolean}>();
       mSales.forEach(s => {
-        const buyerExists = buyers.find(b => b.id === s.buyerId);
-        if (buyerExists) {
-          const key = `${s.buyerId}_${s.cycleId}`;
-          uniqueMonthlySales.set(key, Number(s.totalAmount) || 0);
+        const key = `${s.buyerId}_${s.cycleId}`;
+        const isStable = s.id === `${s.buyerId}_${s.month}_C${s.cycleId}`;
+        const existing = uniqueMonthlySales.get(key);
+        
+        if (!existing || isStable || !existing.isStable) {
+          uniqueMonthlySales.set(key, { 
+            amount: Number(s.totalAmount) || 0, 
+            isStable 
+          });
         }
       });
-      const tRev = Array.from(uniqueMonthlySales.values()).reduce((a, b) => a + b, 0);
+      const tRev = Array.from(uniqueMonthlySales.values()).reduce((a, b) => a + b.amount, 0);
 
       return { 
         label: opt.label, 

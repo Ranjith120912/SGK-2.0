@@ -111,7 +111,7 @@ export default function ReportsPage() {
   const CONVERSION_RATE = 0.96;
   const currentCycle = cycles[activeCycle];
 
-  // CYCLE PROCUREMENT ROSTER
+  // CYCLE PROCUREMENT ROSTER (Robust Calculation)
   const cycleRoster = useMemo(() => {
     if (!allEntries || !selectedMonth || !currentCycle || !farmers || !ratesConfig) return [];
     
@@ -154,7 +154,7 @@ export default function ReportsPage() {
     return Object.values(map).sort((a: any, b: any) => parseInt(a.can) - parseInt(b.can));
   }, [allEntries, farmers, selectedMonth, activeCycle, ratesConfig, currentCycle]);
 
-  // MONTHLY PROCUREMENT ROSTER
+  // MONTHLY PROCUREMENT ROSTER (Robust Calculation)
   const monthlyRoster = useMemo(() => {
     if (!allEntries || !selectedMonth || !farmers || !ratesConfig) return [];
     const map: Record<string, any> = {};
@@ -192,34 +192,37 @@ export default function ReportsPage() {
     return Object.values(map).sort((a: any, b: any) => parseInt(a.can) - parseInt(b.can));
   }, [allEntries, farmers, selectedMonth, ratesConfig]);
 
-  // RECONCILED CYCLE FINANCIALS
+  // RECONCILED CYCLE FINANCIALS (Strict Reconciliation)
   const cycleStats = useMemo(() => {
     const cost = cycleRoster.reduce((acc, c) => acc + c.totalAmount, 0);
     const qty = cycleRoster.reduce((acc, c) => acc + c.totalQty, 0);
     
     let rev = 0;
     if (allSales && buyers) {
+      // Use a Map to ensure only one sale per active buyer is counted per cycle
       const uniqueSales = new Map<string, number>();
-      allSales.forEach(s => {
-        // Ensure strictly matching cycle and month
-        if (s.month === selectedMonth && 
-            s.cycleId !== undefined && 
-            Number(s.cycleId) === activeCycle) {
-          
-          const buyerExists = buyers.find(b => b.id === s.buyerId);
-          if (buyerExists) {
-            // Priority unique map per buyer prevents "ghost" duplication
-            uniqueSales.set(s.buyerId, Number(s.totalAmount) || 0);
-          }
+      
+      const cycleSalesRecords = allSales.filter(s => 
+        s.month === selectedMonth && 
+        s.cycleId !== undefined && 
+        Number(s.cycleId) === activeCycle
+      );
+
+      cycleSalesRecords.forEach(s => {
+        const buyerExists = buyers.find(b => b.id === s.buyerId);
+        if (buyerExists) {
+          // Stable override ensures the latest entry for this buyer/cycle is used
+          uniqueSales.set(s.buyerId, Number(s.totalAmount) || 0);
         }
       });
+      
       rev = Array.from(uniqueSales.values()).reduce((a, b) => a + b, 0);
     }
 
     return { qty, cost, rev, profit: rev - cost };
   }, [cycleRoster, allSales, selectedMonth, activeCycle, buyers]);
 
-  // MASTER AUDIT LOG (MONTHLY)
+  // MASTER AUDIT LOG (Robust Monthly Sums)
   const auditData = useMemo(() => {
     if (!allEntries || !allSales || !farmers || !ratesConfig || !buyers) return [];
     
@@ -239,18 +242,25 @@ export default function ReportsPage() {
       });
 
       const mSales = allSales.filter(s => s.month === opt.value);
-      const uniqueSales = new Map<string, number>();
+      const uniqueMonthlySales = new Map<string, number>();
       mSales.forEach(s => {
         const buyerExists = buyers.find(b => b.id === s.buyerId);
         if (buyerExists) {
-          // Unique key: buyer + cycle ensures no double-counting
+          // Composite key Buyer + Cycle ensures reconciliation across all 3 monthly cycles
           const key = `${s.buyerId}_${s.cycleId}`;
-          uniqueSales.set(key, Number(s.totalAmount) || 0);
+          uniqueMonthlySales.set(key, Number(s.totalAmount) || 0);
         }
       });
-      const tRev = Array.from(uniqueSales.values()).reduce((a, b) => a + b, 0);
+      const tRev = Array.from(uniqueMonthlySales.values()).reduce((a, b) => a + b, 0);
 
-      return { label: opt.label, value: opt.value, qty: tQty, cost: tCost, revenue: tRev, profit: tRev - tCost };
+      return { 
+        label: opt.label, 
+        value: opt.value, 
+        qty: tQty, 
+        cost: tCost, 
+        revenue: tRev, 
+        profit: tRev - tCost 
+      };
     });
   }, [allEntries, allSales, farmers, ratesConfig, monthOptions, buyers]);
 

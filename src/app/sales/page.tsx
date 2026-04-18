@@ -116,7 +116,7 @@ export default function CycleSalesPage() {
 
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
 
-    // COMPOSITE ID: buyerId_month_cycleId
+    // COMPOSITE ID: buyerId_month_cycleId ensures stability and overwrites ghost data
     const saleId = `${buyerId}_${selectedMonth}_C${activeCycle}`;
     const docRef = doc(firestore, 'sales', saleId);
 

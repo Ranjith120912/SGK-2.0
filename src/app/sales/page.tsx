@@ -103,7 +103,7 @@ export default function CycleSalesPage() {
 
     const existingSale = sales?.find(s => s.buyerId === buyerId);
     
-    // IF input is cleared, we treat as 0 to ensure calculation is accurate
+    // IF input is cleared, treat as 0 to ensure accuracy
     const qtyNum = qtyStr !== undefined 
       ? (qtyStr === "" ? 0 : parseFloat(qtyStr)) 
       : (existingSale ? Number(existingSale.quantity) : 0);
@@ -116,7 +116,7 @@ export default function CycleSalesPage() {
 
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
 
-    // Use a fixed ID to prevent duplicate records for the same buyer/cycle
+    // Use a fixed composite ID to prevent duplicate records for the same buyer/cycle
     const saleId = `${buyerId}_${selectedMonth}_C${activeCycle}`;
     const docRef = doc(firestore, 'sales', saleId);
 
@@ -142,6 +142,7 @@ export default function CycleSalesPage() {
   const dynamicGrandTotal = useMemo(() => {
     if (!buyers) return 0;
     
+    // RECONCILIATION: Sum exactly one amount per buyer from current cycle
     const revenueMap = new Map<string, number>();
     
     buyers.forEach(buyer => {

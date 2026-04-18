@@ -190,6 +190,7 @@ export default function FarmerBillsPage() {
     pdf.text(f.totalQty.toFixed(2), 115, finalY + 7, { align: 'center' });
     pdf.text(f.totalAmount.toFixed(2), 178, finalY + 7, { align: 'center' });
 
+    // RECALIBRATED STAMP POSITION: 25mm above signature line
     const sigLineY = pageHeight - 25;
     if (ratesConfig?.stampUrl) {
       try {

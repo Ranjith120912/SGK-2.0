@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -221,7 +222,7 @@ export default function ReportsPage() {
         const f = farmers.find(item => item.id === e.farmerId || item.canNumber === e.canNumber);
         if (!f) return;
         const ltr = (Number(e.kgWeight) || 0) * CONVERSION_RATE;
-        const rate = Number(f.customRate) > 0 ? Number(f.customRate) : (f.milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(ratesConfig.cowRate) || 35));
+        const rate = Number(f.customRate) > 0 ? Number(f.customRate) : (f.milkType === 'BUFFALO' ? (Number(ratesConfig.buffaloRate) || 0) : (Number(f.milkType === 'COW' ? (Number(ratesConfig.cowRate) || 35) : 35)));
         tCost += (ltr * rate);
         tQty += ltr;
       });
@@ -352,26 +353,31 @@ export default function ReportsPage() {
                   <p className="text-3xl font-black mt-2">₹ {cycleStats.profit.toFixed(2)}</p>
                 </Card>
               </div>
-
-              <Card className="rounded-[2rem] p-8 bg-muted/30 border-dashed border-2 flex flex-col items-center justify-center text-center">
-                <FileText className="w-12 h-12 text-muted-foreground/30 mb-4" />
-                <h3 className="text-sm font-black uppercase tracking-widest text-primary">Precision Audit Note</h3>
-                <p className="text-xs text-muted-foreground mt-2 max-w-lg font-medium">
-                  Financial figures are calculated based on the 0.96 Kg-to-Litre standard. 
-                  Revenue strictly reflects manual entries from the Sales module for currently active buyers.
-                </p>
-              </Card>
             </TabsContent>
 
             <TabsContent value="cycle" className="space-y-6 animate-in fade-in duration-500">
-              <div className="flex flex-col sm:flex-row justify-between items-center bg-primary p-8 rounded-[2rem] text-white gap-6 shadow-xl">
-                <div>
-                  <p className="text-xs font-black uppercase opacity-60 tracking-widest">Cycle Procurement Total - {currentCycle?.range}</p>
-                  <p className="text-4xl font-black mt-1">₹ {cycleStats.cost.toFixed(2)}</p>
+              <div className="bg-primary p-8 rounded-[2rem] text-white shadow-xl">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 flex-grow">
+                    <div>
+                      <p className="text-[10px] font-black uppercase opacity-60 tracking-widest">Cycle Revenue</p>
+                      <p className="text-2xl font-black mt-1">₹ {cycleStats.rev.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase opacity-60 tracking-widest">Cycle Cost</p>
+                      <p className="text-2xl font-black mt-1">₹ {cycleStats.cost.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase opacity-60 tracking-widest">Cycle Profit</p>
+                      <p className={cn("text-2xl font-black mt-1", cycleStats.profit >= 0 ? "text-emerald-300" : "text-rose-300")}>
+                        ₹ {cycleStats.profit.toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                  <Button onClick={() => handleExportExcel(cycleRoster, `Cycle_${currentCycle?.label}`)} className="rounded-full bg-white text-primary px-10 h-12 font-black uppercase text-xs shadow-lg hover:bg-white/90 shrink-0">
+                    <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Cycle
+                  </Button>
                 </div>
-                <Button onClick={() => handleExportExcel(cycleRoster, `Cycle_${currentCycle?.label}`)} className="rounded-full bg-white text-primary px-10 h-12 font-black uppercase text-xs shadow-lg hover:bg-white/90">
-                  <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Export
-                </Button>
               </div>
               
               <Card className="rounded-3xl border-none shadow-xl overflow-hidden bg-card/50 backdrop-blur-sm">
@@ -404,15 +410,6 @@ export default function ReportsPage() {
                       ))
                     )}
                   </TableBody>
-                  {cycleRoster.length > 0 && (
-                    <TableFooter className="bg-muted/20 border-t font-black">
-                      <TableRow className="hover:bg-transparent">
-                        <TableCell colSpan={3} className="pl-10 py-6 uppercase text-[10px] tracking-widest">Cycle Grand Totals</TableCell>
-                        <TableCell className="text-right text-lg">{cycleStats.qty.toFixed(2)} L</TableCell>
-                        <TableCell className="text-right pr-10 text-xl text-primary">₹ {cycleStats.cost.toFixed(2)}</TableCell>
-                      </TableRow>
-                    </TableFooter>
-                  )}
                 </Table>
               </Card>
             </TabsContent>
@@ -423,11 +420,9 @@ export default function ReportsPage() {
                   <p className="text-xs font-black uppercase opacity-60 tracking-widest">Full Monthly Procurement Summary</p>
                   <p className="text-4xl font-black mt-1">₹ {monthlyRoster.reduce((acc, f) => acc + f.totalAmount, 0).toFixed(2)}</p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button onClick={() => handleExportExcel(monthlyRoster, "Monthly_Report")} className="rounded-full bg-white text-accent px-10 h-12 font-black uppercase text-xs shadow-lg hover:bg-white/90">
-                    <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Export
-                  </Button>
-                </div>
+                <Button onClick={() => handleExportExcel(monthlyRoster, "Monthly_Report")} className="rounded-full bg-white text-accent px-10 h-12 font-black uppercase text-xs shadow-lg hover:bg-white/90">
+                  <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Export
+                </Button>
               </div>
               
               <Card className="rounded-3xl border-none shadow-xl overflow-hidden bg-card/50 backdrop-blur-sm">
@@ -460,15 +455,6 @@ export default function ReportsPage() {
                       ))
                     )}
                   </TableBody>
-                  {monthlyRoster.length > 0 && (
-                    <TableFooter className="bg-muted/20 border-t font-black">
-                      <TableRow className="hover:bg-transparent">
-                        <TableCell colSpan={3} className="pl-10 py-6 uppercase text-[10px] tracking-widest">Monthly Grand Totals</TableCell>
-                        <TableCell className="text-right text-lg">{monthlyRoster.reduce((acc, f) => acc + f.totalQty, 0).toFixed(2)} L</TableCell>
-                        <TableCell className="text-right pr-10 text-xl text-accent">₹ {monthlyRoster.reduce((acc, f) => acc + f.totalAmount, 0).toFixed(2)}</TableCell>
-                      </TableRow>
-                    </TableFooter>
-                  )}
                 </Table>
               </Card>
             </TabsContent>

@@ -91,7 +91,6 @@ export default function CycleSalesPage() {
   const handleMilkTypeChange = (buyerId: string, type: 'COW' | 'BUFFALO') => {
     setMilkTypes(prev => ({ ...prev, [buyerId]: type }));
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'idle' }));
-    // Auto-save on type change
     setTimeout(() => handleAutoSave(buyerId), 100);
   };
 
@@ -104,7 +103,6 @@ export default function CycleSalesPage() {
 
     const existingSale = sales?.find(s => s.buyerId === buyerId);
     
-    // Resolve numbers correctly from local state or DB
     const qtyNum = qtyStr !== undefined 
       ? (qtyStr === "" ? 0 : parseFloat(qtyStr)) 
       : (existingSale ? Number(existingSale.quantity) : 0);
@@ -117,7 +115,6 @@ export default function CycleSalesPage() {
 
     setSavingStatus(prev => ({ ...prev, [buyerId]: 'saving' }));
 
-    // Fixed Composite ID: ensure exactly one record per buyer per cycle
     const saleId = `${buyerId}_${selectedMonth}_C${activeCycle}`;
     const docRef = doc(firestore, 'sales', saleId);
 
@@ -140,13 +137,9 @@ export default function CycleSalesPage() {
     }, 500);
   };
 
-  // DYNAMIC GRAND TOTAL: Recalculates instantly as user types
   const dynamicGrandTotal = useMemo(() => {
     if (!buyers) return 0;
-    
-    // Reconcile one amount per buyer in the directory
     const revenueMap = new Map<string, number>();
-    
     buyers.forEach(buyer => {
       const localAmt = amountValues[buyer.id];
       if (localAmt !== undefined) {
@@ -156,7 +149,6 @@ export default function CycleSalesPage() {
         revenueMap.set(buyer.id, dbSale ? Number(dbSale.totalAmount) || 0 : 0);
       }
     });
-
     return Array.from(revenueMap.values()).reduce((acc, val) => acc + val, 0);
   }, [buyers, sales, amountValues]);
 
@@ -192,7 +184,6 @@ export default function CycleSalesPage() {
                     key={i} 
                     onClick={() => {
                       setActiveCycle(i);
-                      // Clear local input cache to avoid stale values between cycles
                       setQuantityValues({});
                       setAmountValues({});
                       setSavingStatus({});
